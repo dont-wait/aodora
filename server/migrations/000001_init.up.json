@@ -1,0 +1,17 @@
+[
+  {
+    "createCollection": "health_checks",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["name", "created_at"],
+        "properties": {
+          "name": { "bsonType": "string" },
+          "created_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  }
+]
