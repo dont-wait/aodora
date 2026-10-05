@@ -1,0 +1,1739 @@
+[
+  {
+    "collMod": "categories",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "name",
+          "slug",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "name": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "slug": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "description": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "bsonType": [
+              "objectId",
+              "null"
+            ]
+          },
+          "is_active": {
+            "bsonType": "bool"
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "id": {
+            "enum": [
+              "co-phuc",
+              "dan-gian",
+              "cach-tan",
+              "hy-su"
+            ]
+          },
+          "product_count": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "price_from": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "badge": {
+            "bsonType": "object",
+            "required": [
+              "label",
+              "variant"
+            ],
+            "properties": {
+              "label": {
+                "bsonType": "string"
+              },
+              "variant": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "surface",
+                  "tertiary",
+                  "primaryContainer",
+                  "secondaryContainer"
+                ]
+              }
+            }
+          },
+          "image": {
+            "bsonType": "object",
+            "required": [
+              "src",
+              "alt"
+            ],
+            "properties": {
+              "src": {
+                "bsonType": "string"
+              },
+              "alt": {
+                "bsonType": "string"
+              }
+            }
+          },
+          "sort_order": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "collMod": "products",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "name",
+          "slug",
+          "category_id",
+          "price",
+          "stock",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "name": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "slug": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "description": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "category_id": {
+            "bsonType": "objectId"
+          },
+          "price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "compare_at_price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "images": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "variants": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "sku",
+                "size",
+                "color",
+                "stock"
+              ],
+              "properties": {
+                "sku": {
+                  "bsonType": "string",
+                  "minLength": 1
+                },
+                "size": {
+                  "bsonType": "string"
+                },
+                "color": {
+                  "bsonType": "string"
+                },
+                "stock": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "stock": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "is_active": {
+            "bsonType": "bool"
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "sku": {
+            "bsonType": "string"
+          },
+          "material": {
+            "bsonType": "string"
+          },
+          "old_price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "collection": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "image": {
+            "bsonType": "object",
+            "required": [
+              "src",
+              "alt"
+            ],
+            "properties": {
+              "src": {
+                "bsonType": "string"
+              },
+              "alt": {
+                "bsonType": "string"
+              }
+            }
+          },
+          "gallery": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "src",
+                "alt"
+              ],
+              "properties": {
+                "src": {
+                  "bsonType": "string"
+                },
+                "alt": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "badge": {
+            "bsonType": "object",
+            "required": [
+              "label",
+              "variant"
+            ],
+            "properties": {
+              "label": {
+                "bsonType": "string"
+              },
+              "variant": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "surface",
+                  "tertiary",
+                  "primaryContainer",
+                  "secondaryContainer"
+                ]
+              }
+            }
+          },
+          "tag": {
+            "bsonType": "object",
+            "required": [
+              "label",
+              "variant"
+            ],
+            "properties": {
+              "label": {
+                "bsonType": "string"
+              },
+              "variant": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "surface",
+                  "tertiary",
+                  "primaryContainer",
+                  "secondaryContainer"
+                ]
+              }
+            }
+          },
+          "colors": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "properties": {
+                "name": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "hex": {
+                  "bsonType": "string"
+                }
+              },
+              "required": [
+                "hex"
+              ]
+            }
+          },
+          "color_note": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "sizes": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "bespoke": {
+            "bsonType": "bool"
+          },
+          "cta": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "bundle": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "rating": {
+            "bsonType": [
+              "int",
+              "long",
+              "double",
+              "decimal"
+            ],
+            "minimum": 0,
+            "maximum": 5
+          },
+          "review_count": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "discount": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "availability": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "accessories": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "properties": {
+                "id": {
+                  "bsonType": "string"
+                },
+                "name": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                },
+                "price": {
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "decimal"
+                  ],
+                  "minimum": 0
+                },
+                "tag": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tag_variant": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "image": {
+                  "bsonType": "object",
+                  "required": [
+                    "src",
+                    "alt"
+                  ],
+                  "properties": {
+                    "src": {
+                      "bsonType": "string"
+                    },
+                    "alt": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "price",
+                "image"
+              ]
+            }
+          },
+          "trust": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "title",
+                "description"
+              ],
+              "properties": {
+                "icon": {
+                  "bsonType": "string"
+                },
+                "title": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "story": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "paragraphs": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "string"
+                }
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              }
+            }
+          },
+          "fabric": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              },
+              "care": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "title",
+                    "description"
+                  ],
+                  "properties": {
+                    "icon": {
+                      "bsonType": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "bsonType": "string"
+                    },
+                    "description": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "craft": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              },
+              "steps": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "title",
+                    "description"
+                  ],
+                  "properties": {
+                    "title": {
+                      "bsonType": "string"
+                    },
+                    "description": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "collMod": "customers",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "full_name",
+          "email",
+          "password_hash",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "full_name": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "email": {
+            "bsonType": "string",
+            "minLength": 3
+          },
+          "password_hash": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "phone": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "addresses": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "recipient",
+                "phone",
+                "line1",
+                "city"
+              ],
+              "properties": {
+                "recipient": {
+                  "bsonType": "string"
+                },
+                "phone": {
+                  "bsonType": "string"
+                },
+                "line1": {
+                  "bsonType": "string"
+                },
+                "ward": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "district": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "city": {
+                  "bsonType": "string"
+                },
+                "is_default": {
+                  "bsonType": "bool"
+                }
+              }
+            }
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "measurement_profile": {
+            "bsonType": "object",
+            "properties": {
+              "body": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "neck_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "bust_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "waist_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "hips_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "shoulder_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "sleeve_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "garment_length_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              }
+            }
+          },
+          "measurement_notes": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "wishlist_product_ids": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "objectId"
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "collMod": "orders",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "customer_id",
+          "items",
+          "subtotal",
+          "shipping_fee",
+          "total",
+          "status",
+          "payment_method",
+          "payment_status",
+          "shipping_address",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "items": {
+            "bsonType": "array",
+            "minItems": 1,
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "product_id",
+                "product_name",
+                "sku",
+                "quantity",
+                "unit_price"
+              ],
+              "properties": {
+                "product_id": {
+                  "bsonType": "objectId"
+                },
+                "product_name": {
+                  "bsonType": "string"
+                },
+                "sku": {
+                  "bsonType": "string"
+                },
+                "size": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "color": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 1
+                },
+                "unit_price": {
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "decimal"
+                  ],
+                  "minimum": 0
+                },
+                "color_hex": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fulfillment_mode": {
+                  "enum": [
+                    "ready",
+                    "custom"
+                  ]
+                },
+                "measurements": {
+                  "bsonType": "object",
+                  "properties": {
+                    "body": {
+                      "bsonType": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "neck_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "bust_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "waist_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "hips_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "shoulder_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "sleeve_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "garment_length_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "subtotal": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "shipping_fee": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "total": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "shipping",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "payment_method": {
+            "enum": [
+              "cod",
+              "bank_transfer",
+              "card",
+              "e_wallet"
+            ]
+          },
+          "payment_status": {
+            "enum": [
+              "unpaid",
+              "paid",
+              "refunded"
+            ]
+          },
+          "shipping_address": {
+            "bsonType": "object",
+            "required": [
+              "recipient",
+              "phone",
+              "line1",
+              "city"
+            ],
+            "properties": {
+              "recipient": {
+                "bsonType": "string"
+              },
+              "phone": {
+                "bsonType": "string"
+              },
+              "line1": {
+                "bsonType": "string"
+              },
+              "ward": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "district": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "city": {
+                "bsonType": "string"
+              }
+            }
+          },
+          "note": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "order_number": {
+            "bsonType": "string"
+          },
+          "fulfillment_mode": {
+            "enum": [
+              "ready",
+              "custom"
+            ]
+          },
+          "tailoring_request_id": {
+            "bsonType": [
+              "objectId",
+              "null"
+            ]
+          },
+          "measurement_profile": {
+            "bsonType": "object",
+            "properties": {
+              "body": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "neck_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "bust_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "waist_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "hips_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "shoulder_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "sleeve_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "garment_length_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "collMod": "carts",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "customer_id",
+          "items",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "items": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "product_id",
+                "sku",
+                "quantity"
+              ],
+              "properties": {
+                "product_id": {
+                  "bsonType": "objectId"
+                },
+                "sku": {
+                  "bsonType": "string"
+                },
+                "quantity": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 1
+                },
+                "added_at": {
+                  "bsonType": "date"
+                },
+                "color_name": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "color_hex": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fulfillment_mode": {
+                  "enum": [
+                    "ready",
+                    "custom"
+                  ]
+                },
+                "unit_price": {
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "decimal"
+                  ],
+                  "minimum": 0
+                },
+                "measurements": {
+                  "bsonType": "object",
+                  "properties": {
+                    "body": {
+                      "bsonType": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "neck_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "bust_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "waist_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "hips_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "shoulder_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "sleeve_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    },
+                    "garment_length_cm": {
+                      "bsonType": [
+                        "int",
+                        "long",
+                        "double",
+                        "decimal"
+                      ],
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "fulfillment_mode": {
+            "enum": [
+              "ready",
+              "custom"
+            ]
+          },
+          "measurement_profile": {
+            "bsonType": "object",
+            "properties": {
+              "body": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "neck_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "bust_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "waist_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "hips_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "shoulder_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "sleeve_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "garment_length_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "collMod": "reviews",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "product_id",
+          "customer_id",
+          "rating",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "product_id": {
+            "bsonType": "objectId"
+          },
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "rating": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "content": {
+            "bsonType": "string"
+          },
+          "display_name": {
+            "bsonType": "string"
+          },
+          "initials": {
+            "bsonType": "string"
+          },
+          "location": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "meta": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "purchase_mode": {
+            "enum": [
+              "ready",
+              "custom"
+            ]
+          },
+          "purchase_size": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "verified_purchase": {
+            "bsonType": "bool"
+          },
+          "images": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "src",
+                "alt"
+              ],
+              "properties": {
+                "src": {
+                  "bsonType": "string"
+                },
+                "alt": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "create": "tailoring_requests",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+          "_id": {
+            "bsonType": "objectId"
+          },
+          "customer_id": {
+            "bsonType": [
+              "objectId",
+              "null"
+            ]
+          },
+          "full_name": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "phone": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "preferred_contact": {
+            "enum": [
+              "phone",
+              "zalo"
+            ]
+          },
+          "category_id": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "product_id": {
+            "bsonType": [
+              "objectId",
+              "null"
+            ]
+          },
+          "product_slug": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "measurements": {
+            "bsonType": "object",
+            "properties": {
+              "body": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "neck_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "bust_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "waist_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "hips_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "shoulder_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "sleeve_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              },
+              "garment_length_cm": {
+                "bsonType": [
+                  "int",
+                  "long",
+                  "double",
+                  "decimal"
+                ],
+                "minimum": 0
+              }
+            }
+          },
+          "notes": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "submitted",
+              "contacted",
+              "consultation_scheduled",
+              "measurement_confirmed",
+              "in_progress",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "appointment_at": {
+            "bsonType": [
+              "date",
+              "null"
+            ]
+          },
+          "assigned_staff": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          }
+        },
+        "required": [
+          "full_name",
+          "phone",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "createIndexes": "tailoring_requests",
+    "indexes": [
+      {
+        "key": {
+          "phone": 1,
+          "created_at": -1
+        },
+        "name": "ix_tailoring_requests_phone_created"
+      },
+      {
+        "key": {
+          "status": 1,
+          "created_at": -1
+        },
+        "name": "ix_tailoring_requests_status_created"
+      },
+      {
+        "key": {
+          "customer_id": 1,
+          "created_at": -1
+        },
+        "name": "ix_tailoring_requests_customer_created",
+        "sparse": true
+      }
+    ]
+  },
+  {
+    "insert": "tailoring_requests",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "6d0000000000000000000001"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000001"
+        },
+        "full_name": "Nguyễn Minh An",
+        "phone": "0900000001",
+        "preferred_contact": "zalo",
+        "category_id": "co-phuc",
+        "product_id": {
+          "$oid": "680000000000000000000001"
+        },
+        "product_slug": "ao-thun-basic-cotton",
+        "measurements": {
+          "body": "1m62 / 52kg",
+          "neck_cm": 34,
+          "bust_cm": 86,
+          "waist_cm": 65,
+          "hips_cm": 92,
+          "shoulder_cm": 37,
+          "sleeve_cm": 56,
+          "garment_length_cm": 138
+        },
+        "notes": "Khách muốn được tư vấn phom áo và độ dài tà.",
+        "status": "submitted",
+        "appointment_at": null,
+        "assigned_staff": null,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  }
+]

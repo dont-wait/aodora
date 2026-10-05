@@ -1,6 +1,6 @@
 [
   {
-    "createCollection": "health_checks",
+    "create": "health_checks",
     "validator": {
       "$jsonSchema": {
         "bsonType": "object",

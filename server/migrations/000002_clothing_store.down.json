@@ -1,0 +1,8 @@
+[
+  { "drop": "reviews" },
+  { "drop": "carts" },
+  { "drop": "orders" },
+  { "drop": "customers" },
+  { "drop": "products" },
+  { "drop": "categories" }
+]

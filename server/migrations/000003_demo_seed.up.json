@@ -1,0 +1,532 @@
+[
+  {
+    "insert": "categories",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "670000000000000000000001"
+        },
+        "name": "Áo nam",
+        "slug": "ao-nam",
+        "description": "Áo thun và áo sơ mi nam",
+        "parent_id": null,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "670000000000000000000002"
+        },
+        "name": "Quần nam",
+        "slug": "quan-nam",
+        "description": "Quần dài và quần short nam",
+        "parent_id": null,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "670000000000000000000003"
+        },
+        "name": "Thời trang nữ",
+        "slug": "thoi-trang-nu",
+        "description": "Trang phục nữ",
+        "parent_id": null,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "insert": "products",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "680000000000000000000001"
+        },
+        "name": "Áo thun basic cotton",
+        "slug": "ao-thun-basic-cotton",
+        "description": "Áo thun cotton thoáng mát, form regular.",
+        "category_id": {
+          "$oid": "670000000000000000000001"
+        },
+        "price": {
+          "$numberLong": "199000"
+        },
+        "compare_at_price": {
+          "$numberLong": "249000"
+        },
+        "images": [
+          "https://example.com/products/ao-thun-basic.jpg"
+        ],
+        "variants": [
+          {
+            "sku": "ATBC-DEN-M",
+            "size": "M",
+            "color": "Đen",
+            "stock": 18
+          },
+          {
+            "sku": "ATBC-TRANG-L",
+            "size": "L",
+            "color": "Trắng",
+            "stock": 12
+          }
+        ],
+        "stock": 30,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "680000000000000000000002"
+        },
+        "name": "Áo sơ mi Oxford",
+        "slug": "ao-so-mi-oxford",
+        "description": "Áo sơ mi Oxford phù hợp đi làm và đi chơi.",
+        "category_id": {
+          "$oid": "670000000000000000000001"
+        },
+        "price": {
+          "$numberLong": "389000"
+        },
+        "compare_at_price": null,
+        "images": [
+          "https://example.com/products/so-mi-oxford.jpg"
+        ],
+        "variants": [
+          {
+            "sku": "SMOX-XANH-L",
+            "size": "L",
+            "color": "Xanh nhạt",
+            "stock": 9
+          }
+        ],
+        "stock": 9,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "680000000000000000000003"
+        },
+        "name": "Quần jeans slim fit",
+        "slug": "quan-jeans-slim-fit",
+        "description": "Quần jeans co giãn nhẹ, dáng slim fit.",
+        "category_id": {
+          "$oid": "670000000000000000000002"
+        },
+        "price": {
+          "$numberLong": "459000"
+        },
+        "compare_at_price": null,
+        "images": [
+          "https://example.com/products/jeans-slim.jpg"
+        ],
+        "variants": [
+          {
+            "sku": "QJSL-XANH-32",
+            "size": "32",
+            "color": "Xanh denim",
+            "stock": 7
+          }
+        ],
+        "stock": 7,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "680000000000000000000004"
+        },
+        "name": "Đầm midi hoa nhí",
+        "slug": "dam-midi-hoa-nhi",
+        "description": "Đầm midi nhẹ nhàng cho ngày hè.",
+        "category_id": {
+          "$oid": "670000000000000000000003"
+        },
+        "price": {
+          "$numberLong": "529000"
+        },
+        "compare_at_price": {
+          "$numberLong": "599000"
+        },
+        "images": [
+          "https://example.com/products/dam-midi.jpg"
+        ],
+        "variants": [
+          {
+            "sku": "DMHN-HOA-M",
+            "size": "M",
+            "color": "Hoa nhí",
+            "stock": 5
+          }
+        ],
+        "stock": 5,
+        "is_active": true,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "insert": "customers",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "690000000000000000000001"
+        },
+        "full_name": "Nguyễn Minh An",
+        "email": "an.demo@example.com",
+        "password_hash": "DEMO_ONLY_NOT_A_VALID_PASSWORD_HASH",
+        "phone": "0900000001",
+        "addresses": [
+          {
+            "recipient": "Nguyễn Minh An",
+            "phone": "0900000001",
+            "line1": "12 Nguyễn Huệ",
+            "ward": "Bến Nghé",
+            "district": "Quận 1",
+            "city": "TP. Hồ Chí Minh",
+            "is_default": true
+          }
+        ],
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "690000000000000000000002"
+        },
+        "full_name": "Trần Thu Hà",
+        "email": "ha.demo@example.com",
+        "password_hash": "DEMO_ONLY_NOT_A_VALID_PASSWORD_HASH",
+        "phone": "0900000002",
+        "addresses": [
+          {
+            "recipient": "Trần Thu Hà",
+            "phone": "0900000002",
+            "line1": "25 Lê Lợi",
+            "ward": "Bến Thành",
+            "district": "Quận 1",
+            "city": "TP. Hồ Chí Minh",
+            "is_default": true
+          }
+        ],
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "insert": "orders",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "6a0000000000000000000001"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000001"
+        },
+        "items": [
+          {
+            "product_id": {
+              "$oid": "680000000000000000000001"
+            },
+            "product_name": "Áo thun basic cotton",
+            "sku": "ATBC-DEN-M",
+            "size": "M",
+            "color": "Đen",
+            "quantity": 2,
+            "unit_price": {
+              "$numberLong": "199000"
+            }
+          }
+        ],
+        "subtotal": {
+          "$numberLong": "398000"
+        },
+        "shipping_fee": {
+          "$numberLong": "30000"
+        },
+        "total": {
+          "$numberLong": "428000"
+        },
+        "status": "delivered",
+        "payment_method": "cod",
+        "payment_status": "paid",
+        "shipping_address": {
+          "recipient": "Nguyễn Minh An",
+          "phone": "0900000001",
+          "line1": "12 Nguyễn Huệ",
+          "ward": "Bến Nghé",
+          "district": "Quận 1",
+          "city": "TP. Hồ Chí Minh"
+        },
+        "note": "Gọi trước khi giao",
+        "created_at": {
+          "$date": {
+            "$numberLong": "1790843400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791021600000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "6a0000000000000000000002"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000002"
+        },
+        "items": [
+          {
+            "product_id": {
+              "$oid": "680000000000000000000004"
+            },
+            "product_name": "Đầm midi hoa nhí",
+            "sku": "DMHN-HOA-M",
+            "size": "M",
+            "color": "Hoa nhí",
+            "quantity": 1,
+            "unit_price": {
+              "$numberLong": "529000"
+            }
+          }
+        ],
+        "subtotal": {
+          "$numberLong": "529000"
+        },
+        "shipping_fee": {
+          "$numberLong": "25000"
+        },
+        "total": {
+          "$numberLong": "554000"
+        },
+        "status": "shipping",
+        "payment_method": "e_wallet",
+        "payment_status": "paid",
+        "shipping_address": {
+          "recipient": "Trần Thu Hà",
+          "phone": "0900000002",
+          "line1": "25 Lê Lợi",
+          "ward": "Bến Thành",
+          "district": "Quận 1",
+          "city": "TP. Hồ Chí Minh"
+        },
+        "note": null,
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791123300000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791165600000"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "insert": "carts",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "6b0000000000000000000001"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000001"
+        },
+        "items": [
+          {
+            "product_id": {
+              "$oid": "680000000000000000000002"
+            },
+            "sku": "SMOX-XANH-L",
+            "quantity": 1,
+            "added_at": {
+              "$date": {
+                "$numberLong": "1791158400000"
+              }
+            }
+          }
+        ],
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "6b0000000000000000000002"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000002"
+        },
+        "items": [
+          {
+            "product_id": {
+              "$oid": "680000000000000000000003"
+            },
+            "sku": "QJSL-XANH-32",
+            "quantity": 1,
+            "added_at": {
+              "$date": {
+                "$numberLong": "1791158400000"
+              }
+            }
+          }
+        ],
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "insert": "reviews",
+    "documents": [
+      {
+        "_id": {
+          "$oid": "6c0000000000000000000001"
+        },
+        "product_id": {
+          "$oid": "680000000000000000000001"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000001"
+        },
+        "rating": 5,
+        "comment": "Vải mềm, mặc thoải mái.",
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791100800000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791100800000"
+          }
+        }
+      },
+      {
+        "_id": {
+          "$oid": "6c0000000000000000000002"
+        },
+        "product_id": {
+          "$oid": "680000000000000000000004"
+        },
+        "customer_id": {
+          "$oid": "690000000000000000000002"
+        },
+        "rating": 4,
+        "comment": "Mẫu đẹp, giao hàng nhanh.",
+        "created_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        },
+        "updated_at": {
+          "$date": {
+            "$numberLong": "1791158400000"
+          }
+        }
+      }
+    ]
+  }
+]

@@ -107,7 +107,7 @@ func LoadLogConfig() (LogConfig, error) {
 func LoadMongoConfig() (MongoConfig, error) {
 	cfg := MongoConfig{
 		URI: envOr("MONGO_URI", "mongodb://localhost:27017"),
-		DB:  envOr("MONGO_DB", "aodora"),
+		DB:  envOr("MONGO_DB", "QuanLyBanQuanAo"),
 	}
 	if strings.TrimSpace(cfg.URI) == "" {
 		return MongoConfig{}, errors.New("MONGO_URI must not be empty")

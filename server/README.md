@@ -47,6 +47,12 @@ make migrate-up-one
 make migrate-down
 ```
 
+Schema, validator, index và mapping field từ client được mô tả tại [docs/database-schema.md](docs/database-schema.md). `make migrate-up` tạo collection bán hàng, seed demo và thêm `tailoring_requests` để lưu form may đo. Database mặc định là `QuanLyBanQuanAo` theo tài liệu đề tài; có thể đổi bằng `MONGO_DB`.
+
+Sơ đồ có thể mở/chỉnh sửa bằng draw.io tại [docs/database-schema.drawio](docs/database-schema.drawio), hoặc xem nhanh bản [SVG](docs/database-schema.svg).
+
+Kết nối MongoDB local bằng Compass/Navicat: host `localhost`, port `27017`, authentication database `admin`, username/password mặc định `aodora` / `aodora`, database `QuanLyBanQuanAo`. Connection string: `mongodb://aodora:aodora@localhost:27017/QuanLyBanQuanAo?authSource=admin`. Nếu đã đổi `MONGO_ROOT_USERNAME` hoặc `MONGO_ROOT_PASSWORD`, dùng giá trị tương ứng trong `.env`.
+
 ## Quy ước mở rộng
 
 - Mỗi business capability có package riêng trong `internal/domain` và `internal/application`.
