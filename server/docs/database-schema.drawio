@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net" modified="2026-10-05T10:20:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="aodora-mongo-schema" name="Aodora MongoDB Schema">
+    <mxGraphModel dx="1850" dy="1450" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1850" pageHeight="1450" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="categories" value="&lt;b&gt;categories&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId&lt;br&gt;id: co-phuc | dan-gian | cach-tan | hy-su&lt;br&gt;name, slug, description&lt;br&gt;product_count (aggregate)&lt;br&gt;price_from: number VND&lt;br&gt;badge: label + UI variant&lt;br&gt;image: src, alt&lt;br&gt;parent_id: ObjectId?&lt;br&gt;sort_order, is_active&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#eff6ff;strokeColor=#3b82f6;fontColor=#172554;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="400" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="products" value="&lt;b&gt;products&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId; category_id → categories&lt;br&gt;slug, sku, name, collection&lt;br&gt;material, description&lt;br&gt;price, old_price, compare_at_price (VND)&lt;br&gt;image{src,alt}; gallery[{src,alt}]&lt;br&gt;badge{label,variant}; tag?&lt;br&gt;colors[{name,hex}], color_note&lt;br&gt;sizes[]; variants[{sku,size,color,stock}]&lt;br&gt;stock, is_active&lt;br&gt;bespoke, cta, bundle, availability&lt;br&gt;rating, review_count, discount&lt;br&gt;accessories[{name,description,price,image}]&lt;br&gt;trust[{icon,title,description}]&lt;br&gt;story{eyebrow,title,paragraphs[],image}&lt;br&gt;fabric{title,description,image,care[]}&lt;br&gt;craft{title,description,image,steps[]}&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#eff6ff;strokeColor=#3b82f6;fontColor=#172554;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="480" y="100" width="530" height="500" as="geometry"/>
+        </mxCell>
+        <mxCell id="customers" value="&lt;b&gt;customers&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId&lt;br&gt;full_name, email (unique lowercase)&lt;br&gt;password_hash, phone&lt;br&gt;addresses[{recipient,phone,line1,ward,&lt;br&gt;  district,city,is_default}]&lt;br&gt;measurement_profile: body, neck_cm, bust_cm,&lt;br&gt;  waist_cm, hips_cm, shoulder_cm, sleeve_cm,&lt;br&gt;  garment_length_cm&lt;br&gt;measurement_notes&lt;br&gt;wishlist_product_ids: ObjectId[]&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f0fdf4;strokeColor=#22c55e;fontColor=#14532d;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="100" width="450" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="orders" value="&lt;b&gt;orders&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id, order_number, customer_id&lt;br&gt;fulfillment_mode: ready | custom&lt;br&gt;tailoring_request_id?, measurement_profile?&lt;br&gt;items[{product_id,product_name,sku,quantity,&lt;br&gt;  size,color,color_hex,unit_price,measurements}]&lt;br&gt;subtotal, shipping_fee, total (VND)&lt;br&gt;status: pending | confirmed | shipping |&lt;br&gt;  delivered | cancelled&lt;br&gt;payment_method, payment_status&lt;br&gt;shipping_address snapshot, note?&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff7ed;strokeColor=#f97316;fontColor=#7c2d12;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="540" width="500" height="430" as="geometry"/>
+        </mxCell>
+        <mxCell id="reviews" value="&lt;b&gt;reviews&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId&lt;br&gt;product_id → products&lt;br&gt;customer_id → customers&lt;br&gt;rating: 1–5, content&lt;br&gt;display_name, initials, location&lt;br&gt;meta: purchase/time label&lt;br&gt;purchase_mode: ready | custom&lt;br&gt;purchase_size, verified_purchase&lt;br&gt;images[{src,alt}]&lt;br&gt;unique customer_id + product_id&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#faf5ff;strokeColor=#a855f7;fontColor=#581c87;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="700" width="400" height="360" as="geometry"/>
+        </mxCell>
+        <mxCell id="carts" value="&lt;b&gt;carts&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId&lt;br&gt;customer_id → customers (unique)&lt;br&gt;fulfillment_mode: ready | custom&lt;br&gt;items[{product_id,sku,quantity,size,color_name,&lt;br&gt;  color_hex,unit_price,measurements,added_at}]&lt;br&gt;measurement_profile?&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f0fdf4;strokeColor=#22c55e;fontColor=#14532d;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="480" y="700" width="530" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="tailoring_requests" value="&lt;b&gt;tailoring_requests&lt;/b&gt;&lt;br&gt;&lt;font color='#64748b'&gt;Collection&lt;/font&gt;&lt;hr&gt;_id: ObjectId; customer_id?&lt;br&gt;full_name, phone (form required)&lt;br&gt;preferred_contact: phone | zalo&lt;br&gt;category_id?, product_id?, product_slug?&lt;br&gt;measurements.body: height/weight text&lt;br&gt;measurements: neck_cm, bust_cm, waist_cm,&lt;br&gt;  hips_cm, shoulder_cm, sleeve_cm,&lt;br&gt;  garment_length_cm&lt;br&gt;notes: body shape / hem requirements&lt;br&gt;status: submitted → contacted → ... → completed&lt;br&gt;appointment_at?, assigned_staff?&lt;br&gt;created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ecfeff;strokeColor=#06b6d4;fontColor=#164e63;align=left;verticalAlign=top;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="1030" width="500" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-1" value="1 : N  category_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="categories" target="products">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-2" value="1 : N  customer_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="customers" target="orders">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-3" value="1 : 1  customer_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="customers" target="carts">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-4" value="1 : N  item product snapshot" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="products" target="orders">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-5" value="1 : N  product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="products" target="reviews">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-6" value="1 : N  customer_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="customers" target="reviews">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-7" value="1 : N  optional customer_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="customers" target="tailoring_requests">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-8" value="optional product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="products" target="tailoring_requests">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-9" value="optional tailoring_request_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#64748b;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="tailoring_requests" target="orders">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="note" value="MongoDB refs use ObjectId; no foreign keys. Prices are whole VND. rating/count fields are derived display values." style="shape=note;whiteSpace=wrap;html=1;fillColor=#fffbeb;strokeColor=#f59e0b;fontColor=#78350f;size=15;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1110" width="900" height="90" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

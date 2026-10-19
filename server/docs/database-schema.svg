@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1850" height="1450" viewBox="0 0 1850 1450" role="img" aria-labelledby="title desc">
+<title id="title">QuanLyBanQuanAo MongoDB schema</title><desc id="desc">Seven collections with client-derived catalog, tailoring, order, cart, and review fields.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+<style>text{font-family:Inter,Arial,sans-serif;fill:#172033}.title{font-size:30px;font-weight:700}.subtitle{font-size:15px;fill:#64748b}.box{stroke-width:2;rx:14}.head{font-size:20px;font-weight:700}.kind{font-size:12px;fill:#64748b}.field{font-size:14px}.edge{fill:none;stroke:#64748b;stroke-width:2;marker-end:url(#arrow)}.edge-label{font-size:12px;fill:#475569;paint-order:stroke;stroke:#f8fafc;stroke-width:5px;stroke-linejoin:round}.note{font-size:13px;fill:#78350f}</style></defs>
+<rect width="100%" height="100%" fill="#f8fafc"/><text x="40" y="42" class="title">QuanLyBanQuanAo · MongoDB</text><text x="40" y="68" class="subtitle">7 collections · fields mapped from client types, product detail and tailoring form</text>
+<!-- relationship routes behind collection cards -->
+<path class="edge" d="M440 250 H480"/><text class="edge-label" x="443" y="238">1 : N category</text>
+<path class="edge" d="M1305 440 V540"/><text class="edge-label" x="1315" y="495">1 : N customer</text>
+<path class="edge" d="M1080 380 H1045 V850 H1010"/><text class="edge-label" x="1018" y="840">1 : 1 cart</text>
+<path class="edge" d="M1010 520 H1045 V760 H1080"/><text class="edge-label" x="1020" y="748">1 : N item snapshot</text>
+<path class="edge" d="M480 540 H455 V880 H440"/><text class="edge-label" x="375" y="868">1 : N product reviews</text>
+<path class="edge" d="M1080 400 H1058 V1040 H440"/><text class="edge-label" x="720" y="1028">1 : N customer reviews</text>
+<path class="edge" d="M1530 390 H1730 V1210 H1580"/><text class="edge-label" x="1585" y="1198">optional customer</text>
+<path class="edge" d="M1010 570 H1045 V1300 H1080"/><text class="edge-label" x="1048" y="1288">optional product</text>
+<path class="edge" d="M1330 1030 V970"/><text class="edge-label" x="1340" y="1010">optional tailoring request</text>
+
+<g><rect class="box" x="40" y="100" width="400" height="350" fill="#eff6ff" stroke="#3b82f6"/>
+<text class="head" x="62" y="132">categories</text><text class="kind" x="62" y="152">Collection</text><path d="M60 164H420" stroke="#3b82f6" opacity=".3"/>
+<text class="field" x="62" y="190">_id: ObjectId</text>
+<text class="field" x="62" y="212">id: co-phuc | dan-gian | cach-tan | hy-su</text>
+<text class="field" x="62" y="234">name, slug, description</text>
+<text class="field" x="62" y="256">product_count (aggregate)</text>
+<text class="field" x="62" y="278">price_from: number VND</text>
+<text class="field" x="62" y="300">badge: label + UI variant</text>
+<text class="field" x="62" y="322">image: src, alt</text>
+<text class="field" x="62" y="344">parent_id: ObjectId?</text>
+<text class="field" x="62" y="366">sort_order, is_active</text>
+<text class="field" x="62" y="388">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="480" y="100" width="530" height="500" fill="#eff6ff" stroke="#3b82f6"/>
+<text class="head" x="502" y="132">products</text><text class="kind" x="502" y="152">Collection</text><path d="M500 164H990" stroke="#3b82f6" opacity=".3"/>
+<text class="field" x="502" y="190">_id: ObjectId; category_id → categories</text>
+<text class="field" x="502" y="212">slug, sku, name, collection</text>
+<text class="field" x="502" y="234">material, description</text>
+<text class="field" x="502" y="256">price, old_price, compare_at_price (VND)</text>
+<text class="field" x="502" y="278">image{src,alt}; gallery[{src,alt}]</text>
+<text class="field" x="502" y="300">badge{label,variant}; tag?</text>
+<text class="field" x="502" y="322">colors[{name,hex}], color_note</text>
+<text class="field" x="502" y="344">sizes[]; variants[{sku,size,color,stock}]</text>
+<text class="field" x="502" y="366">stock, is_active</text>
+<text class="field" x="502" y="388">bespoke, cta, bundle, availability</text>
+<text class="field" x="502" y="410">rating, review_count, discount</text>
+<text class="field" x="502" y="432">accessories[{name,description,price,image}]</text>
+<text class="field" x="502" y="454">trust[{icon,title,description}]</text>
+<text class="field" x="502" y="476">story{eyebrow,title,paragraphs[],image}</text>
+<text class="field" x="502" y="498">fabric{title,description,image,care[]}</text>
+<text class="field" x="502" y="520">craft{title,description,image,steps[]}</text>
+<text class="field" x="502" y="542">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="1080" y="100" width="450" height="340" fill="#f0fdf4" stroke="#22c55e"/>
+<text class="head" x="1102" y="132">customers</text><text class="kind" x="1102" y="152">Collection</text><path d="M1100 164H1510" stroke="#22c55e" opacity=".3"/>
+<text class="field" x="1102" y="190">_id: ObjectId</text>
+<text class="field" x="1102" y="212">full_name, email (unique lowercase)</text>
+<text class="field" x="1102" y="234">password_hash, phone</text>
+<text class="field" x="1102" y="256">addresses[{recipient,phone,line1,ward,</text>
+<text class="field" x="1102" y="278">  district,city,is_default}]</text>
+<text class="field" x="1102" y="300">measurement_profile: body, neck_cm, bust_cm,</text>
+<text class="field" x="1102" y="322">  waist_cm, hips_cm, shoulder_cm, sleeve_cm,</text>
+<text class="field" x="1102" y="344">  garment_length_cm</text>
+<text class="field" x="1102" y="366">measurement_notes</text>
+<text class="field" x="1102" y="388">wishlist_product_ids: ObjectId[]</text>
+<text class="field" x="1102" y="410">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="1080" y="540" width="500" height="430" fill="#fff7ed" stroke="#f97316"/>
+<text class="head" x="1102" y="572">orders</text><text class="kind" x="1102" y="592">Collection</text><path d="M1100 604H1560" stroke="#f97316" opacity=".3"/>
+<text class="field" x="1102" y="630">_id, order_number, customer_id</text>
+<text class="field" x="1102" y="652">fulfillment_mode: ready | custom</text>
+<text class="field" x="1102" y="674">tailoring_request_id?, measurement_profile?</text>
+<text class="field" x="1102" y="696">items[{product_id,product_name,sku,quantity,</text>
+<text class="field" x="1102" y="718">  size,color,color_hex,unit_price,measurements}]</text>
+<text class="field" x="1102" y="740">subtotal, shipping_fee, total (VND)</text>
+<text class="field" x="1102" y="762">status: pending | confirmed | shipping |</text>
+<text class="field" x="1102" y="784">  delivered | cancelled</text>
+<text class="field" x="1102" y="806">payment_method, payment_status</text>
+<text class="field" x="1102" y="828">shipping_address snapshot, note?</text>
+<text class="field" x="1102" y="850">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="40" y="700" width="400" height="360" fill="#faf5ff" stroke="#a855f7"/>
+<text class="head" x="62" y="732">reviews</text><text class="kind" x="62" y="752">Collection</text><path d="M60 764H420" stroke="#a855f7" opacity=".3"/>
+<text class="field" x="62" y="790">_id: ObjectId</text>
+<text class="field" x="62" y="812">product_id → products</text>
+<text class="field" x="62" y="834">customer_id → customers</text>
+<text class="field" x="62" y="856">rating: 1–5, content</text>
+<text class="field" x="62" y="878">display_name, initials, location</text>
+<text class="field" x="62" y="900">meta: purchase/time label</text>
+<text class="field" x="62" y="922">purchase_mode: ready | custom</text>
+<text class="field" x="62" y="944">purchase_size, verified_purchase</text>
+<text class="field" x="62" y="966">images[{src,alt}]</text>
+<text class="field" x="62" y="988">unique customer_id + product_id</text>
+<text class="field" x="62" y="1010">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="480" y="700" width="530" height="300" fill="#f0fdf4" stroke="#22c55e"/>
+<text class="head" x="502" y="732">carts</text><text class="kind" x="502" y="752">Collection</text><path d="M500 764H990" stroke="#22c55e" opacity=".3"/>
+<text class="field" x="502" y="790">_id: ObjectId</text>
+<text class="field" x="502" y="812">customer_id → customers (unique)</text>
+<text class="field" x="502" y="834">fulfillment_mode: ready | custom</text>
+<text class="field" x="502" y="856">items[{product_id,sku,quantity,size,color_name,</text>
+<text class="field" x="502" y="878">  color_hex,unit_price,measurements,added_at}]</text>
+<text class="field" x="502" y="900">measurement_profile?</text>
+<text class="field" x="502" y="922">created_at, updated_at</text>
+</g>
+<g><rect class="box" x="1080" y="1030" width="500" height="370" fill="#ecfeff" stroke="#06b6d4"/>
+<text class="head" x="1102" y="1062">tailoring_requests</text><text class="kind" x="1102" y="1082">Collection</text><path d="M1100 1094H1560" stroke="#06b6d4" opacity=".3"/>
+<text class="field" x="1102" y="1120">_id: ObjectId; customer_id?</text>
+<text class="field" x="1102" y="1142">full_name, phone (form required)</text>
+<text class="field" x="1102" y="1164">preferred_contact: phone | zalo</text>
+<text class="field" x="1102" y="1186">category_id?, product_id?, product_slug?</text>
+<text class="field" x="1102" y="1208">measurements.body: height/weight text</text>
+<text class="field" x="1102" y="1230">measurements: neck_cm, bust_cm, waist_cm,</text>
+<text class="field" x="1102" y="1252">  hips_cm, shoulder_cm, sleeve_cm,</text>
+<text class="field" x="1102" y="1274">  garment_length_cm</text>
+<text class="field" x="1102" y="1296">notes: body shape / hem requirements</text>
+<text class="field" x="1102" y="1318">status: submitted → contacted → ... → completed</text>
+<text class="field" x="1102" y="1340">appointment_at?, assigned_staff?</text>
+<text class="field" x="1102" y="1362">created_at, updated_at</text>
+</g>
+<rect x="40" y="1110" width="900" height="74" rx="8" fill="#fffbeb" stroke="#f59e0b"/><text class="note" x="58" y="1138">Refs are ObjectId and are not MongoDB foreign keys. Prices are stored as whole VND.</text><text class="note" x="58" y="1160">product_count, rating and review_count are derived display values; calculate or keep synchronized in application logic.</text>
+</svg>
