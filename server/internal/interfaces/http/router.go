@@ -9,10 +9,18 @@ import (
 	"github.com/your-org/aodora/server/internal/application/health"
 )
 
-func NewRouter(healthService *health.Service, log zerolog.Logger) http.Handler {
+// RouterOption registers an isolated capability without changing other routes.
+type RouterOption func(*http.ServeMux)
+
+func NewRouter(healthService *health.Service, log zerolog.Logger, extra ...RouterOption) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	mux.HandleFunc("GET /readyz", readyz(healthService))
+	for _, register := range extra {
+		if register != nil {
+			register(mux)
+		}
+	}
 	return requestLogger(log, withJSONContentType(mux))
 }
 

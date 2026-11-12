@@ -9,9 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/your-org/aodora/server/internal/application/catalog"
 	"github.com/your-org/aodora/server/internal/application/health"
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
+	catalogMongo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
 	httpapi "github.com/your-org/aodora/server/internal/interfaces/http"
 	"github.com/your-org/aodora/server/internal/logger"
 )
@@ -51,9 +53,10 @@ func main() {
 	}()
 
 	service := health.NewService(db, *log)
+	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
 	server := &http.Server{
 		Addr:              cfg.HTTP.Addr,
-		Handler:           httpapi.NewRouter(service, *log),
+		Handler:           httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

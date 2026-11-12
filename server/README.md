@@ -60,3 +60,7 @@ Kết nối MongoDB local bằng Compass/Navicat: host `localhost`, port `27017`
 - Handler chỉ parse request, gọi use case, map response/error; không chứa business rule.
 - Mọi thay đổi schema/index/validator phải có cặp migration `.up.json` và `.down.json`, tên theo số thứ tự.
 - Không chạy migration tự động khi API boot; migration chạy riêng trong deploy/release step.
+
+## Product catalog (PD-01)
+
+Public read-only endpoints: `GET /api/v1/categories`, `GET /api/v1/products`, and `GET /api/v1/products/{slug}`. Filter, pagination, sample-data scripts and manual tests: [docs/PD01_CATALOG_API.md](docs/PD01_CATALOG_API.md).
