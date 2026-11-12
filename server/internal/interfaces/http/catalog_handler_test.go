@@ -105,7 +105,16 @@ func (r failingCatalogRepo) ReviewSummary(context.Context, string) (model.Review
 func TestCatalogErrorsAreLoggedWithoutCredentials(t *testing.T) {
 	var buffer bytes.Buffer
 	log := zerolog.New(&buffer)
-	injected := errors.New("cannot connect mongodb://user:secret@localhost:27017/db?authSource=admin")
+	// Construct a synthetic URI rather than embedding credentials in source.
+	// No connection is established; this only tests safe error reporting.
+	testPassword := "unit-test-credential"
+	connectionURI := (&url.URL{
+		Scheme: "mongodb",
+		User:   url.UserPassword("fixture-user", testPassword),
+		Host:   "example.invalid:27017",
+		Path:   "/test-db",
+	}).String()
+	injected := errors.New("cannot connect " + connectionURI)
 	router := NewRouter(nil, *logger.NewDiscard(), WithCatalog(app.NewService(failingCatalogRepo{cause: injected}), log))
 	for _, path := range []string{"/api/v1/categories", "/api/v1/products", "/api/v1/products/test-slug"} {
 		rec := httptest.NewRecorder()
@@ -113,13 +122,15 @@ func TestCatalogErrorsAreLoggedWithoutCredentials(t *testing.T) {
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
 		}
-		if strings.Contains(rec.Body.String(), "secret") {
-			t.Fatal("leaked password to client")
+		if strings.Contains(rec.Body.String(), testPassword) || strings.Contains(rec.Body.String(), connectionURI) {
+			t.Fatal("leaked connection credentials to client")
 		}
 	}
 	logs := buffer.String()
-	if !strings.Contains(logs, "catalog request failed") || strings.Contains(logs, "secret") {
-		t.Fatalf("missing or sensitive log: %s", logs)
+	if !strings.Contains(logs, "catalog request failed") ||
+		!strings.Contains(logs, "[mongodb-uri-redacted]") ||
+		strings.Contains(logs, testPassword) || strings.Contains(logs, connectionURI) {
+		t.Fatalf("missing redaction or sensitive log: %s", logs)
 	}
 }
 
