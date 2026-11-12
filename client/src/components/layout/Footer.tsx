@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { getCategories } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
 import { useToast } from '@/hooks/useToast'
+import BrandMark from './BrandMark'
 
 const linkItem = 'font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer'
 const colTitle = 'font-label-uppercase text-label-uppercase text-primary mb-4 tracking-widest'
@@ -24,7 +25,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-gutter-desktop">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img alt={SITE.name} className="h-7 w-auto object-contain" src={SITE.logo} />
+              <BrandMark compact />
               <span className="font-title-editorial text-title-editorial uppercase text-primary font-bold">{SITE.name}</span>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant mb-6 leading-relaxed">{FOOTER.about}</p>

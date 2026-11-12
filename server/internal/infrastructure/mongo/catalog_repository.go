@@ -125,7 +125,14 @@ func productPagePipeline(filter model.Filter, activeCategoryIDs []string) bson.A
 func (r *CatalogRepository) ListProducts(ctx context.Context, filter model.Filter, activeCategoryIDs []string) ([]model.Product, int64, error) {
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	cursor, err := r.products.Aggregate(ctx, productPagePipeline(filter, activeCategoryIDs))
+	aggregateOptions := options.Aggregate()
+	// Keep text-index searches on their binary collation. For ordinary name
+	// browsing, use the Vietnamese collation (and matching indexes) instead
+	// of comparing UTF-8 bytes, which puts accented names out of order.
+	if usesVietnameseNameCollation(filter) {
+		aggregateOptions.SetCollation(&options.Collation{Locale: "vi", Strength: 2})
+	}
+	cursor, err := r.products.Aggregate(ctx, productPagePipeline(filter, activeCategoryIDs), aggregateOptions)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list catalog products: %w", err)
 	}
@@ -225,6 +232,22 @@ func (r *CatalogRepository) ReviewSummary(ctx context.Context, productID string)
 	return summary, nil
 }
 
+// Phrase matching avoids the default OR semantics of MongoDB $text: a
+// multi-word product name must not match unrelated products just because
+// they share a generic word (for example, "Áo"). Strip literal quotation
+// marks to keep the entire user-entered text inside one phrase, not as
+// additional MongoDB text query operators.
+func catalogSearchPhrase(search string) string {
+	cleaned := strings.Join(strings.Fields(strings.ReplaceAll(search, `"`, "")), " ")
+	return `"` + cleaned + `"`
+}
+
+// MongoDB text indexes are binary-collated; the Vietnamese collation is used
+// for name sorting only when a text-index query is not in progress.
+func usesVietnameseNameCollation(f model.Filter) bool {
+	return strings.TrimSpace(f.Search) == "" && (f.Sort == "name_asc" || f.Sort == "name_desc")
+}
+
 func productFilter(f model.Filter, categoryIDs []string) bson.M {
 	ids := make(bson.A, 0, len(categoryIDs))
 	for _, value := range categoryIDs {
@@ -236,7 +259,7 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 	if f.Search != "" {
 		// Use the existing text index on name + description rather than a
 		// collection-scanning unanchored case-insensitive regex.
-		terms = append(terms, bson.M{"$text": bson.M{"$search": f.Search}})
+		terms = append(terms, bson.M{"$text": bson.M{"$search": catalogSearchPhrase(f.Search)}})
 	}
 	price := bson.M{}
 	if f.MinPrice != nil {

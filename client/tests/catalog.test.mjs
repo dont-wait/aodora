@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createCartSelection, registerCartAddHandler, addSelectedProduct } from '../src/features/catalog/selection.ts'
 import { getCategories, getProduct, listProducts, CatalogApiError } from '../src/features/catalog/api.ts'
+import { parseVNDInput, formatVNDInput } from '../src/features/catalog/prices.ts'
 
 const product = {
   id: '507f1f77bcf86cd799439011', slug: 'ao-mau', stock: 6, sku: '', ready_available: true,
@@ -61,4 +62,15 @@ test('API 404 không trả sản phẩm khác thay cho slug bị thiếu', async
   try {
     await assert.rejects(getProduct('khong-ton-tai'), (err) => err instanceof CatalogApiError && err.status === 404 && err.code === 'PRODUCT_NOT_FOUND')
   } finally { globalThis.fetch = previous }
+})
+
+test('định dạng tiền VNĐ không tự nhân 1000 và không chấp nhận dữ liệu sai', () => {
+  assert.equal(parseVNDInput('400.000'), '400000')
+  assert.equal(parseVNDInput('500,000'), '500000')
+  assert.equal(parseVNDInput('400'), '400')
+  assert.equal(formatVNDInput('400000'), '400.000')
+  assert.equal(parseVNDInput('400k'), null)
+  assert.equal(parseVNDInput('4.00'), null)
+  assert.equal(parseVNDInput('-100'), null)
+  assert.equal(parseVNDInput(''), '')
 })

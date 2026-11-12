@@ -17,9 +17,9 @@ Giá bán, tên, ảnh, danh mục, vật liệu, số lượng tồn, biến th
 Trang bộ sưu tập đồng bộ các tham số vào URL:
 
 - `category`: slug hoặc ID danh mục từ API.
-- `search`: từ khóa cho MongoDB text search trên tên và mô tả (không tìm một đoạn ký tự bất kỳ).
+- `search`: tìm theo cụm từ trên tên và mô tả với MongoDB text index, không tìm đoạn ký tự bất kỳ. Một từ có thể khớp nhiều sản phẩm, nhiều từ phải đi cùng nhau.
 - `material`, `color`, `size`: các trường lọc theo tên chính xác; màu và size phải nằm cùng biến thể SKU.
-- `min_price`, `max_price`: khoảng giá không âm, đơn vị VND.
+- `min_price`, `max_price`: khoảng giá không âm, đơn vị VND. Giao diện định dạng hàng nghìn (ví dụ `400.000`), nhưng API luôn nhận số nguyên `400000`, không tự nhân hệ số 1000.
 - `sort`: `newest`, `price_asc`, `price_desc`, `name_asc`, `name_desc`.
 - `page`: trang đang xem; kích cỡ trang là 12.
 
@@ -29,7 +29,7 @@ Bộ lọc được áp dụng một lần sau khi nhấn nút áp dụng để 
 
 Đường dẫn `/san-pham/:slug` xác định sản phẩm. API trả 404 khi không tồn tại hoặc sản phẩm/danh mục không hoạt động. Trang chi tiết hiển thị lỗi và đường dẫn quay lại bộ sưu tập, không thay bằng sản phẩm mặc định.
 
-- Ảnh chính và thư viện lấy từ `image`, `gallery` hoặc `images` trong response.
+- Ảnh chính và thư viện lấy từ `image`, `gallery` hoặc `images` trong response. Nếu URL trong MongoDB không tải được, giao diện hiện placeholder trung tính; không hiển thị ảnh thay thế của một sản phẩm khác.
 - Nội dung `story`, `fabric`, `craft`, phụ kiện, badge, trust chỉ hiển thị khi có dữ liệu tương ứng.
 - Mã màu chỉ hiển thị dạng swatch khi response thực sự có `hex`; nếu không có thì dùng tên màu.
 - `variants[]` quyết định SKU. Chọn một màu chỉ cho phép chọn các kích cỡ có cùng màu và còn hàng. Khi thay màu, lựa chọn kích cỡ được đặt lại để tránh ghép thuộc tính từ hai SKU.
@@ -71,3 +71,7 @@ Trong môi trường triển khai thực tế, web và API có thể chung origi
 Các màn hình hỗ trợ đang tải, rỗng, lỗi tải, thử lại; request cũ bị hủy khi thay từ khóa, bộ lọc hoặc slug. Dữ liệu cũ không được hiển thị nhầm khi chuyển từ mẫu A sang mẫu B.
 
 Kiểm thử nghiệp vụ tại `client/tests/catalog.test.mjs` tập trung vào hành vi lấy API, sản phẩm không tồn tại, chọn SKU đúng/màu/cỡ hợp lệ, tồn kho và hợp đồng tích hợp KR-03. Kiểm thử tương tác trên trình duyệt và độ tương thích điện thoại cần chạy trên frontend đã kết nối backend MongoDB thực tế.
+
+## 7. Hiển thị tên và hình ảnh
+
+Sắp xếp tên thông thường sử dụng quy tắc so sánh tiếng Việt từ backend với collation `vi`. Đối với truy vấn đồng thời có tìm kiếm `$text`, thứ tự tên vẫn theo collation mặc định của text index. Những hình ảnh không tải được từ URL dữ liệu sẽ hiện trạng thái "Hình ảnh đang được cập nhật". Biểu trưng thương hiệu dạng chữ chỉ là thành phần giao diện tĩnh, không phải ảnh sản phẩm. Ảnh thật của sản phẩm cần được quản lý và cập nhật qua dữ liệu MongoDB khi có nguồn hợp lệ.

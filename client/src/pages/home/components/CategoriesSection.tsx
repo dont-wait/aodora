@@ -4,6 +4,7 @@ import { ROUTES } from '@/data/site'
 import CatalogState from '@/features/catalog/CatalogState'
 import { getCategories } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
+import CatalogImage from '@/features/catalog/CatalogImage'
 
 export default function CategoriesSection() {
   const { data, loading, error, retry } = useCatalogRequest(getCategories, 'home:categories')
@@ -14,7 +15,7 @@ export default function CategoriesSection() {
         {data?.length ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {data.map((category) => <Link key={category.id} to={`${ROUTES.collection}?category=${encodeURIComponent(category.slug || category.id)}`}
             className="group bg-surface shadow-sm hover:shadow-xl transition-all block">
-            {category.image?.src && <div className="aspect-[3/4] overflow-hidden bg-surface-container"><img src={category.image.src} alt={category.image.alt || category.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" /></div>}
+            <CatalogImage src={category.image?.src} alt={category.image?.alt || category.name} className="aspect-[3/4]" imageClassName="group-hover:scale-105 transition-transform" />
             <div className="p-6"><h3 className="font-headline-sm text-headline-sm group-hover:text-primary">{category.name}</h3>
               {category.description && <p className="mt-2 text-on-surface-variant line-clamp-3">{category.description}</p>}
               <span className="block text-primary mt-4">Khám phá →</span></div>

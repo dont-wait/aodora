@@ -2,6 +2,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState, type FormEvent } from 'react'
 import { NAV_ITEMS, ROUTES, SITE } from '@/data/site'
 import Icon from '@/components/ui/Icon'
+import BrandMark from './BrandMark'
 
 const iconButton = 'relative text-on-surface-variant hover:text-primary transition-colors p-1'
 
@@ -21,7 +22,7 @@ export default function Header() {
       </div>
       <div className="h-20 max-w-[1440px] mx-auto px-margin-desktop flex items-center justify-between gap-6">
         <Link to={ROUTES.home} className="flex items-center gap-4 flex-shrink-0">
-          <img alt={`${SITE.name} - Logo`} className="h-8 w-auto object-contain" src={SITE.logo} />
+          <BrandMark />
           <div className="flex flex-col">
             <span className="font-title-editorial text-title-editorial tracking-wide uppercase text-primary font-bold">{SITE.name}</span>
             <span className="font-label-uppercase text-label-uppercase text-secondary tracking-widest">{SITE.tagline}</span>

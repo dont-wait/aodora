@@ -1,7 +1,6 @@
 export const SITE = {
   name: 'AN SOIE',
   tagline: 'Áo Dài Di Sản Việt',
-  logo: 'https://lh3.googleusercontent.com/aida/AEtjO1X-9KiMTRhVLlzblCutvzRwTbzWOewmGAtJ1Zc0vCBtBNp5ji7K6JZovhmRKm9FyRstKHBx2ZmVqPsGLOkUTZTGlMPOJeHBmC1Ra2FOM3tczDNO6vprpX09CuoSnxmj__Auy9YZJDfc59KWsuWdP8QTcVkDOPW5cbOj-QJkAs55nCzz3DDmdDMjY30Mn17EL8Afm5jaX1hGt39c1DplyWJR_NgQInYA3D70RdxAZN3q689gk5w4gaom8dXp',
   announcement: 'Miễn phí vận chuyển toàn quốc cho đơn hàng từ 1.500.000đ | Dịch vụ may đo chuẩn dáng tận nơi',
   hotline: '0988 888 888',
 }

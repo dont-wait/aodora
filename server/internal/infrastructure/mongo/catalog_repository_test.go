@@ -33,7 +33,7 @@ func TestProductFilterCombinesColorAndSizeInOneSKU(t *testing.T) {
 	foundSearch := false
 	for _, term := range query["$and"].(bson.A) {
 		if value, ok := term.(bson.M)["$text"]; ok {
-			foundSearch = value.(bson.M)["$search"] == "[lụa]"
+			foundSearch = value.(bson.M)["$search"] == `"[lụa]"`
 		}
 	}
 	if !foundSearch {
@@ -192,5 +192,41 @@ func TestCatalogAggregationCountsVisiblePageInOneQuery(t *testing.T) {
 	}
 	if !strings.Contains(string(detail), `"$graphLookup"`) {
 		t.Fatal("detail does not verify category")
+	}
+}
+
+func TestCatalogSearchUsesWholePhrase(t *testing.T) {
+	cases := []struct{ input, expected string }{
+		{"Áo sơ mi Oxford", `"Áo sơ mi Oxford"`},
+		{"  sơ   mi  ", `"sơ mi"`},
+		{`áo "sơ mi"`, `"áo sơ mi"`},
+		{"Oxford", `"Oxford"`},
+	}
+	for _, tc := range cases {
+		if got := catalogSearchPhrase(tc.input); got != tc.expected {
+			t.Errorf("catalogSearchPhrase(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+		query := productFilter(model.Filter{Search: tc.input}, nil)
+		found := false
+		for _, term := range query["$and"].(bson.A) {
+			if predicate, ok := term.(bson.M)["$text"]; ok {
+				found = predicate.(bson.M)["$search"] == tc.expected
+			}
+		}
+		if !found {
+			t.Errorf("search filter %q not quoted as expected: %#v", tc.input, query)
+		}
+	}
+}
+
+func TestVietnameseNameCollationOnlyWhenSafeForTextIndex(t *testing.T) {
+	if !usesVietnameseNameCollation(model.Filter{Sort: "name_asc"}) || !usesVietnameseNameCollation(model.Filter{Sort: "name_desc"}) {
+		t.Fatal("name sorting should use Vietnamese collation")
+	}
+	if usesVietnameseNameCollation(model.Filter{Sort: "name_asc", Search: "Oxford"}) {
+		t.Fatal("text-index search must retain simple collation")
+	}
+	if usesVietnameseNameCollation(model.Filter{Sort: "price_asc"}) {
+		t.Fatal("price sorting must use default collation")
 	}
 }

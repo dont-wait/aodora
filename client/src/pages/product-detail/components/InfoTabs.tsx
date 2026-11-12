@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CatalogProduct, CatalogContent } from '@/features/catalog/types'
+import CatalogImage from '@/features/catalog/CatalogImage'
 
 type SectionName = 'story' | 'fabric' | 'craft'
 const title: Record<SectionName, string> = { story: 'Câu chuyện tác phẩm', fabric: 'Chất liệu & bảo quản', craft: 'Quy trình chế tác' }
@@ -28,7 +29,7 @@ export default function InfoTabs({ product }: { product: CatalogProduct }) {
             <h3 className="font-semibold text-primary">{item.title}</h3><p className="mt-1 text-on-surface-variant">{item.description}</p>
           </div>)}
         </div>
-        {content.image?.src && <div className="lg:col-span-5"><img src={content.image.src} alt={content.image.alt || title[current]} loading="lazy" className="w-full aspect-[4/5] object-cover" /></div>}
+        {content.image?.src && <div className="lg:col-span-5"><CatalogImage src={content.image.src} alt={content.image.alt || title[current]} className="w-full aspect-[4/5]" /></div>}
       </div>}
     </div>
   </section>

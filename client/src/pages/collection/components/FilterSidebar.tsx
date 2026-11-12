@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { sidebarFilterKeys, type SidebarFilters } from '../sidebarFilters'
+import { parseVNDInput, formatVNDInput } from '@/features/catalog/prices'
 const readValues = (params: URLSearchParams): SidebarFilters => Object.fromEntries(sidebarFilterKeys.map((key) => [key, params.get(key) || ''])) as unknown as SidebarFilters
 interface Props { params: URLSearchParams; onApply: (draft: SidebarFilters) => void; onClear: () => void }
 const field = 'w-full p-2.5 border border-outline-variant bg-surface text-on-surface focus:outline-primary'
@@ -10,13 +11,14 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
   function update(name: keyof SidebarFilters, value: string) { setDraft((previous) => ({ ...previous, [name]: value })) }
   function submit(event: FormEvent) {
     event.preventDefault()
-    const min = draft.min_price ? Number(draft.min_price) : 0
-    const max = draft.max_price ? Number(draft.max_price) : Infinity
-    if (min < 0 || max < 0 || !Number.isSafeInteger(min) || (max !== Infinity && !Number.isSafeInteger(max)) || min > max) {
-      setError('Khoảng giá không hợp lệ. Vui lòng kiểm tra lại.'); return
+    const minPrice = parseVNDInput(draft.min_price)
+    const maxPrice = parseVNDInput(draft.max_price)
+    if (minPrice === null || maxPrice === null || (minPrice !== '' && maxPrice !== '' && Number(minPrice) > Number(maxPrice))) {
+      setError('Khoảng giá không hợp lệ. Hãy nhập số tiền đầy đủ bằng VNĐ, ví dụ 400.000.'); return
     }
     setError('')
-    onApply(Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, v.trim()])) as SidebarFilters)
+    onApply({ ...Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, v.trim()])),
+      min_price: minPrice, max_price: maxPrice } as SidebarFilters)
   }
   return <aside id="filterSidebar" className="lg:col-span-3 space-y-6 bg-surface-container-low p-6 shadow-sm">
     <div className="flex items-center justify-between">
@@ -33,9 +35,9 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
       <label className="block"><span className={label}>Kích cỡ</span><input className={field} value={draft.size}
         onChange={(e) => update('size', e.target.value)} placeholder="Ví dụ: M" /></label>
       <fieldset><legend className={label}>Khoảng giá (VNĐ)</legend><div className="grid grid-cols-2 gap-2">
-        <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="number" min={0} value={draft.min_price} onChange={(e) => update('min_price', e.target.value)} /></label>
-        <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="number" min={0} value={draft.max_price} onChange={(e) => update('max_price', e.target.value)} /></label>
-      </div></fieldset>
+        <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="text" inputMode="numeric" placeholder="400.000" value={formatVNDInput(draft.min_price)} onChange={(e) => update('min_price', e.target.value)} /></label>
+        <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="text" inputMode="numeric" placeholder="500.000" value={formatVNDInput(draft.max_price)} onChange={(e) => update('max_price', e.target.value)} /></label>
+      </div><p className="mt-2 text-xs text-on-surface-variant">Nhập số tiền đầy đủ (ví dụ 400.000 VNĐ, không phải 400).</p></fieldset>
       {error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
       <button type="submit" className="bg-primary text-on-primary px-5 py-3 w-full">Áp dụng bộ lọc</button>
     </form>

@@ -32,7 +32,7 @@ Các trường `key`, `description`, `parent_id`, `image` và `badge` có thể 
 
 | Tham số | Quy tắc |
 | --- | --- |
-| `search` hoặc `q` | Tìm theo **từ khóa** trên `name` và `description` bằng MongoDB text index. Không phải tìm khớp chuỗi con bất kỳ. Chỉ dùng một tham số. |
+| `search` hoặc `q` | Tìm trên `name` và `description` bằng MongoDB text index. Chuỗi nhiều từ được xử lý như **một cụm từ** để tránh kết quả không liên quan chỉ trùng một từ. Không phải tìm khớp đoạn ký tự bất kỳ. Chỉ dùng một tham số. |
 | `category` | Khớp `_id`, `slug` hoặc `id` của danh mục đang hiển thị |
 | `min_price`, `max_price` | Số nguyên VND không âm; `min_price` không vượt `max_price` |
 | `color` | Tên màu trong cùng phần tử `variants[]` với size; không phân biệt hoa/thường |
@@ -57,6 +57,8 @@ Response có cấu trúc:
   "total_pages": 0
 }
 ```
+
+Khi sắp xếp theo tên không kết hợp tìm kiếm, truy vấn sử dụng collation `vi` (strength 2) cùng index tương ứng để so sánh chữ tiếng Việt. Truy vấn có `$text` sử dụng collation mặc định của text index; thứ tự tên trong trường hợp kết hợp tìm kiếm có thể khác collation `vi`.
 
 Danh sách dữ liệu được truy vấn từ MongoDB với `_id` làm khóa phụ khi sắp xếp, để bảo đảm thứ tự ổn định khi các sản phẩm có cùng giá, tên hoặc ngày tạo. Tổng kết quả và trang dữ liệu được tính trong cùng một pipeline aggregation (`$facet`), sau khi áp dụng điều kiện hiển thị danh mục. Tính nhất quán giữa *hai HTTP request độc lập* không được bảo đảm nếu admin cập nhật catalog trong lúc duyệt trang.
 
@@ -90,8 +92,8 @@ Lỗi trả theo định dạng `{"error":{"code":"...","message":"...","field":
 
 ## 6. MongoDB và hiệu năng
 
-- Text index hiện có trên `products.name` và `products.description` phục vụ tham số `search`/`q`.
-- Index trên `is_active`, `category_id`, `created_at`, `price`, `name` và `_id` hỗ trợ các dạng sắp xếp/lọc phổ biến; hiệu quả thực tế cần đánh giá bằng `explain()` trên dữ liệu có quy mô đại diện.
+- Text index trên `products.name` và `products.description` phục vụ tham số `search`/`q`, với truy vấn theo cụm từ đối với nhiều từ khóa.
+- Các index với collation `vi` trên `name` (đọc sản phẩm đang hoạt động và theo danh mục), cùng index trên `is_active`, `category_id`, `created_at`, `price` và `_id` hỗ trợ các dạng sắp xếp/lọc phổ biến; hiệu quả thực tế cần đánh giá bằng `explain()` trên dữ liệu có quy mô đại diện.
 - Một aggregation sử dụng kiểm tra danh mục (`$lookup`, `$graphLookup`) trước khi đếm và phân trang, nhằm tránh lộ sản phẩm thuộc danh mục không còn hiển thị. Quan hệ danh mục cha được xác định theo ObjectId.
 - Do MongoDB standalone không tự cung cấp snapshot transaction cho nhiều HTTP request, kết quả các lần truy vấn khác nhau có thể thay đổi khi admin chỉnh catalog. Trường hợp yêu cầu snapshot tuyệt đối xuyên nhiều collection cần cấu hình deployment và read concern phù hợp.
 - Không dùng bộ dữ liệu tĩnh ở frontend làm nguồn giá, tồn kho hoặc danh mục; phần quản trị và checkout phải đọc lại trạng thái database trước khi ghi.

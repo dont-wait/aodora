@@ -25,8 +25,7 @@ export default function Toolbar({ shown, total, filterOpen, onToggleFilter, sort
           <span className="font-semibold">Bộ lọc tinh tuyển</span>
         </button>
         <span className="font-body-sm text-body-sm text-on-surface-variant hidden sm:inline">
-          Hiển thị <strong className="text-on-surface font-medium">{shown}</strong> trong <strong className="text-on-surface font-medium">{total}</strong> mẫu
-          áo dài
+          Hiển thị <strong className="text-on-surface font-medium">{shown}</strong> trong <strong className="text-on-surface font-medium">{total}</strong> sản phẩm
         </span>
       </div>
 
