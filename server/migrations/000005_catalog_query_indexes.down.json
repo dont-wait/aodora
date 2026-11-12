@@ -1,0 +1,6 @@
+[
+  { "dropIndexes": "products", "index": "ix_catalog_active_created" },
+  { "dropIndexes": "products", "index": "ix_catalog_category_created" },
+  { "dropIndexes": "products", "index": "ix_catalog_category_price" },
+  { "dropIndexes": "products", "index": "ix_catalog_category_name" }
+]

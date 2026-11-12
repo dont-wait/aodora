@@ -51,7 +51,7 @@ Schema, validator, index và mapping field từ client được mô tả tại [
 
 Sơ đồ có thể mở/chỉnh sửa bằng draw.io tại [docs/database-schema.drawio](docs/database-schema.drawio), hoặc xem nhanh bản [SVG](docs/database-schema.svg).
 
-Kết nối MongoDB local bằng Compass/Navicat: host `localhost`, port `27017`, authentication database `admin`, username/password mặc định `aodora` / `aodora`, database `QuanLyBanQuanAo`. Connection string: `mongodb://aodora:aodora@localhost:27017/QuanLyBanQuanAo?authSource=admin`. Nếu đã đổi `MONGO_ROOT_USERNAME` hoặc `MONGO_ROOT_PASSWORD`, dùng giá trị tương ứng trong `.env`.
+Kết nối MongoDB local bằng Compass/Navicat: sử dụng host/port và authentication database theo cấu hình MongoDB của môi trường, lấy tên database từ `MONGO_DB`. Thông tin tài khoản và mật khẩu được quản lý riêng trong biến môi trường/`.env`, không ghi trực tiếp vào tài liệu chung.
 
 ## Quy ước mở rộng
 
@@ -63,4 +63,4 @@ Kết nối MongoDB local bằng Compass/Navicat: host `localhost`, port `27017`
 
 ## Product catalog (PD-01)
 
-Public read-only endpoints: `GET /api/v1/categories`, `GET /api/v1/products`, and `GET /api/v1/products/{slug}`. Filter, pagination, sample-data scripts and manual tests: [docs/PD01_CATALOG_API.md](docs/PD01_CATALOG_API.md).
+Public read-only endpoints: `GET /api/v1/categories`, `GET /api/v1/products`, and `GET /api/v1/products/{slug}`. Filters, pagination, detail fields and consistency rules: [docs/PD01_CATALOG_API.md](docs/PD01_CATALOG_API.md).

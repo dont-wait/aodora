@@ -56,7 +56,7 @@ func main() {
 	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
 	server := &http.Server{
 		Addr:              cfg.HTTP.Addr,
-		Handler:           httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService)),
+		Handler:           httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService, *log)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

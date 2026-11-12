@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// CatalogRepository uses only existing collections and indexes. PD-01 is read-only.
+// CatalogRepository implements the read-only MongoDB catalog.
 type CatalogRepository struct {
 	categories *driver.Collection
 	products   *driver.Collection
@@ -32,7 +32,17 @@ func NewCatalogRepository(db *driver.Database) *CatalogRepository {
 	}
 }
 
+// Keep MongoDB work below the HTTP response budget even if the caller supplies
+// a context without a deadline. Parent request cancellation still takes priority.
+const catalogQueryTimeout = 8 * time.Second
+
+func catalogContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, catalogQueryTimeout)
+}
+
 func (r *CatalogRepository) Categories(ctx context.Context) ([]model.Category, error) {
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
 	cursor, err := r.categories.Find(ctx, bson.M{}, options.Find().SetProjection(bson.M{
 		"_id": 1, "id": 1, "slug": 1, "name": 1, "description": 1,
 		"parent_id": 1, "is_active": 1, "sort_order": 1, "image": 1, "badge": 1,
@@ -55,51 +65,126 @@ func (r *CatalogRepository) Categories(ctx context.Context) ([]model.Category, e
 	return result, nil
 }
 
+// categoryVisibilityStages validates the category and its complete parent chain
+// while reading products. A missing, disabled, cyclic or orphan parent hides the
+// product. This also closes the stale service-side category check window.
+func categoryVisibilityStages() bson.A {
+	return bson.A{
+		bson.M{"$lookup": bson.M{
+			"from": "categories", "localField": "category_id", "foreignField": "_id", "as": "_category",
+		}},
+		bson.M{"$unwind": "$_category"},
+		bson.M{"$graphLookup": bson.M{
+			"from": "categories", "startWith": "$_category.parent_id",
+			"connectFromField": "parent_id", "connectToField": "_id", "as": "_ancestors",
+		}},
+		bson.M{"$match": bson.M{"$expr": bson.M{"$and": bson.A{
+			bson.M{"$eq": bson.A{"$_category.is_active", true}},
+			bson.M{"$allElementsTrue": bson.A{bson.M{"$map": bson.M{
+				"input": "$_ancestors", "as": "ancestor",
+				"in": bson.M{"$eq": bson.A{"$$ancestor.is_active", true}},
+			}}}},
+			// An ancestor chain must terminate at a root (null/missing
+			// parent_id), rather than at a deleted category or in a cycle.
+			bson.M{"$or": bson.A{
+				bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$_category.parent_id", nil}}, nil}},
+				bson.M{"$gt": bson.A{
+					bson.M{"$size": bson.M{"$filter": bson.M{
+						"input": "$_ancestors", "as": "ancestor",
+						"cond": bson.M{"$eq": bson.A{
+							bson.M{"$ifNull": bson.A{"$$ancestor.parent_id", nil}}, nil,
+						}},
+					}}},
+					0,
+				}},
+			}},
+		}}}},
+	}
+}
+
+// productPagePipeline reads data and pagination metadata in one aggregate.
+// The equality/filter and indexed sort precede the category join; the facet
+// counts only visible products and applies the offset to the same result set.
+func productPagePipeline(filter model.Filter, activeCategoryIDs []string) bson.A {
+	pipeline := bson.A{
+		bson.M{"$match": productFilter(filter, activeCategoryIDs)},
+		bson.M{"$sort": productSort(filter.Sort)},
+	}
+	pipeline = append(pipeline, categoryVisibilityStages()...)
+	pipeline = append(pipeline, bson.M{"$facet": bson.M{
+		"metadata": bson.A{bson.M{"$count": "total"}},
+		"data": bson.A{
+			bson.M{"$skip": (filter.Page - 1) * filter.PageSize},
+			bson.M{"$limit": filter.PageSize},
+			bson.M{"$project": publicProductSummaryProjection()},
+		},
+	}})
+	return pipeline
+}
+
 func (r *CatalogRepository) ListProducts(ctx context.Context, filter model.Filter, activeCategoryIDs []string) ([]model.Product, int64, error) {
-	query := productFilter(filter, activeCategoryIDs)
-	total, err := r.products.CountDocuments(ctx, query)
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
+	cursor, err := r.products.Aggregate(ctx, productPagePipeline(filter, activeCategoryIDs))
 	if err != nil {
-		return nil, 0, fmt.Errorf("count products: %w", err)
-	}
-	if total == 0 {
-		return []model.Product{}, 0, nil
-	}
-	cursor, err := r.products.Find(ctx, query, options.Find().
-		SetProjection(publicProductSummaryProjection()).
-		SetSort(productSort(filter.Sort)).
-		SetSkip((filter.Page-1)*filter.PageSize).
-		SetLimit(filter.PageSize))
-	if err != nil {
-		return nil, 0, fmt.Errorf("list products: %w", err)
+		return nil, 0, fmt.Errorf("list catalog products: %w", err)
 	}
 	defer cursor.Close(ctx)
-	products := make([]model.Product, 0)
-	for cursor.Next(ctx) {
-		var raw bson.M
-		if err := cursor.Decode(&raw); err != nil {
-			return nil, 0, fmt.Errorf("decode product: %w", err)
+	if !cursor.Next(ctx) {
+		if err := cursor.Err(); err != nil {
+			return nil, 0, fmt.Errorf("read catalog page: %w", err)
 		}
-		product, err := productFromBSON(raw)
+		return []model.Product{}, 0, nil
+	}
+	var result bson.M
+	if err := cursor.Decode(&result); err != nil {
+		return nil, 0, fmt.Errorf("decode catalog page: %w", err)
+	}
+	total := int64(0)
+	metadata := asSlice(result["metadata"])
+	if len(metadata) > 0 {
+		total = asInt64(asMap(metadata[0])["total"])
+	}
+	products := make([]model.Product, 0)
+	for _, row := range asSlice(result["data"]) {
+		product, err := productFromBSON(asMap(row))
 		if err != nil {
 			return nil, 0, err
 		}
 		products = append(products, product)
 	}
 	if err := cursor.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterate products: %w", err)
+		return nil, 0, fmt.Errorf("iterate catalog page: %w", err)
 	}
 	return products, total, nil
 }
 
+func productDetailPipeline(slug string) bson.A {
+	pipeline := bson.A{bson.M{"$match": bson.M{"slug": slug, "is_active": true}}}
+	pipeline = append(pipeline, categoryVisibilityStages()...)
+	return append(pipeline,
+		bson.M{"$limit": 1},
+		bson.M{"$project": publicProductProjection()},
+	)
+}
+
 func (r *CatalogRepository) ProductBySlug(ctx context.Context, slug string) (*model.Product, error) {
-	var raw bson.M
-	err := r.products.FindOne(ctx, bson.M{"slug": slug, "is_active": true},
-		options.FindOne().SetProjection(publicProductProjection())).Decode(&raw)
-	if err == driver.ErrNoDocuments {
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
+	cursor, err := r.products.Aggregate(ctx, productDetailPipeline(slug))
+	if err != nil {
+		return nil, fmt.Errorf("find catalog product by slug: %w", err)
+	}
+	defer cursor.Close(ctx)
+	if !cursor.Next(ctx) {
+		if err := cursor.Err(); err != nil {
+			return nil, fmt.Errorf("read product detail: %w", err)
+		}
 		return nil, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("find product by slug: %w", err)
+	var raw bson.M
+	if err := cursor.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode product detail: %w", err)
 	}
 	product, err := productFromBSON(raw)
 	if err != nil {
@@ -109,6 +194,8 @@ func (r *CatalogRepository) ProductBySlug(ctx context.Context, slug string) (*mo
 }
 
 func (r *CatalogRepository) ReviewSummary(ctx context.Context, productID string) (model.ReviewSummary, error) {
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
 	id, err := bson.ObjectIDFromHex(productID)
 	if err != nil {
 		return model.ReviewSummary{}, fmt.Errorf("invalid product id in review summary: %w", err)
@@ -147,10 +234,9 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 	}
 	terms := bson.A{bson.M{"is_active": true}, bson.M{"category_id": bson.M{"$in": ids}}}
 	if f.Search != "" {
-		needle := bson.Regex{Pattern: regexp.QuoteMeta(f.Search), Options: "i"}
-		terms = append(terms, bson.M{"$or": bson.A{
-			bson.M{"name": needle}, bson.M{"description": needle},
-		}})
+		// Use the existing text index on name + description rather than a
+		// collection-scanning unanchored case-insensitive regex.
+		terms = append(terms, bson.M{"$text": bson.M{"$search": f.Search}})
 	}
 	price := bson.M{}
 	if f.MinPrice != nil {
@@ -164,7 +250,7 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 	}
 	if f.Material != "" {
 		terms = append(terms, bson.M{"material": bson.Regex{
-			Pattern: regexp.QuoteMeta(f.Material), Options: "i",
+			Pattern: "^" + regexp.QuoteMeta(f.Material) + "$", Options: "i",
 		}})
 	}
 	if f.Color != "" || f.Size != "" {
@@ -201,11 +287,11 @@ func productSort(sortKey string) bson.D {
 	case "price_asc", "price-asc":
 		return bson.D{{Key: "price", Value: 1}, {Key: "_id", Value: 1}}
 	case "price_desc", "price-desc":
-		return bson.D{{Key: "price", Value: -1}, {Key: "_id", Value: 1}}
+		return bson.D{{Key: "price", Value: -1}, {Key: "_id", Value: -1}}
 	case "name_asc":
 		return bson.D{{Key: "name", Value: 1}, {Key: "_id", Value: 1}}
 	case "name_desc":
-		return bson.D{{Key: "name", Value: -1}, {Key: "_id", Value: 1}}
+		return bson.D{{Key: "name", Value: -1}, {Key: "_id", Value: -1}}
 	default:
 		return bson.D{{Key: "created_at", Value: -1}, {Key: "_id", Value: -1}}
 	}
@@ -562,7 +648,9 @@ func asNumber(value any) (json.Number, error) {
 		return json.Number(strconv.FormatFloat(v, 'f', -1, 64)), nil
 	case bson.Decimal128:
 		value := v.String()
-		if _, err := strconv.ParseFloat(value, 64); err != nil || strings.EqualFold(value, "nan") {
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) ||
+			strings.EqualFold(value, "nan") {
 			return "", fmt.Errorf("invalid decimal price %q", value)
 		}
 		return json.Number(value), nil

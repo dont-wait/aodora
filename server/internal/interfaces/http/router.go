@@ -70,6 +70,14 @@ func withJSONContentType(next http.Handler) http.Handler {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	// Encode before WriteHeader: failure must not produce HTTP 200 with
+	// an incomplete or invalid JSON document.
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"code":"RESPONSE_ENCODING_FAILED","message":"Không thể tạo phản hồi"}}`))
+		return
+	}
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	_, _ = w.Write(append(data, '\n'))
 }

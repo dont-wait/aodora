@@ -19,7 +19,7 @@ type Label struct {
 
 type Color struct {
 	Name string `json:"name,omitempty"`
-	Hex  string `json:"hex"`
+	Hex  string `json:"hex,omitempty"`
 }
 
 type Category struct {

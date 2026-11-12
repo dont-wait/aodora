@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -9,16 +10,47 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/rs/zerolog"
+
 	app "github.com/your-org/aodora/server/internal/application/catalog"
 	model "github.com/your-org/aodora/server/internal/domain/catalog"
 )
 
-type catalogHandler struct{ service *app.Service }
+type catalogHandler struct {
+	service *app.Service
+	log     zerolog.Logger
+}
+
+// Log internal causes while keeping connection URI credentials and other
+// sensitive values out of logs and generic HTTP error responses.
+var mongodbURI = regexp.MustCompile(`(?i)mongodb(?:\+srv)?://[^\s]+`)
+
+func safeCatalogError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return mongodbURI.ReplaceAllString(err.Error(), "[mongodb-uri-redacted]")
+}
+func (h catalogHandler) logFailure(operation string, err error) {
+	h.log.Error().Str("operation", operation).Str("cause", safeCatalogError(err)).Msg("catalog request failed")
+}
+func (h catalogHandler) respondFailure(w http.ResponseWriter, operation string, err error, message string) {
+	h.logFailure(operation, err)
+	if errors.Is(err, context.DeadlineExceeded) {
+		respondError(w, http.StatusGatewayTimeout, "CATALOG_TIMEOUT", "", "Truy vấn sản phẩm quá thời gian cho phép")
+		return
+	}
+	respondError(w, http.StatusInternalServerError, "CATALOG_UNAVAILABLE", "", message)
+}
 
 // WithCatalog keeps the public catalog API independent of auth/admin routes.
-func WithCatalog(service *app.Service) RouterOption {
+func WithCatalog(service *app.Service, logs ...zerolog.Logger) RouterOption {
+	log := zerolog.Nop()
+	if len(logs) > 0 {
+		log = logs[0]
+	}
 	return func(mux *http.ServeMux) {
-		handler := catalogHandler{service: service}
+		handler := catalogHandler{service: service, log: log}
 		mux.HandleFunc("GET /api/v1/categories", handler.categories)
 		mux.HandleFunc("GET /api/v1/products", handler.products)
 		mux.HandleFunc("GET /api/v1/products/{slug}", handler.product)
@@ -42,7 +74,7 @@ func (h catalogHandler) categories(w http.ResponseWriter, r *http.Request) {
 	}
 	categories, err := h.service.Categories(r.Context())
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "CATALOG_UNAVAILABLE", "", "Không thể tải danh mục")
+		h.respondFailure(w, "categories", err, "Không thể tải danh mục")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": categories})
@@ -56,7 +88,7 @@ func (h catalogHandler) products(w http.ResponseWriter, r *http.Request) {
 	}
 	products, err := h.service.List(r.Context(), filter)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "CATALOG_UNAVAILABLE", "", "Không thể tải sản phẩm")
+		h.respondFailure(w, "products", err, "Không thể tải sản phẩm")
 		return
 	}
 	writeJSON(w, http.StatusOK, products)
@@ -80,7 +112,7 @@ func (h catalogHandler) product(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "CATALOG_UNAVAILABLE", "", "Không thể tải sản phẩm")
+		h.respondFailure(w, "product_detail", err, "Không thể tải sản phẩm")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": product})
@@ -136,8 +168,8 @@ func parseProductFilter(query url.Values) (model.Filter, string, string) {
 	}
 	if query.Has("page") {
 		value, err := strconv.ParseInt(query.Get("page"), 10, 64)
-		if err != nil || value < 1 || value > 100000 {
-			return filter, "page", "page phải là số nguyên từ 1 đến 100000"
+		if err != nil || value < 1 || value > 200 {
+			return filter, "page", "page phải là số nguyên từ 1 đến 200"
 		}
 		filter.Page = value
 	}
@@ -161,6 +193,9 @@ func parseProductFilter(query url.Values) (model.Filter, string, string) {
 			return filter, "max_price", "max_price phải là số nguyên không âm"
 		}
 		filter.MaxPrice = &value
+	}
+	if (filter.Page-1)*filter.PageSize > 10000 {
+		return filter, "page", "Vượt giới hạn độ sâu phân trang"
 	}
 	if filter.MinPrice != nil && filter.MaxPrice != nil && *filter.MinPrice > *filter.MaxPrice {
 		return filter, "min_price", "min_price không được lớn hơn max_price"

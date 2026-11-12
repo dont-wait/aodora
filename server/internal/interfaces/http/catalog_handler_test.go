@@ -1,14 +1,18 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	app "github.com/your-org/aodora/server/internal/application/catalog"
 	model "github.com/your-org/aodora/server/internal/domain/catalog"
 	"github.com/your-org/aodora/server/internal/logger"
@@ -80,5 +84,65 @@ func TestFilterParsing(t *testing.T) {
 	}
 	if filter.Search != "lụa tơ" || filter.Page != 3 || filter.PageSize != 4 || *filter.MinPrice != 1000000 || filter.Color != "Đỏ" {
 		t.Fatalf("bad filter %+v", filter)
+	}
+}
+
+type failingCatalogRepo struct{ cause error }
+
+func (r failingCatalogRepo) Categories(context.Context) ([]model.Category, error) {
+	return nil, r.cause
+}
+func (r failingCatalogRepo) ListProducts(context.Context, model.Filter, []string) ([]model.Product, int64, error) {
+	return nil, 0, r.cause
+}
+func (r failingCatalogRepo) ProductBySlug(context.Context, string) (*model.Product, error) {
+	return nil, r.cause
+}
+func (r failingCatalogRepo) ReviewSummary(context.Context, string) (model.ReviewSummary, error) {
+	return model.ReviewSummary{}, r.cause
+}
+
+func TestCatalogErrorsAreLoggedWithoutCredentials(t *testing.T) {
+	var buffer bytes.Buffer
+	log := zerolog.New(&buffer)
+	injected := errors.New("cannot connect mongodb://user:secret@localhost:27017/db?authSource=admin")
+	router := NewRouter(nil, *logger.NewDiscard(), WithCatalog(app.NewService(failingCatalogRepo{cause: injected}), log))
+	for _, path := range []string{"/api/v1/categories", "/api/v1/products", "/api/v1/products/test-slug"} {
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "secret") {
+			t.Fatal("leaked password to client")
+		}
+	}
+	logs := buffer.String()
+	if !strings.Contains(logs, "catalog request failed") || strings.Contains(logs, "secret") {
+		t.Fatalf("missing or sensitive log: %s", logs)
+	}
+}
+
+func TestWriteJSONReturns500OnMarshallingFailure(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusOK, map[string]any{"unsupported": make(chan int)})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("wrote %d instead of 500", rec.Code)
+	}
+	var result map[string]any
+	if err := json.NewDecoder(io.NopCloser(strings.NewReader(rec.Body.String()))).Decode(&result); err != nil {
+		t.Fatalf("invalid error response: %v", err)
+	}
+}
+
+func TestDeepPaginationRejected(t *testing.T) {
+	for _, path := range []string{
+		"/api/v1/products?page=201", "/api/v1/products?page=200&page_size=51",
+	} {
+		recorder := httptest.NewRecorder()
+		testCatalogRouter().ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
+		if recorder.Code != 400 {
+			t.Fatalf("%s: status %d", path, recorder.Code)
+		}
 	}
 }
