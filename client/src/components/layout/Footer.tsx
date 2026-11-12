@@ -1,19 +1,21 @@
 import { useState, type FormEvent } from 'react'
-import { FOOTER, SITE } from '@/data/site'
+import { FOOTER, SITE, ROUTES } from '@/data/site'
+import { Link } from 'react-router-dom'
+import { getCategories } from '@/features/catalog/api'
+import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
 import { useToast } from '@/hooks/useToast'
 
 const linkItem = 'font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer'
 const colTitle = 'font-label-uppercase text-label-uppercase text-primary mb-4 tracking-widest'
 
 export default function Footer() {
+  const categories = useCatalogRequest(getCategories, 'footer:categories')
   const { showToast } = useToast()
   const [email, setEmail] = useState('')
 
   const subscribe = (e: FormEvent) => {
     e.preventDefault()
-    // TODO: gọi API đăng ký bản tin
-    showToast('Cảm ơn quý khách đã đăng ký nhận tin!')
-    setEmail('')
+    showToast('Bản tin chưa được mở đăng ký. Vui lòng quay lại sau.')
   }
 
   return (
@@ -32,9 +34,9 @@ export default function Footer() {
           <div>
             <h4 className={colTitle}>Danh mục</h4>
             <ul className="space-y-2.5">
-              {FOOTER.categories.map((c) => (
-                <li key={c} className={linkItem}>
-                  {c}
+              {categories.data?.map((category) => (
+                <li key={category.id} className={linkItem}>
+                  <Link to={`${ROUTES.collection}?category=${encodeURIComponent(category.slug || category.id)}`}>{category.name}</Link>
                 </li>
               ))}
             </ul>

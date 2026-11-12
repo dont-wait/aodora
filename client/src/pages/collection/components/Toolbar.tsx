@@ -1,13 +1,13 @@
 import Icon from '@/components/ui/Icon'
-import { sortOptions, type SortValue } from '@/data/products'
+import { sortOptions, type CatalogSort } from '@/features/catalog/types'
 
 interface Props {
   shown: number
   total: number
   filterOpen: boolean
   onToggleFilter: () => void
-  sort: SortValue
-  onSortChange: (v: SortValue) => void
+  sort: CatalogSort
+  onSortChange: (v: CatalogSort) => void
 }
 
 export default function Toolbar({ shown, total, filterOpen, onToggleFilter, sort, onSortChange }: Props) {
@@ -35,7 +35,7 @@ export default function Toolbar({ shown, total, filterOpen, onToggleFilter, sort
         <span className="relative inline-block">
           <select
             value={sort}
-            onChange={(e) => onSortChange(e.target.value as SortValue)}
+            onChange={(e) => onSortChange(e.target.value as CatalogSort)}
             className="appearance-none bg-surface text-on-surface px-4 py-2 pr-9 font-label-regular text-label-regular shadow-sm focus:outline-none focus:bg-surface-bright cursor-pointer"
           >
             {sortOptions.map((o) => (

@@ -1,13 +1,7 @@
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import { ROUTES } from '@/data/site'
 
-const STATS = [
-  { value: '100%', label: 'Tơ tằm dệt thủ công', accent: 'text-primary' },
-  { value: '48 Mẫu', label: 'Độc bản & Tinh hoa', accent: 'text-primary' },
-  { value: 'Bespoke 1:1', label: 'May đo chuẩn nhân trắc', accent: 'text-secondary' },
-]
-
-export default function CollectionHero() {
+export default function CollectionHero({ total }: { total?: number }) {
   return (
     <section className="relative w-full bg-surface-container-low px-margin md:px-margin-desktop py-12 md:py-20 overflow-hidden">
       <div className="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
@@ -28,17 +22,7 @@ export default function CollectionHero() {
           Thưởng lãm tinh hoa lụa tơ tằm nguyên bản, nơi sắc thái dịu lành của tơ sợi tự nhiên hòa cùng đường may đo đĩnh đạc, chắt lọc cốt cách truyền thống và
           nhịp sống thanh tân.
         </p>
-        <div className="mt-10 pt-8 flex flex-wrap justify-center items-center gap-8 md:gap-16 text-on-surface">
-          {STATS.map((s, i) => (
-            <div key={s.label} className="flex items-center gap-8 md:gap-16">
-              {i > 0 && <span className="w-1.5 h-1.5 rounded-full bg-outline-variant hidden sm:block" />}
-              <div className="flex flex-col items-center">
-                <span className={`font-title-editorial text-title-editorial font-bold ${s.accent}`}>{s.value}</span>
-                <span className="font-label-uppercase text-label-uppercase text-on-surface-variant mt-1">{s.label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {total !== undefined && <p className="mt-8 text-primary font-semibold">{total} sản phẩm phù hợp</p>}
       </div>
     </section>
   )
