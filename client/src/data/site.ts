@@ -13,20 +13,15 @@ export const ROUTES = {
   tailoring: '/dich-vu-may-do',
 } as const
 
-export const DEFAULT_PRODUCT_SLUG = 'ao-dai-ngu-than-sen-tram'
-
 export const NAV_ITEMS = [
   { to: ROUTES.home, label: 'Trang chủ', end: true },
   { to: ROUTES.collection, label: 'Bộ sưu tập' },
-  { to: ROUTES.product(DEFAULT_PRODUCT_SLUG), label: 'Cổ phục & Dân gian' },
-  { to: `${ROUTES.collection}?loai=cach-tan`, label: 'Hiện đại Cách tân' },
   { to: ROUTES.tailoring, label: 'Dịch vụ May đo' },
 ]
 
 export const FOOTER = {
   about: 'Gìn giữ và tôn vinh cốt cách Áo Dài Việt Nam qua từng tấc lụa tơ tằm thượng hạng dệt thủ công từ làng nghề nghìn năm tuổi.',
   badge: 'Lụa Tơ Tằm Tự Nhiên',
-  categories: ['Áo dài Ngũ thân', 'Áo dài Dân gian', 'Áo dài Lễ hội & Cưới', 'Áo dài Cách tân', 'Lụa Hà Đông cao cấp'],
   support: ['Hướng dẫn lấy số đo', 'Chính sách may đo bespoke', 'Bảo hành chỉ may trọn đời', 'Đổi trả & Giao hàng tận nơi', 'Câu hỏi thường gặp'],
   showrooms: [
     { label: 'Hà Nội', value: 'Làng Lụa Vạn Phúc, Hà Đông & 18 Tràng Tiền, Hoàn Kiếm' },

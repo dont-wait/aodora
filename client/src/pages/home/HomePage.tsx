@@ -3,7 +3,6 @@ import CategoriesSection from './components/CategoriesSection'
 import HeroSection from './components/HeroSection'
 import NewCollectionSection from './components/NewCollectionSection'
 import PillarsSection from './components/PillarsSection'
-import TestimonialsSection from './components/TestimonialsSection'
 
 export default function HomePage() {
   return (
@@ -12,7 +11,6 @@ export default function HomePage() {
       <CategoriesSection />
       <NewCollectionSection />
       <PillarsSection />
-      <TestimonialsSection />
       <BespokeSection />
     </div>
   )
