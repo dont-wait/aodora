@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:catalog": "node --experimental-strip-types --test tests/catalog.test.mjs"
+    "test:catalog": "node --experimental-strip-types --test tests/catalog.test.mjs",
+    "test:admin": "node --experimental-strip-types --test tests/admin-catalog.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

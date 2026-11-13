@@ -4,10 +4,12 @@ import CollectionPage from '@/pages/collection/CollectionPage'
 import GuidePage from '@/pages/guide/GuidePage'
 import HomePage from '@/pages/home/HomePage'
 import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
+import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 
 export default function App() {
   return (
     <Routes>
+      <Route path="admin/catalog" element={<AdminCatalogPage />} />
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="bo-suu-tap" element={<CollectionPage />} />
