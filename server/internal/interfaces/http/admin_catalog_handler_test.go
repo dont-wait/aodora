@@ -85,3 +85,17 @@ func TestCredentialedCORSPreflightRestrictsOrigin(t *testing.T) {
 		t.Fatalf("untrusted origin allowed: %d %v", w.Code, w.Header())
 	}
 }
+
+func TestContentReplacementRequiresAllThreeSections(t *testing.T) {
+	r := httptest.NewRequest("PUT", "/api/v1/admin/products/id/content", strings.NewReader(`{"story":null,"expected_version":0}`))
+	r.Header.Set("Content-Type", "application/json")
+	var input app.ProductContent
+	if err := adminRequestBody(r, &input, "story", "fabric", "craft", "expected_version"); err == nil {
+		t.Fatal("missing fabric/craft fields accepted")
+	}
+	r = httptest.NewRequest("PUT", "/api/v1/admin/products/id/content", strings.NewReader(`{"story":null,"fabric":null,"craft":null,"expected_version":0}`))
+	r.Header.Set("Content-Type", "application/json")
+	if err := adminRequestBody(r, &input, "story", "fabric", "craft", "expected_version"); err != nil {
+		t.Fatalf("explicit removal of sections must be accepted: %v", err)
+	}
+}

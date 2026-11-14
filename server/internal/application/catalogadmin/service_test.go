@@ -44,6 +44,13 @@ func (f *fakeRepo) AdjustInventory(context.Context, string, string, int64, strin
 	f.adjusted = true
 	return map[string]any{}, nil
 }
+func (f *fakeRepo) ProductContent(context.Context, string) (ContentRecord, error) {
+	return ContentRecord{}, nil
+}
+func (f *fakeRepo) UpdateProductContent(_ context.Context, id string, input ProductContent) (ContentRecord, error) {
+	f.edited = true
+	return ContentRecord{ID: id, Version: *input.ExpectedVersion + 1, Story: input.Story, Fabric: input.Fabric, Craft: input.Craft}, nil
+}
 func goodCreate() ProductCreate {
 	return ProductCreate{ProductInput: ProductInput{Name: "Áo dài", Slug: "ao-dai", CategoryID: "670000000000000000000001", Price: 500000, IsActive: true}, Variants: []Variant{{SKU: "AO-DO-M", Color: "Đỏ", Size: "M", Stock: 10}}}
 }

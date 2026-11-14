@@ -110,6 +110,8 @@ type Repository interface {
 	AddVariant(context.Context, string, Variant) (map[string]any, error)
 	UpdateVariant(context.Context, string, string, VariantDetails) (map[string]any, error)
 	AdjustInventory(context.Context, string, string, int64, string) (map[string]any, error)
+	ProductContent(context.Context, string) (ContentRecord, error)
+	UpdateProductContent(context.Context, string, ProductContent) (ContentRecord, error)
 }
 type Service struct{ repo Repository }
 
