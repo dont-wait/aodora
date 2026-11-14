@@ -3,11 +3,10 @@ import type { CatalogProduct } from '@/features/catalog/types'
 import { badgeVariant } from '@/features/catalog/types'
 import Badge from '@/components/ui/Badge'
 import CatalogImage from '@/features/catalog/CatalogImage'
+import { productGallery } from '@/features/catalog/gallery'
 export default function ProductGallery({ product }: { product: CatalogProduct }) {
   const [active, setActive] = useState(0)
-  const images = [product.image, ...(product.gallery || [])].filter((image): image is { src: string; alt: string } => !!image?.src)
-  // API may store only legacy `images[]` without a primary object.
-  if (!images.length) for (const url of (product.images || [])) images.push({ src: url, alt: product.name })
+  const images = productGallery(product)
   const current = images[active] || images[0]
   return <div className="lg:col-span-7 flex flex-col gap-5">
     <div className="relative aspect-[3/4] w-full overflow-hidden bg-surface-container shadow-sm">

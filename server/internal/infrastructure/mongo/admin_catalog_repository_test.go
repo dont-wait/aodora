@@ -1,10 +1,30 @@
 package mongo
 
 import (
+	"testing"
+
 	app "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"testing"
 )
+
+func TestAdminObjectIDTakesPrecedenceOverLegacyID(t *testing.T) {
+	id := bson.NewObjectID()
+	for _, doc := range []any{
+		bson.M{"_id": id, "id": "co-phuc"},
+		map[string]any{"_id": id, "id": "co-phuc"},
+		bson.D{{Key: "_id", Value: id}, {Key: "id", Value: "co-phuc"}},
+		bson.D{{Key: "id", Value: "co-phuc"}, {Key: "_id", Value: id}},
+	} {
+		for i := 0; i < 100; i++ {
+			if got := adminValue(doc).(map[string]any)["id"]; got != id.Hex() {
+				t.Fatalf("ID collision for %T: %v", doc, got)
+			}
+		}
+	}
+	if got := adminValue(bson.M{"id": "accessory-1"}).(map[string]any)["id"]; got != "accessory-1" {
+		t.Fatalf("nested string ID changed: %v", got)
+	}
+}
 
 func TestInventoryMutationGuardsVariantAndAggregateStock(t *testing.T) {
 	id := bson.NewObjectID()
@@ -24,6 +44,7 @@ func TestInventoryMutationGuardsVariantAndAggregateStock(t *testing.T) {
 		t.Fatalf("not updating both stocks: %v", inc)
 	}
 }
+
 func TestMetadataUpdateDoesNotIncludeInventoryOrRatings(t *testing.T) {
 	set, _, err := productFields(app.ProductInput{Name: "Áo dài", Slug: "ao-dai", CategoryID: "670000000000000000000001", Price: 500000})
 	if err != nil {
@@ -46,6 +67,7 @@ func TestOptimisticVersionFilterIncludesLegacyRecords(t *testing.T) {
 		t.Fatalf("wrong version: %v", current)
 	}
 }
+
 func TestLegacyOldPriceIsClearedOnMetadataSave(t *testing.T) {
 	input := app.ProductInput{CategoryID: "670000000000000000000001"}
 	_, unset, err := productFields(input)
@@ -56,6 +78,7 @@ func TestLegacyOldPriceIsClearedOnMetadataSave(t *testing.T) {
 		t.Fatal("stale old_price was not cleared")
 	}
 }
+
 func TestInventoryMutationDeduplicatesInSameDocument(t *testing.T) {
 	id := bson.NewObjectID()
 	key := "33aa1234-1234-4123-8123-123456789012"
@@ -67,6 +90,7 @@ func TestInventoryMutationDeduplicatesInSameDocument(t *testing.T) {
 		t.Fatal("missing operation log")
 	}
 }
+
 func TestSizesAreDerivedFromSKUWithoutDuplicates(t *testing.T) {
 	actual := sizesFromVariants([]app.Variant{{Size: "M"}, {Size: "L"}, {Size: "M"}})
 	if len(actual) != 2 || actual[0] != "M" || actual[1] != "L" {

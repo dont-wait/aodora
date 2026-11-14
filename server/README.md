@@ -53,6 +53,64 @@ Sơ đồ có thể mở/chỉnh sửa bằng draw.io tại [docs/database-schem
 
 Kết nối MongoDB local bằng Compass/Navicat: sử dụng host/port và authentication database theo cấu hình MongoDB của môi trường, lấy tên database từ `MONGO_DB`. Thông tin tài khoản và mật khẩu được quản lý riêng trong biến môi trường/`.env`, không ghi trực tiếp vào tài liệu chung.
 
+## Lưu ảnh bằng RustFS local
+
+Cấu hình tham khảo `anomaly/server/docker-compose.yml`: RustFS cung cấp S3 API,
+console và volume lưu dữ liệu riêng. Compose dùng tên project `aodora` để tách
+container/network/volume khỏi các repo khác. Aodora dùng cổng `9100`/`9101` để tránh
+trùng với RustFS của Anomaly. Có thể đổi bằng `RUSTFS_API_PORT` và
+`RUSTFS_CONSOLE_PORT` trong `.env`.
+Volume MongoDB vẫn dùng tên cũ `server_mongo_data` để giữ dữ liệu đã có;
+nếu trước đây dùng tên project khác, đặt `MONGO_DATA_VOLUME` theo volume hiện tại.
+
+```bash
+make storage-up
+```
+
+Lệnh này khởi động RustFS, chờ healthcheck, tạo bucket `RUSTFS_BUCKET`
+(mặc định `aodora-images`) và bật đọc ảnh công khai. Chạy lại không xóa ảnh.
+`make infra-up` cũng khởi tạo storage cùng MongoDB.
+
+1. Mở console `http://localhost:9101`, đăng nhập bằng `RUSTFS_ACCESS_KEY` và
+   `RUSTFS_SECRET_KEY` trong `.env`.
+2. Upload ảnh vào bucket `aodora-images`, ví dụ object `products/ao-dai/front.jpg`.
+3. Nhập URL `http://localhost:9100/aodora-images/products/ao-dai/front.jpg`
+   vào ô ảnh chính hoặc ảnh phụ của admin. Ảnh phụ nhập mỗi dòng `URL | mô tả ảnh`.
+4. Lưu sản phẩm. MongoDB lưu URL và alt trong `products.image`, `products.gallery`
+   và danh sách URL `products.images`; file nằm trong volume `rustfs_data`.
+
+Bucket này dành riêng cho ảnh storefront: người chưa đăng nhập được đọc ảnh,
+không được upload/xóa ẩn danh. Không đưa tài liệu riêng tư vào đây.
+API Go và giao diện admin hiện vẫn nhận URL; chưa có endpoint/nút upload file.
+Không dùng URL ký tạm thời trong gallery vì ảnh sẽ hết hạn.
+
+`make storage-down` dừng storage và giữ dữ liệu. `docker compose down` giữ volume;
+`docker compose down -v` xóa cả ảnh và dữ liệu MongoDB.
+Khi triển khai ngoài local, đổi credentials, dùng domain HTTPS công khai trỏ đến
+S3 API và lưu URL domain đó trong sản phẩm; trình duyệt khách phải truy cập được
+URL này. Các cổng Compose hiện chỉ bind loopback.
+
+## Seed catalog có ảnh RustFS
+
+```bash
+make seed-demo
+```
+
+Seeder tải chín ảnh tham khảo từ Forher, upload vào RustFS và thêm ba danh mục,
+ba sản phẩm cùng SKU/tồn kho mẫu. Chạy lại giữ nguyên dữ liệu đã chỉnh.
+Chi tiết nguồn ảnh, cấu hình URL và hành vi chạy lại: [seeds/README.md](seeds/README.md).
+
+## Navicat qua trình duyệt
+
+```bash
+make navicat-up
+```
+
+Build image từ AppImage Navicat 18 for MongoDB đã tải trong `~/Downloads`, rồi mở
+`https://localhost:9443` (tài khoản web mặc định `aodora` / `navicat-local`).
+Navicat và cấu hình chạy trong Docker; không cần cài trực tiếp trên host.
+Chi tiết build, kết nối MongoDB và volume: [docker/navicat/README.md](docker/navicat/README.md).
+
 ## Quy ước mở rộng
 
 - Mỗi business capability có package riêng trong `internal/domain` và `internal/application`.

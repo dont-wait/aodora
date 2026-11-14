@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { adminCatalog, AdminApiError, type Image } from '@/features/admin/catalog'
 import {
-  blankStory, blankFabric, blankCraft, editableContent, moveEntry, validateEditorialInput,
-  type StoryContent, type FabricContent, type CraftContent, type ProductContentInput,
+  blankStory, blankFabric, blankCraft, editableContent, moveEntry, validateEditorialInput, synchronizeContentVersion,
+  type StoryContent, type FabricContent, type CraftContent, type ProductContentInput, type MetadataWrite,
 } from '@/features/admin/content'
 
 const fieldClass = 'w-full border border-outline/40 bg-white text-on-surface p-2.5 rounded-sm'
@@ -31,11 +31,12 @@ function RowActions({ index, count, move, remove }: { index: number; count: numb
   </div>
 }
 
-export default function ProductContentEditor({ productId, onVersion, onForbidden }: {
-  productId: string; onVersion: (version: number) => void; onForbidden: () => void
+export default function ProductContentEditor({ productId, metadataWrites, onVersion, onForbidden }: {
+  productId: string; metadataWrites: MetadataWrite[]; onVersion: (version: number) => void; onForbidden: () => void
 }) {
   const mounted = useRef(true)
-  const [data, setData] = useState<ProductContentInput | null>(null)
+  const [draft, setData] = useState<ProductContentInput | null>(null)
+  const data = draft && synchronizeContentVersion(draft, metadataWrites)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')

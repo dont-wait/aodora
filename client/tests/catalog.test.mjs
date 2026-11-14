@@ -3,6 +3,18 @@ import assert from 'node:assert/strict'
 import { createCartSelection, registerCartAddHandler, addSelectedProduct } from '../src/features/catalog/selection.ts'
 import { getCategories, getProduct, listProducts, CatalogApiError } from '../src/features/catalog/api.ts'
 import { parseVNDInput, formatVNDInput } from '../src/features/catalog/prices.ts'
+import { productGallery } from '../src/features/catalog/gallery.ts'
+
+test('gallery gộp URL legacy và RustFS, bỏ trùng và giữ alt của ảnh chính', () => {
+  const primary = { src: 'http://localhost:9100/aodora-images/main.jpg', alt: 'Ảnh chính' }
+  assert.deepEqual(productGallery({
+    name: 'Áo mẫu', image: primary,
+    gallery: [{ src: primary.src, alt: 'Trùng' }, { src: '/detail.jpg', alt: 'Chi tiết' }],
+    images: [primary.src, '/legacy.jpg', '/detail.jpg', ''],
+  }), [primary, { src: '/detail.jpg', alt: 'Chi tiết' }, { src: '/legacy.jpg', alt: 'Áo mẫu' }])
+  assert.deepEqual(productGallery({ name: 'Áo mẫu', image: null, gallery: [], images: ['/a.jpg', '/b.jpg'] }),
+    [{ src: '/a.jpg', alt: 'Áo mẫu' }, { src: '/b.jpg', alt: 'Áo mẫu' }])
+})
 
 const product = {
   id: '507f1f77bcf86cd799439011', slug: 'ao-mau', stock: 6, sku: '', ready_available: true,

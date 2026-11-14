@@ -15,6 +15,15 @@ export type ProductContentInput = {
 export type ProductContentRecord = Omit<ProductContentInput, 'expected_version'> & {
   id: string; name: string; version: number
 }
+export type MetadataWrite = { from: number; to: number }
+
+// Advance only across metadata writes made by this page. A stale editorial
+// snapshot must still conflict if another admin changed the product.
+export function synchronizeContentVersion(data: ProductContentInput, writes: MetadataWrite[]): ProductContentInput {
+  let version = data.expected_version
+  for (const write of writes) if (version === write.from) version = write.to
+  return version === data.expected_version ? data : { ...data, expected_version: version }
+}
 export const blankStory = (): StoryContent => ({ eyebrow: '', title: '', image: null, paragraphs: [] })
 export const blankFabric = (): FabricContent => ({ eyebrow: '', title: '', description: '', image: null, care: [] })
 export const blankCraft = (): CraftContent => ({ eyebrow: '', title: '', description: '', image: null, steps: [] })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { blankStory, editableContent, moveEntry, validateEditorialInput } from '../src/features/admin/content.ts'
+import { blankStory, editableContent, moveEntry, validateEditorialInput, synchronizeContentVersion } from '../src/features/admin/content.ts'
 import { adminCatalog } from '../src/features/admin/catalog.ts'
 
 const record = {
@@ -9,6 +9,20 @@ const record = {
   fabric: { title: 'Vải mẫu', care: [{ title: 'Giặt', description: 'Giặt tay' }] },
   craft: null,
 }
+test('lưu metadata cập nhật version nhưng giữ nguyên bản nháp nội dung', () => {
+  const draft = editableContent(record)
+  draft.story.paragraphs[0] = 'Nội dung đang soạn chưa lưu'
+  const writes = [{ from: 2, to: 3 }, { from: 3, to: 4 }]
+  const synchronized = synchronizeContentVersion(draft, writes)
+  assert.equal(synchronized.expected_version, 4)
+  assert.equal(synchronized.story, draft.story)
+  assert.equal(synchronized.story.paragraphs[0], 'Nội dung đang soạn chưa lưu')
+  assert.equal(draft.expected_version, 2)
+  assert.equal(synchronizeContentVersion(synchronized, writes), synchronized)
+  // An older editorial snapshot must not skip a write made by another admin.
+  const stale = { ...draft, expected_version: 1 }
+  assert.equal(synchronizeContentVersion(stale, writes), stale)
+})
 test('nội dung từng mẫu lấy từ bản ghi riêng, không thay bằng chuyện mẫu', () => {
   const a = editableContent(record)
   const b = editableContent({ ...record, id: '670000000000000000000002', story: null, fabric: null })

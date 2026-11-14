@@ -71,6 +71,9 @@ func adminValue(raw any) any {
 			}
 			out[k] = adminValue(x)
 		}
+		if id, ok := v["_id"]; ok {
+			out["id"] = adminValue(id)
+		}
 		return out
 	case map[string]any:
 		out := map[string]any{}
@@ -79,6 +82,9 @@ func adminValue(raw any) any {
 				k = "id"
 			}
 			out[k] = adminValue(x)
+		}
+		if id, ok := v["_id"]; ok {
+			out["id"] = adminValue(id)
 		}
 		return out
 	case bson.D:
@@ -89,6 +95,11 @@ func adminValue(raw any) any {
 				k = "id"
 			}
 			out[k] = adminValue(entry.Value)
+		}
+		for _, entry := range v {
+			if entry.Key == "_id" {
+				out["id"] = adminValue(entry.Value)
+			}
 		}
 		return out
 	case bson.A:

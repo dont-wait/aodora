@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import ProductContentEditor from './ProductContentEditor'
+import type { MetadataWrite } from '@/features/admin/content'
 import { adminCatalog, AdminApiError, editableGallery, parseImageLines, parseVariantLines,
   type Category, type CategoryInput, type Product, type ProductInput, type Variant } from '@/features/admin/catalog'
 
@@ -74,6 +75,7 @@ export default function AdminCatalogPage() {
   const [product, setProduct] = useState<ProductInput>(emptyProduct)
   const [variantsText, setVariantsText] = useState('')
   const [galleryText, setGalleryText] = useState('')
+  const [metadataWrites, setMetadataWrites] = useState<(MetadataWrite & { productId: string })[]>([])
   const [colorsText, setColorsText] = useState('')
   const [accessoriesText, setAccessoriesText] = useState('')
   const [newSKU, setNewSKU] = useState({ sku: '', color: '', size: '', stock: 0 })
@@ -116,6 +118,7 @@ export default function AdminCatalogPage() {
     setCategory(value ? { name: value.name, slug: value.slug, description: value.description || '', parent_id: value.parent_id || '', is_active: value.is_active, sort_order: value.sort_order || 0, image: value.image || null, expected_version: value.version ?? 0 } : { ...emptyCategory })
   }
   function selectProduct(id: string) {
+    if (id !== productId) setMetadataWrites([])
     setError(''); setSuccess(''); setProductId(id)
     const value = products.find((row) => row.id === id)
     setProduct(value ? {
@@ -151,6 +154,7 @@ export default function AdminCatalogPage() {
       const data = { ...product, images, gallery, colors, accessories }
       if (productId) {
         const updated = await adminCatalog.updateProduct(productId, data)
+        setMetadataWrites((writes) => [...writes, { productId, from: data.expected_version ?? 0, to: updated.version ?? 0 }])
         setProduct((current) => ({ ...current, expected_version: updated.version ?? 0 }))
       } else await adminCatalog.createProduct({ ...data, variants: parseVariantLines(variantsText) })
       await load();setSuccess('Đã lưu sản phẩm vào MongoDB')
@@ -201,7 +205,7 @@ export default function AdminCatalogPage() {
               {(chosen.variants || []).map((v) => <VariantRow key={`${chosen.id}:${v.sku}`} productId={chosen.id} variant={v} onSaved={load} onForbidden={onForbidden}/>)}
               <div className="border-t pt-3 space-y-2"><h3 className="font-bold">Thêm SKU (tồn = 0)</h3><div className="grid md:grid-cols-3 gap-2"><input className={inputClass} placeholder="SKU" value={newSKU.sku} onChange={(e) => setNewSKU({ ...newSKU, sku: e.target.value })}/><input className={inputClass} placeholder="Màu" value={newSKU.color} onChange={(e) => setNewSKU({ ...newSKU, color: e.target.value })}/><input className={inputClass} placeholder="Cỡ" value={newSKU.size} onChange={(e) => setNewSKU({ ...newSKU, size: e.target.value })}/></div><button className={buttonClass} disabled={busy} type="button" onClick={() => void addSKU()}>Thêm SKU</button></div>
             </section>}
-            {chosen && <ProductContentEditor key={chosen.id} productId={chosen.id} onForbidden={onForbidden}
+            {chosen && <ProductContentEditor key={chosen.id} productId={chosen.id} metadataWrites={metadataWrites.filter((write) => write.productId === chosen.id)} onForbidden={onForbidden}
               onVersion={(version) => {
                 setProduct((current) => current.expected_version == null ? current : { ...current, expected_version: version })
                 setProducts((current) => current.map((row) => row.id === chosen.id ? { ...row, version } : row))
