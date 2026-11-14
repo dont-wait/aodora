@@ -40,13 +40,39 @@ func catalogContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, catalogQueryTimeout)
 }
 
+// Public navigation applies the same active-ancestor/root rule as product
+// listing, so an inactive parent cannot leak active child categories into tabs.
+func publicCategoriesPipeline() bson.A {
+	return bson.A{
+		bson.M{"$match": bson.M{"is_active": true}},
+		bson.M{"$graphLookup": bson.M{
+			"from": "categories", "startWith": "$parent_id",
+			"connectFromField": "parent_id", "connectToField": "_id", "as": "_ancestors",
+		}},
+		bson.M{"$match": bson.M{"$expr": bson.M{"$and": bson.A{
+			bson.M{"$allElementsTrue": bson.A{bson.M{"$map": bson.M{
+				"input": "$_ancestors", "as": "ancestor",
+				"in": bson.M{"$eq": bson.A{"$$ancestor.is_active", true}},
+			}}}},
+			bson.M{"$or": bson.A{
+				bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$parent_id", nil}}, nil}},
+				bson.M{"$gt": bson.A{
+					bson.M{"$size": bson.M{"$filter": bson.M{
+						"input": "$_ancestors", "as": "ancestor",
+						"cond": bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$$ancestor.parent_id", nil}}, nil}},
+					}}}, 0,
+				}},
+			}},
+		}}}},
+		bson.M{"$sort": bson.D{{Key: "sort_order", Value: 1}, {Key: "name", Value: 1}, {Key: "_id", Value: 1}}},
+		bson.M{"$project": bson.M{"_id": 1, "id": 1, "slug": 1, "name": 1, "description": 1,
+			"parent_id": 1, "is_active": 1, "sort_order": 1, "image": 1, "badge": 1}},
+	}
+}
 func (r *CatalogRepository) Categories(ctx context.Context) ([]model.Category, error) {
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	cursor, err := r.categories.Find(ctx, bson.M{}, options.Find().SetProjection(bson.M{
-		"_id": 1, "id": 1, "slug": 1, "name": 1, "description": 1,
-		"parent_id": 1, "is_active": 1, "sort_order": 1, "image": 1, "badge": 1,
-	}))
+	cursor, err := r.categories.Aggregate(ctx, publicCategoriesPipeline(), options.Aggregate().SetCollation(&options.Collation{Locale: "vi", Strength: 2}))
 	if err != nil {
 		return nil, fmt.Errorf("list categories: %w", err)
 	}
