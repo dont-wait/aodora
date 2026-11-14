@@ -9,10 +9,18 @@ import (
 	"github.com/your-org/aodora/server/internal/application/health"
 )
 
-func NewRouter(healthService *health.Service, log zerolog.Logger) http.Handler {
+// RouterOption registers an isolated capability without changing other routes.
+type RouterOption func(*http.ServeMux)
+
+func NewRouter(healthService *health.Service, log zerolog.Logger, extra ...RouterOption) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	mux.HandleFunc("GET /readyz", readyz(healthService))
+	for _, register := range extra {
+		if register != nil {
+			register(mux)
+		}
+	}
 	return requestLogger(log, withJSONContentType(mux))
 }
 
@@ -62,6 +70,14 @@ func withJSONContentType(next http.Handler) http.Handler {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	// Encode before WriteHeader: failure must not produce HTTP 200 with
+	// an incomplete or invalid JSON document.
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"code":"RESPONSE_ENCODING_FAILED","message":"Không thể tạo phản hồi"}}`))
+		return
+	}
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	_, _ = w.Write(append(data, '\n'))
 }

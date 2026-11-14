@@ -9,9 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/your-org/aodora/server/internal/application/catalog"
+	admin "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	"github.com/your-org/aodora/server/internal/application/health"
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
+	catalogMongo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
 	httpapi "github.com/your-org/aodora/server/internal/interfaces/http"
 	"github.com/your-org/aodora/server/internal/logger"
 )
@@ -51,9 +54,14 @@ func main() {
 	}()
 
 	service := health.NewService(db, *log)
+	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
+	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB))
 	server := &http.Server{
-		Addr:              cfg.HTTP.Addr,
-		Handler:           httpapi.NewRouter(service, *log),
+		Addr: cfg.HTTP.Addr,
+		Handler: httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService, *log),
+			// KR-01 supplies a verified role-based authorizer when available.
+			// Default denies admin access; never expose unauthenticated writes.
+			httpapi.WithAdminCatalog(adminService, nil, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

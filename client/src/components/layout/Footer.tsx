@@ -1,19 +1,22 @@
 import { useState, type FormEvent } from 'react'
-import { FOOTER, SITE } from '@/data/site'
+import { FOOTER, SITE, ROUTES } from '@/data/site'
+import { Link } from 'react-router-dom'
+import { getCategories } from '@/features/catalog/api'
+import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
 import { useToast } from '@/hooks/useToast'
+import BrandMark from './BrandMark'
 
 const linkItem = 'font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer'
 const colTitle = 'font-label-uppercase text-label-uppercase text-primary mb-4 tracking-widest'
 
 export default function Footer() {
+  const categories = useCatalogRequest(getCategories, 'footer:categories')
   const { showToast } = useToast()
   const [email, setEmail] = useState('')
 
   const subscribe = (e: FormEvent) => {
     e.preventDefault()
-    // TODO: gọi API đăng ký bản tin
-    showToast('Cảm ơn quý khách đã đăng ký nhận tin!')
-    setEmail('')
+    showToast('Bản tin chưa được mở đăng ký. Vui lòng quay lại sau.')
   }
 
   return (
@@ -22,7 +25,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-gutter-desktop">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img alt={SITE.name} className="h-7 w-auto object-contain" src={SITE.logo} />
+              <BrandMark compact />
               <span className="font-title-editorial text-title-editorial uppercase text-primary font-bold">{SITE.name}</span>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant mb-6 leading-relaxed">{FOOTER.about}</p>
@@ -32,9 +35,9 @@ export default function Footer() {
           <div>
             <h4 className={colTitle}>Danh mục</h4>
             <ul className="space-y-2.5">
-              {FOOTER.categories.map((c) => (
-                <li key={c} className={linkItem}>
-                  {c}
+              {categories.data?.map((category) => (
+                <li key={category.id} className={linkItem}>
+                  <Link to={`${ROUTES.collection}?category=${encodeURIComponent(category.slug || category.id)}`}>{category.name}</Link>
                 </li>
               ))}
             </ul>

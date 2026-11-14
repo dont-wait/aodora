@@ -1,0 +1,50 @@
+{
+  "source": "https://forhershop.vn/product-category/ao-dai/",
+  "categories": [
+    {"key": "gam", "name": "Áo dài gấm", "slug": "demo-ao-dai-gam"},
+    {"key": "hoa-tiet", "name": "Áo dài họa tiết", "slug": "demo-ao-dai-hoa-tiet"},
+    {"key": "dinh-da", "name": "Áo dài đính đá", "slug": "demo-ao-dai-dinh-da"}
+  ],
+  "products": [
+    {
+      "key": "ad05202", "category": "gam",
+      "name": "Áo dài Mộc Tâm cổ 2 lớp xanh rêu AD05202",
+      "slug": "demo-ao-dai-moc-tam-xanh-reu",
+      "source_url": "https://forhershop.vn/product/ao-dai-moc-tam-co-2-lop-xanh-reu/",
+      "description": "Mẫu áo dài xanh rêu với điểm nhấn cổ hai lớp. Dữ liệu tham khảo phục vụ giao diện demo.",
+      "material": "Gấm 2 da", "price": 820000, "color": "Xanh rêu", "hex": "#596647",
+      "sizes": ["S", "M", "L"], "stocks": [5, 3, 0],
+      "images": [
+        {"file": "ad05202/01.webp", "alt": "Áo dài Mộc Tâm xanh rêu — tổng thể", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05202-QUA40TK.webp"},
+        {"file": "ad05202/02.webp", "alt": "Áo dài Mộc Tâm xanh rêu — chi tiết", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05202.webp"},
+        {"file": "ad05202/03.webp", "alt": "Áo dài Mộc Tâm xanh rêu — góc chụp bổ sung", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05202-QUA40TK-2.webp"}
+      ]
+    },
+    {
+      "key": "ad05203", "category": "hoa-tiet",
+      "name": "Áo dài Ngọc An bi AD05203", "slug": "demo-ao-dai-ngoc-an-bi",
+      "source_url": "https://forhershop.vn/product/ao-dai-ngoc-an-bi/",
+      "description": "Mẫu áo dài sắc xám kết hợp họa tiết chấm bi. Dữ liệu tham khảo phục vụ giao diện demo.",
+      "material": "Tơ Nha Xá", "price": 850000, "color": "Xám", "hex": "#93958F",
+      "sizes": ["S", "M", "L"], "stocks": [2, 4, 2],
+      "images": [
+        {"file": "ad05203/01.webp", "alt": "Áo dài Ngọc An bi — tổng thể", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05203-QUA40KV.webp"},
+        {"file": "ad05203/02.webp", "alt": "Áo dài Ngọc An bi — chi tiết", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05203.webp"},
+        {"file": "ad05203/03.webp", "alt": "Áo dài Ngọc An bi — góc chụp bổ sung", "source_url": "https://forhershop.vn/wp-content/uploads/2026/10/AD05203-QUA40KV-2.webp"}
+      ]
+    },
+    {
+      "key": "ad06277", "category": "dinh-da",
+      "name": "Áo dài Thanh Xuân đính đá đỏ AD06277", "slug": "demo-ao-dai-thanh-xuan-do",
+      "source_url": "https://forhershop.vn/product/ao-dai-thanh-xuan-dinh-da-do/",
+      "description": "Mẫu áo dài đỏ với điểm nhấn đính đá. Dữ liệu tham khảo phục vụ giao diện demo.",
+      "material": "Tơ tằm", "price": 890000, "color": "Đỏ", "hex": "#A62832",
+      "sizes": ["S", "M", "L"], "stocks": [0, 0, 0],
+      "images": [
+        {"file": "ad06277/01.webp", "alt": "Áo dài Thanh Xuân đỏ — tổng thể", "source_url": "https://forhershop.vn/wp-content/uploads/2026/08/AD06277-QUA40DO-2.webp"},
+        {"file": "ad06277/02.webp", "alt": "Áo dài Thanh Xuân đỏ — chi tiết", "source_url": "https://forhershop.vn/wp-content/uploads/2026/08/AD06277.webp"},
+        {"file": "ad06277/03.webp", "alt": "Áo dài Thanh Xuân đỏ — góc chụp bổ sung", "source_url": "https://forhershop.vn/wp-content/uploads/2026/08/AD06277-QUA40DO.webp"}
+      ]
+    }
+  ]
+}

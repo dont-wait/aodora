@@ -1,0 +1,4 @@
+[
+  { "dropIndexes": "products", "index": "ix_catalog_active_name_vi" },
+  { "dropIndexes": "products", "index": "ix_catalog_category_name_vi" }
+]

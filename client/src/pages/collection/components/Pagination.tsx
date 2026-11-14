@@ -7,7 +7,8 @@ interface Props {
 }
 
 export default function Pagination({ page, totalPages, onChange }: Props) {
-  const pages = Array.from({ length: Math.min(totalPages, 4) }, (_, i) => i + 1)
+  const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+  const pages = Array.from({ length: Math.min(totalPages, 5) }, (_, i) => start + i)
   return (
     <div className="mt-14 pt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
       <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -34,7 +35,7 @@ export default function Pagination({ page, totalPages, onChange }: Props) {
             {p}
           </button>
         ))}
-        {totalPages > 4 && <span className="px-2 text-outline">...</span>}
+
         <button
           type="button"
           disabled={page === totalPages}

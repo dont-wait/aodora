@@ -1,4 +1,4 @@
-import { heroImages, heroStats } from '@/data/home'
+import { heroImages } from '@/data/home'
 
 export default function HeroSection() {
   return (
@@ -8,7 +8,7 @@ export default function HeroSection() {
           <div className="lg:col-span-6 flex flex-col justify-center space-y-6 lg:space-y-8 z-10">
             <div className="inline-flex items-center gap-2 self-start bg-surface-container px-3 py-1.5 rounded-full">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              <span className="font-label-uppercase text-label-uppercase text-secondary tracking-widest uppercase">Bộ Sưu Tập Mùa Thu 2025</span>
+              <span className="font-label-uppercase text-label-uppercase text-secondary tracking-widest uppercase">Tinh hoa tà áo Việt</span>
             </div>
             <div className="space-y-4">
               <h1 className="font-headline-lg lg:font-display-hero text-headline-lg lg:text-display-hero text-primary tracking-tight leading-none">
@@ -39,14 +39,7 @@ export default function HeroSection() {
               </a>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 pt-6 bg-surface-container-low p-6 rounded-lg shadow-sm">
-              {heroStats.map((stat) => (
-                <div key={stat.label} className="space-y-1">
-                  <span className="block font-headline-md text-headline-md text-primary font-semibold">{stat.value}</span>
-                  <span className="block font-body-sm text-body-sm text-on-surface-variant leading-snug">{stat.label}</span>
-                </div>
-              ))}
-            </div>
+
           </div>
 
           <div className="lg:col-span-6 relative flex justify-center items-center">
@@ -61,7 +54,7 @@ export default function HeroSection() {
               <div className="absolute bottom-6 left-6 right-6 p-5 bg-surface/90 backdrop-blur-md shadow-lg flex items-center justify-between">
                 <div>
                   <p className="font-label-uppercase text-label-uppercase text-secondary">Tuyệt Tác Thêu Độc Bản</p>
-                  <h3 className="font-headline-sm text-headline-sm text-on-surface">Nguyệt Dạ Vân Tơ '25</h3>
+                  <h3 className="font-headline-sm text-headline-sm text-on-surface">Áo dài thủ công Việt</h3>
                 </div>
                 <span className="font-title-editorial text-title-editorial text-primary font-bold">Kén tằm tự nhiên</span>
               </div>

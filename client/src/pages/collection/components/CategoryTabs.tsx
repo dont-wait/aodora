@@ -1,35 +1,13 @@
-import type { Category, CategoryId } from '@/types'
-
-export type CategoryFilter = CategoryId | 'all'
-
-interface Props {
-  categories: Category[]
-  active: CategoryFilter
-  total: number
-  onChange: (id: CategoryFilter) => void
-}
-
-export default function CategoryTabs({ categories, active, total, onChange }: Props) {
-  const tabs: { id: CategoryFilter; label: string; count: number }[] = [
-    { id: 'all', label: 'Tất cả', count: total },
-    ...categories.map((c) => ({ id: c.id, label: c.name, count: c.count })),
-  ]
-  return (
-    <div role="tablist" className="flex items-center gap-3 overflow-x-auto pb-4 mb-10">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          role="tab"
-          aria-selected={active === t.id}
-          type="button"
-          onClick={() => onChange(t.id)}
-          className={`flex-shrink-0 px-5 py-2.5 font-label-uppercase text-label-uppercase tracking-wider transition-colors ${
-            active === t.id ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-          }`}
-        >
-          {t.label} ({t.count})
-        </button>
-      ))}
-    </div>
-  )
+import type { CatalogCategory } from '@/features/catalog/types'
+interface Props { categories: CatalogCategory[]; active: string; onChange: (value: string) => void }
+export default function CategoryTabs({ categories, active, onChange }: Props) {
+  return <div role="tablist" aria-label="Danh mục" className="flex items-center gap-3 overflow-x-auto pb-4 mb-10">
+    {[{ id: '', slug: '', name: 'Tất cả' }, ...categories].map((category) => (
+      <button key={category.id} role="tab" aria-selected={active === (category.slug || category.id)} type="button"
+        onClick={() => onChange(category.slug || category.id)}
+        className={`flex-shrink-0 px-5 py-2.5 font-label-uppercase text-label-uppercase tracking-wider transition-colors ${active === (category.slug || category.id) ? 'bg-primary text-on-primary' : 'bg-surface-container hover:bg-surface-container-high text-on-surface'}`}>
+        {category.name}
+      </button>
+    ))}
+  </div>
 }

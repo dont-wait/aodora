@@ -1,3 +1,5 @@
+name: aodora
+
 services:
   mongo:
     image: mongo:8.0
@@ -14,5 +16,91 @@ services:
       timeout: 5s
       retries: 10
 
+  navicat:
+    profiles: [tools]
+    platform: linux/amd64
+    build:
+      context: ./docker/navicat
+    image: aodora-navicat:local
+    environment:
+      PUID: ${NAVICAT_PUID:-1000}
+      PGID: ${NAVICAT_PGID:-1000}
+      TZ: Asia/Ho_Chi_Minh
+      CUSTOM_USER: ${NAVICAT_WEB_USER:-aodora}
+      PASSWORD: ${NAVICAT_WEB_PASSWORD:-navicat-local}
+    ports:
+      - "127.0.0.1:${NAVICAT_WEB_PORT:-9443}:3001"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - navicat_config:/config
+    shm_size: "1gb"
+    restart: unless-stopped
+
+  # S3-compatible image storage; host ports differ from Anomaly's defaults.
+  rustfs:
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:latest}
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-aodoraadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-aodora-local-secret}
+      RUSTFS_CONSOLE_ENABLE: "true"
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "127.0.0.1:${RUSTFS_API_PORT:-9100}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9101}:9001"
+    volumes:
+      - rustfs_data:/data
+      - rustfs_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  rustfs-init:
+    image: amazon/aws-cli:2.27.60
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-aodoraadmin}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-aodora-local-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-aodora-images}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$RUSTFS_BUCKET" 2>/dev/null ||
+          aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$RUSTFS_BUCKET"
+        aws --endpoint-url http://rustfs:9000 s3api put-bucket-policy --bucket "$$RUSTFS_BUCKET" --policy \
+          "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"s3:GetObject\",\"Resource\":\"arn:aws:s3:::$$RUSTFS_BUCKET/*\"}]}"
+
+  rustfs-seed:
+    image: amazon/aws-cli:2.27.60
+    profiles: [seed]
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-aodoraadmin}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-aodora-local-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-aodora-images}
+    volumes:
+      - ./seeds/assets:/seed:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        aws --endpoint-url http://rustfs:9000 s3 sync /seed "s3://$$RUSTFS_BUCKET/demo/forher/" \
+          --exclude '*' --include '*.webp' --content-type image/webp --cache-control public,max-age=86400
+
 volumes:
   mongo_data:
+    # Preserve the existing Aodora MongoDB volume from the former "server" project.
+    name: ${MONGO_DATA_VOLUME:-server_mongo_data}
+  rustfs_data:
+  rustfs_logs:
+  navicat_config:

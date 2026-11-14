@@ -1,0 +1,518 @@
+[
+  {
+    "collMod": "products",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "name",
+          "slug",
+          "category_id",
+          "price",
+          "stock",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "name": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "slug": {
+            "bsonType": "string",
+            "minLength": 1
+          },
+          "description": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "category_id": {
+            "bsonType": "objectId"
+          },
+          "price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "compare_at_price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "images": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "variants": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "sku",
+                "size",
+                "color",
+                "stock"
+              ],
+              "properties": {
+                "sku": {
+                  "bsonType": "string",
+                  "minLength": 1
+                },
+                "size": {
+                  "bsonType": "string"
+                },
+                "color": {
+                  "bsonType": "string"
+                },
+                "stock": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "stock": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "is_active": {
+            "bsonType": "bool"
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "sku": {
+            "bsonType": "string"
+          },
+          "material": {
+            "bsonType": "string"
+          },
+          "old_price": {
+            "bsonType": [
+              "int",
+              "long",
+              "decimal"
+            ],
+            "minimum": 0
+          },
+          "collection": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "image": {
+            "bsonType": "object",
+            "required": [
+              "src",
+              "alt"
+            ],
+            "properties": {
+              "src": {
+                "bsonType": "string"
+              },
+              "alt": {
+                "bsonType": "string"
+              }
+            }
+          },
+          "gallery": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "src",
+                "alt"
+              ],
+              "properties": {
+                "src": {
+                  "bsonType": "string"
+                },
+                "alt": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "badge": {
+            "bsonType": "object",
+            "required": [
+              "label",
+              "variant"
+            ],
+            "properties": {
+              "label": {
+                "bsonType": "string"
+              },
+              "variant": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "surface",
+                  "tertiary",
+                  "primaryContainer",
+                  "secondaryContainer"
+                ]
+              }
+            }
+          },
+          "tag": {
+            "bsonType": "object",
+            "required": [
+              "label",
+              "variant"
+            ],
+            "properties": {
+              "label": {
+                "bsonType": "string"
+              },
+              "variant": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "surface",
+                  "tertiary",
+                  "primaryContainer",
+                  "secondaryContainer"
+                ]
+              }
+            }
+          },
+          "colors": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "properties": {
+                "name": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "hex": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "color_note": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "sizes": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "bespoke": {
+            "bsonType": "bool"
+          },
+          "cta": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "bundle": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "rating": {
+            "bsonType": [
+              "int",
+              "long",
+              "double",
+              "decimal"
+            ],
+            "minimum": 0,
+            "maximum": 5
+          },
+          "review_count": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "discount": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "availability": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "accessories": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "properties": {
+                "id": {
+                  "bsonType": "string"
+                },
+                "name": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                },
+                "price": {
+                  "bsonType": [
+                    "int",
+                    "long",
+                    "decimal"
+                  ],
+                  "minimum": 0
+                },
+                "tag": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tag_variant": {
+                  "bsonType": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "image": {
+                  "bsonType": "object",
+                  "required": [
+                    "src",
+                    "alt"
+                  ],
+                  "properties": {
+                    "src": {
+                      "bsonType": "string"
+                    },
+                    "alt": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "price"
+              ]
+            }
+          },
+          "trust": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "title",
+                "description"
+              ],
+              "properties": {
+                "icon": {
+                  "bsonType": "string"
+                },
+                "title": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "story": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "paragraphs": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "string"
+                }
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              }
+            }
+          },
+          "fabric": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              },
+              "care": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "title",
+                    "description"
+                  ],
+                  "properties": {
+                    "icon": {
+                      "bsonType": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "bsonType": "string"
+                    },
+                    "description": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "craft": {
+            "bsonType": "object",
+            "properties": {
+              "eyebrow": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "bsonType": [
+                  "string",
+                  "null"
+                ]
+              },
+              "image": {
+                "bsonType": "object",
+                "required": [
+                  "src",
+                  "alt"
+                ],
+                "properties": {
+                  "src": {
+                    "bsonType": "string"
+                  },
+                  "alt": {
+                    "bsonType": "string"
+                  }
+                }
+              },
+              "steps": {
+                "bsonType": "array",
+                "items": {
+                  "bsonType": "object",
+                  "required": [
+                    "title",
+                    "description"
+                  ],
+                  "properties": {
+                    "title": {
+                      "bsonType": "string"
+                    },
+                    "description": {
+                      "bsonType": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  }
+]
