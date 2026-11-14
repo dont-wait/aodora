@@ -12,10 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-type AdminCatalogRepository struct{ categories, products *driver.Collection }
+type AdminCatalogRepository struct{ categories, products, state *driver.Collection }
 
 func NewAdminCatalogRepository(db *driver.Database) *AdminCatalogRepository {
-	return &AdminCatalogRepository{categories: db.Collection("categories"), products: db.Collection("products")}
+	return &AdminCatalogRepository{categories: db.Collection("categories"), products: db.Collection("products"), state: db.Collection("catalog_admin_state")}
 }
 func (r *AdminCatalogRepository) Categories(ctx context.Context) ([]map[string]any, error) {
 	ctx, cancel := catalogContext(ctx)
@@ -165,7 +165,7 @@ func productFields(v app.ProductInput) (bson.M, bson.M, error) {
 		v.Accessories = []app.Accessory{}
 	}
 	set := bson.M{"name": v.Name, "slug": v.Slug, "category_id": categoryID, "description": v.Description, "material": v.Material, "price": v.Price, "images": v.Images, "gallery": v.Gallery, "colors": v.Colors, "accessories": v.Accessories, "is_active": v.IsActive, "updated_at": now}
-	unset := bson.M{}
+	unset := bson.M{"old_price": ""} // Remove legacy fallback whenever comparison pricing is saved.
 	if v.CompareAtPrice != nil {
 		set["compare_at_price"] = *v.CompareAtPrice
 	} else {
@@ -199,6 +199,7 @@ func (r *AdminCatalogRepository) CreateCategory(ctx context.Context, v app.Categ
 	}
 	set["_id"] = bson.NewObjectID()
 	set["created_at"] = set["updated_at"]
+	set["version"] = int64(1)
 	_, err = r.categories.InsertOne(ctx, set)
 	if err != nil {
 		return nil, mongoWriteErr(err)
@@ -214,14 +215,16 @@ func (r *AdminCatalogRepository) verifyParent(ctx context.Context, current bson.
 		seen[current.Hex()] = true
 	}
 	for parent != "" {
-		if seen[parent] {
-			return app.Invalid{Field: "parent_id", Message: "Quan hệ cha tạo thành vòng lặp"}
-		}
-		seen[parent] = true
 		id, err := oid(parent)
 		if err != nil {
 			return app.Invalid{Field: "parent_id", Message: "ID danh mục cha không hợp lệ"}
 		}
+		// ObjectIDs are case-insensitive hexadecimal values, not raw strings.
+		canonical := id.Hex()
+		if seen[canonical] {
+			return app.Invalid{Field: "parent_id", Message: "Quan hệ cha tạo thành vòng lặp"}
+		}
+		seen[canonical] = true
 		var row bson.M
 		if err := r.categories.FindOne(ctx, bson.M{"_id": id}).Decode(&row); err != nil {
 			if errors.Is(err, driver.ErrNoDocuments) {
@@ -233,6 +236,82 @@ func (r *AdminCatalogRepository) verifyParent(ctx context.Context, current bson.
 	}
 	return nil
 }
+
+// A metadata version is optimistic concurrency control for full-form PUTs.
+// Legacy documents without a version start at zero; the first successful
+// update stores version=1. Variant/inventory operations don't bump this
+// version because they are excluded from the metadata replacement payload.
+func metadataVersionFilter(expected int64) bson.M {
+	if expected == 0 {
+		return bson.M{"$or": bson.A{bson.M{"version": bson.M{"$exists": false}}, bson.M{"version": int64(0)}}}
+	}
+	return bson.M{"version": expected}
+}
+func withMetadataVersion(id bson.ObjectID, expected int64) bson.M {
+	filter := bson.M{"_id": id}
+	for k, v := range metadataVersionFilter(expected) {
+		filter[k] = v
+	}
+	return filter
+}
+func (r *AdminCatalogRepository) missingOrConflict(ctx context.Context, collection *driver.Collection, id bson.ObjectID) error {
+	err := collection.FindOne(ctx, bson.M{"_id": id}, options.FindOne().SetProjection(bson.M{"_id": 1})).Err()
+	if errors.Is(err, driver.ErrNoDocuments) {
+		return app.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return app.ErrConflict
+}
+func (r *AdminCatalogRepository) updateCategoryRecord(ctx context.Context, oidValue bson.ObjectID, v app.CategoryInput) (map[string]any, error) {
+	set, unset, err := categoryFields(v)
+	if err != nil {
+		return nil, err
+	}
+	update := bson.M{"$set": set, "$inc": bson.M{"version": int64(1)}}
+	if len(unset) > 0 {
+		update["$unset"] = unset
+	}
+	result := r.categories.FindOneAndUpdate(ctx, withMetadataVersion(oidValue, *v.ExpectedVersion), update, options.FindOneAndUpdate().SetReturnDocument(options.After))
+	var doc bson.M
+	if err := result.Decode(&doc); err != nil {
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return nil, r.missingOrConflict(ctx, r.categories, oidValue)
+		}
+		return nil, mongoWriteErr(err)
+	}
+	return adminDocument(doc), nil
+}
+func (r *AdminCatalogRepository) reparentCategoryTransaction(ctx context.Context, oidValue bson.ObjectID, v app.CategoryInput) (map[string]any, error) {
+	// A shared document is deliberately written before checking ancestry.
+	// Conflicting transactions cannot both validate against the old tree and
+	// commit a cycle. This requires a replica set; no unsafe standalone
+	// read-then-write fallback is permitted for hierarchy changes.
+	session, err := r.categories.Database().Client().StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(context.Background())
+	value, err := session.WithTransaction(ctx, func(tx context.Context) (any, error) {
+		_, lockErr := r.state.UpdateOne(tx, bson.M{"_id": "category-tree"}, bson.M{"$inc": bson.M{"revision": int64(1)}}, options.UpdateOne().SetUpsert(true))
+		if lockErr != nil {
+			return nil, lockErr
+		}
+		if err := r.verifyParent(tx, oidValue, v.ParentID); err != nil {
+			return nil, err
+		}
+		return r.updateCategoryRecord(tx, oidValue, v)
+	})
+	if err != nil {
+		var cmdErr driver.CommandError
+		if errors.As(err, &cmdErr) && cmdErr.Code == 20 {
+			return nil, app.ErrTransactionsRequired
+		}
+		return nil, err
+	}
+	return value.(map[string]any), nil
+}
 func (r *AdminCatalogRepository) UpdateCategory(ctx context.Context, id string, v app.CategoryInput) (map[string]any, error) {
 	oidValue, err := oid(id)
 	if err != nil {
@@ -240,26 +319,21 @@ func (r *AdminCatalogRepository) UpdateCategory(ctx context.Context, id string, 
 	}
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	if err := r.verifyParent(ctx, oidValue, v.ParentID); err != nil {
-		return nil, err
-	}
-	set, unset, err := categoryFields(v)
-	if err != nil {
-		return nil, err
-	}
-	update := bson.M{"$set": set}
-	if len(unset) > 0 {
-		update["$unset"] = unset
-	}
-	result := r.categories.FindOneAndUpdate(ctx, bson.M{"_id": oidValue}, update, options.FindOneAndUpdate().SetReturnDocument(options.After))
-	var doc bson.M
-	if err := result.Decode(&doc); err != nil {
+	var current bson.M
+	if err := r.categories.FindOne(ctx, bson.M{"_id": oidValue}, options.FindOne().SetProjection(bson.M{"parent_id": 1})).Decode(&current); err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
 			return nil, app.ErrNotFound
 		}
-		return nil, mongoWriteErr(err)
+		return nil, err
 	}
-	return adminDocument(doc), nil
+	parent, err := optionalParent(v.ParentID)
+	if err != nil {
+		return nil, app.Invalid{Field: "parent_id", Message: "Mã danh mục cha không hợp lệ"}
+	}
+	if parent == current["parent_id"] || (parent == nil && current["parent_id"] == nil) {
+		return r.updateCategoryRecord(ctx, oidValue, v)
+	}
+	return r.reparentCategoryTransaction(ctx, oidValue, v)
 }
 func (r *AdminCatalogRepository) CreateProduct(ctx context.Context, v app.ProductCreate) (map[string]any, error) {
 	ctx, cancel := catalogContext(ctx)
@@ -270,12 +344,14 @@ func (r *AdminCatalogRepository) CreateProduct(ctx context.Context, v app.Produc
 	}
 	set["_id"] = bson.NewObjectID()
 	set["created_at"] = set["updated_at"]
+	set["version"] = int64(1)
 	set["variants"] = v.Variants
 	var total int64
 	for _, item := range v.Variants {
 		total += item.Stock
 	}
 	set["stock"] = total
+	set["sizes"] = sizesFromVariants(v.Variants)
 	_, err = r.products.InsertOne(ctx, set)
 	if err != nil {
 		return nil, mongoWriteErr(err)
@@ -293,19 +369,26 @@ func (r *AdminCatalogRepository) UpdateProduct(ctx context.Context, id string, v
 	if err != nil {
 		return nil, err
 	}
-	update := bson.M{"$set": set}
+	update := bson.M{"$set": set, "$inc": bson.M{"version": int64(1)}}
 	if len(unset) > 0 {
 		update["$unset"] = unset
 	}
-	result := r.products.FindOneAndUpdate(ctx, bson.M{"_id": itemID}, update, options.FindOneAndUpdate().SetReturnDocument(options.After))
+	result := r.products.FindOneAndUpdate(ctx, withMetadataVersion(itemID, *v.ExpectedVersion), update, options.FindOneAndUpdate().SetReturnDocument(options.After))
 	var doc bson.M
 	if err := result.Decode(&doc); err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
-			return nil, app.ErrNotFound
+			return nil, r.missingOrConflict(ctx, r.products, itemID)
 		}
 		return nil, mongoWriteErr(err)
 	}
 	return adminDocument(doc), nil
+}
+
+// Product display sizes are materialized from the authoritative SKUs in the
+// same atomic update. A pipeline reads the current array, rather than writing
+// a stale client copy of stock or replacing variants after a concurrent order.
+func variantSizesExpression() bson.M {
+	return bson.M{"$setUnion": bson.A{bson.M{"$map": bson.M{"input": "$variants", "as": "variant", "in": "$$variant.size"}}, bson.A{}}}
 }
 func (r *AdminCatalogRepository) AddVariant(ctx context.Context, id string, v app.Variant) (map[string]any, error) {
 	itemID, err := oid(id)
@@ -314,14 +397,29 @@ func (r *AdminCatalogRepository) AddVariant(ctx context.Context, id string, v ap
 	}
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	filter := bson.M{"_id": itemID, "$nor": bson.A{bson.M{"variants.sku": v.SKU}, bson.M{"variants": bson.M{"$elemMatch": bson.M{"color": v.Color, "size": v.Size}}}}}
-	result := r.products.FindOneAndUpdate(ctx, filter, bson.M{"$push": bson.M{"variants": v}, "$set": bson.M{"updated_at": time.Now().UTC()}}, options.FindOneAndUpdate().SetReturnDocument(options.After).SetCollation(&options.Collation{Locale: "vi", Strength: 2}))
+	// A legacy product with positive aggregate stock but zero SKUs cannot
+	// silently acquire a zero-stock first SKU. It needs a Q-07 reconciliation.
+	filter := bson.M{"_id": itemID,
+		"$nor": bson.A{bson.M{"variants.sku": v.SKU}, bson.M{"variants": bson.M{"$elemMatch": bson.M{"color": v.Color, "size": v.Size}}}},
+		"$expr": bson.M{"$eq": bson.A{
+			bson.M{"$ifNull": bson.A{"$stock", 0}},
+			bson.M{"$sum": bson.M{"$ifNull": bson.A{"$variants.stock", bson.A{}}}},
+		}},
+	}
+	pipeline := driver.Pipeline{
+		bson.D{{Key: "$set", Value: bson.M{
+			"variants":   bson.M{"$concatArrays": bson.A{bson.M{"$ifNull": bson.A{"$variants", bson.A{}}}, bson.M{"$literal": bson.A{v}}}},
+			"updated_at": time.Now().UTC(),
+		}}},
+		bson.D{{Key: "$set", Value: bson.M{"sizes": variantSizesExpression()}}},
+	}
+	result := r.products.FindOneAndUpdate(ctx, filter, pipeline, options.FindOneAndUpdate().SetReturnDocument(options.After).SetCollation(&options.Collation{Locale: "vi", Strength: 2}))
 	var doc bson.M
 	if err := result.Decode(&doc); err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
-			return nil, app.ErrConflict
+			return nil, r.missingOrConflict(ctx, r.products, itemID)
 		}
-		return nil, err
+		return nil, mongoWriteErr(err)
 	}
 	return adminDocument(doc), nil
 }
@@ -332,48 +430,131 @@ func (r *AdminCatalogRepository) UpdateVariant(ctx context.Context, id, sku stri
 	}
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	filter := bson.M{"_id": itemID, "variants.sku": sku, "$nor": bson.A{bson.M{"variants": bson.M{"$elemMatch": bson.M{"sku": bson.M{"$ne": sku}, "color": v.Color, "size": v.Size}}}}}
-	update := bson.M{"$set": bson.M{"variants.$.color": v.Color, "variants.$.size": v.Size, "updated_at": time.Now().UTC()}}
-	result := r.products.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After).SetCollation(&options.Collation{Locale: "vi", Strength: 2}))
+	filter := bson.M{"_id": itemID, "variants.sku": sku,
+		"$nor": bson.A{bson.M{"variants": bson.M{"$elemMatch": bson.M{"sku": bson.M{"$ne": sku}, "color": v.Color, "size": v.Size}}}},
+	}
+	// MongoDB evaluates both stages atomically on the latest product document,
+	// preserving SKU stock even if an inventory adjustment runs concurrently.
+	pipeline := driver.Pipeline{
+		bson.D{{Key: "$set", Value: bson.M{"variants": bson.M{"$map": bson.M{
+			"input": "$variants", "as": "variant", "in": bson.M{"$cond": bson.A{
+				bson.M{"$eq": bson.A{"$$variant.sku", sku}},
+				bson.M{"$mergeObjects": bson.A{"$$variant", bson.M{"$literal": bson.M{"color": v.Color, "size": v.Size}}}},
+				"$$variant",
+			}},
+		}}, "updated_at": time.Now().UTC()}}},
+		bson.D{{Key: "$set", Value: bson.M{"sizes": variantSizesExpression()}}},
+	}
+	result := r.products.FindOneAndUpdate(ctx, filter, pipeline, options.FindOneAndUpdate().SetReturnDocument(options.After).SetCollation(&options.Collation{Locale: "vi", Strength: 2}))
 	var doc bson.M
 	if err := result.Decode(&doc); err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
-			return nil, app.ErrConflict
+			return nil, r.missingVariantOrConflict(ctx, itemID, sku)
 		}
-		return nil, err
+		return nil, mongoWriteErr(err)
 	}
 	return adminDocument(doc), nil
 }
+func (r *AdminCatalogRepository) missingVariantOrConflict(ctx context.Context, id bson.ObjectID, sku string) error {
+	var doc bson.M
+	err := r.products.FindOne(ctx, bson.M{"_id": id}, options.FindOne().SetProjection(bson.M{"variants.sku": 1})).Decode(&doc)
+	if errors.Is(err, driver.ErrNoDocuments) {
+		return app.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range asSlice(doc["variants"]) {
+		if asString(asMap(entry)["sku"]) == sku {
+			return app.ErrConflict
+		}
+	}
+	return app.ErrNotFound
+}
 
-// AdjustInventory is a single-document conditional atomic update. DW-02 must
-// use an equivalent SKU+aggregate guarded $inc when reserving/cancelling orders.
-func inventoryMutation(id bson.ObjectID, sku string, delta int64) (bson.M, bson.M) {
+// Each request id is stored in the same product document and atomic mutation.
+// The store of processed IDs is intentionally bounded; exhaustion FAILS
+// CLOSED rather than silently forgetting keys and applying a retry twice.
+const inventoryRequestLimit = 10000
+
+func inventoryMutation(id bson.ObjectID, sku string, delta int64, requestID string) (bson.M, bson.M) {
 	variant := bson.M{"sku": sku}
-	filter := bson.M{"_id": id}
+	filter := bson.M{"_id": id,
+		"variants":                        bson.M{"$elemMatch": variant},
+		"inventory_operations.request_id": bson.M{"$ne": requestID},
+		"$expr":                           bson.M{"$lt": bson.A{bson.M{"$size": bson.M{"$ifNull": bson.A{"$inventory_operations", bson.A{}}}}, inventoryRequestLimit}},
+	}
 	if delta < 0 {
 		needed := -delta
 		variant["stock"] = bson.M{"$gte": needed}
 		filter["stock"] = bson.M{"$gte": needed}
 	}
-	filter["variants"] = bson.M{"$elemMatch": variant}
-	update := bson.M{"$inc": bson.M{"stock": delta, "variants.$.stock": delta}, "$set": bson.M{"updated_at": time.Now().UTC()}}
+	update := bson.M{
+		"$inc":  bson.M{"stock": delta, "variants.$[target].stock": delta},
+		"$set":  bson.M{"updated_at": time.Now().UTC()},
+		"$push": bson.M{"inventory_operations": bson.M{"request_id": requestID, "sku": sku, "delta": delta, "at": time.Now().UTC()}},
+	}
 	return filter, update
 }
-func (r *AdminCatalogRepository) AdjustInventory(ctx context.Context, id, sku string, delta int64) (map[string]any, error) {
+
+// Filtered positional updates avoid ambiguity with the separate
+// inventory_operations array used for retry deduplication.
+func inventoryArrayFilters(sku string, delta int64) []any {
+	filter := bson.M{"target.sku": sku}
+	if delta < 0 {
+		filter["target.stock"] = bson.M{"$gte": -delta}
+	}
+	return []any{filter}
+}
+func (r *AdminCatalogRepository) AdjustInventory(ctx context.Context, id, sku string, delta int64, requestID string) (map[string]any, error) {
 	itemID, err := oid(id)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := catalogContext(ctx)
 	defer cancel()
-	filter, update := inventoryMutation(itemID, sku, delta)
-	result := r.products.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After))
+	filter, update := inventoryMutation(itemID, sku, delta, requestID)
+	result := r.products.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After).SetArrayFilters(inventoryArrayFilters(sku, delta)))
 	var doc bson.M
 	if err := result.Decode(&doc); err != nil {
-		if errors.Is(err, driver.ErrNoDocuments) {
-			return nil, app.ErrConflict
+		if !errors.Is(err, driver.ErrNoDocuments) {
+			return nil, err
 		}
-		return nil, err
+		// The write may have committed but the response was lost. Return the
+		// current product for a replay of that exact request id + payload.
+		if err := r.products.FindOne(ctx, bson.M{"_id": itemID}).Decode(&doc); err != nil {
+			if errors.Is(err, driver.ErrNoDocuments) {
+				return nil, app.ErrNotFound
+			}
+			return nil, err
+		}
+		for _, entry := range asSlice(doc["inventory_operations"]) {
+			op := asMap(entry)
+			if asString(op["request_id"]) == requestID {
+				if asString(op["sku"]) == sku && asInt64(op["delta"]) == delta {
+					return adminDocument(doc), nil
+				}
+				return nil, app.ErrConflict // same key, different operation
+			}
+		}
+		for _, entry := range asSlice(doc["variants"]) {
+			if asString(asMap(entry)["sku"]) == sku {
+				return nil, app.ErrConflict
+			}
+		}
+		return nil, app.ErrNotFound
 	}
 	return adminDocument(doc), nil
+}
+
+func sizesFromVariants(variants []app.Variant) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(variants))
+	for _, variant := range variants {
+		if variant.Size != "" && !seen[variant.Size] {
+			seen[variant.Size] = true
+			out = append(out, variant.Size)
+		}
+	}
+	return out
 }

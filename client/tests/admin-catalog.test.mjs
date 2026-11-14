@@ -13,3 +13,21 @@ test('hình ảnh phải có cả src và alt', () => {
  assert.deepEqual(parseImageLines('https://cdn.example.test/a.jpg | Ảnh chính'),[{src:'https://cdn.example.test/a.jpg',alt:'Ảnh chính'}])
  assert.throws(() => parseImageLines('https://cdn.example.test/a.jpg'))
 })
+
+test('tồn kho SKU bỏ trống không tự trở thành 0', () => {
+ assert.throws(() => parseVariantLines('AO-DO-M | Đỏ | M |'))
+ assert.throws(() => parseVariantLines('AO-DO-M | Đỏ | M |   '))
+ assert.deepEqual(parseVariantLines('AO-DO-M | Đỏ | M | 0')[0].stock, 0)
+})
+test('ảnh chỉ tồn tại trong images[] được giữ khi mở form sửa', async () => {
+ const { editableGallery } = await import('../src/features/admin/catalog.ts')
+ const images = editableGallery({
+  name: 'Sản phẩm thử', image: { src: '/main.jpg', alt: 'Ảnh chính' },
+  images: ['/main.jpg', '/legacy.jpg', '/gallery.jpg', '/legacy.jpg'],
+  gallery: [{ src: '/gallery.jpg', alt: 'Ảnh phụ' }],
+ })
+ assert.deepEqual(images, [
+  { src: '/gallery.jpg', alt: 'Ảnh phụ' },
+  { src: '/legacy.jpg', alt: 'Sản phẩm thử' },
+ ])
+})

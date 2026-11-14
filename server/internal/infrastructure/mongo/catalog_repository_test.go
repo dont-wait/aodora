@@ -230,3 +230,22 @@ func TestVietnameseNameCollationOnlyWhenSafeForTextIndex(t *testing.T) {
 		t.Fatal("price sorting must use default collation")
 	}
 }
+
+func TestPublicCategoryNavigationIsActiveAndSorted(t *testing.T) {
+	pipeline := publicCategoriesPipeline()
+	if len(pipeline) < 4 {
+		t.Fatal("public category filter stages missing")
+	}
+	match := asMap(asMap(pipeline[0])["$match"])
+	if match["is_active"] != true {
+		t.Fatalf("inactive category leaks: %v", match)
+	}
+	if _, ok := asMap(pipeline[1])["$graphLookup"]; !ok {
+		t.Fatal("missing ancestor visibility check")
+	}
+	sortStage := asMap(pipeline[len(pipeline)-2])
+	sortFields, ok := sortStage["$sort"].(bson.D)
+	if !ok || len(sortFields) != 3 || sortFields[0].Key != "sort_order" || sortFields[2].Key != "_id" {
+		t.Fatalf("unstable public category sort: %v", sortStage)
+	}
+}

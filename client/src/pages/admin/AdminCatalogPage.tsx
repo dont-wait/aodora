@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { adminCatalog, AdminApiError, parseImageLines, parseVariantLines,
+import { adminCatalog, AdminApiError, editableGallery, parseImageLines, parseVariantLines,
   type Category, type CategoryInput, type Product, type ProductInput, type Variant } from '@/features/admin/catalog'
 
-const emptyCategory: CategoryInput = { name: '', slug: '', description: '', parent_id: '', is_active: true, sort_order: 0 }
+const emptyCategory: CategoryInput = { name: '', slug: '', description: '', parent_id: '', is_active: true, sort_order: 0, image: null }
 const emptyProduct: ProductInput = {
   name: '', slug: '', category_id: '', description: '', material: '', price: 0,
-  compare_at_price: null, is_active: true, images: [], gallery: [], colors: [], accessories: [],
+  compare_at_price: null, is_active: true, images: [], image: null, gallery: [], colors: [], accessories: [],
 }
 const inputClass = 'w-full p-2.5 border border-outline/40 bg-white text-on-surface rounded-sm'
 const buttonClass = 'bg-primary px-4 py-2 text-on-primary disabled:opacity-50 rounded-sm'
@@ -20,6 +20,7 @@ function VariantRow({ productId, variant, onSaved }: { productId: string; varian
   const [delta, setDelta] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const pendingStockRequest = useRef<string | null>(null)
   async function act(action: 'details' | 'stock') {
     setBusy(true); setError('')
     try {
@@ -27,7 +28,10 @@ function VariantRow({ productId, variant, onSaved }: { productId: string; varian
       else {
         const n = Number(delta)
         if (!Number.isSafeInteger(n) || n === 0) throw new Error('Nhập số nguyên khác 0, ví dụ -2 hoặc 5')
-        await adminCatalog.adjustStock(productId, variant.sku, n)
+        const requestId = pendingStockRequest.current || crypto.randomUUID()
+        pendingStockRequest.current = requestId
+        await adminCatalog.adjustStock(productId, variant.sku, n, requestId)
+        pendingStockRequest.current = null
         setDelta('')
       }
       await onSaved()
@@ -42,7 +46,7 @@ function VariantRow({ productId, variant, onSaved }: { productId: string; varian
       <button className={buttonClass} disabled={busy} onClick={() => void act('details')} type="button">Lưu màu/cỡ</button>
     </div>
     <div className="flex gap-2 flex-wrap items-center">
-      <input className={`${inputClass} max-w-36`} aria-label={`Điều chỉnh tồn ${variant.sku}`} placeholder="+5 hoặc -2" value={delta} onChange={(event) => setDelta(event.target.value)} />
+      <input className={`${inputClass} max-w-36`} aria-label={`Điều chỉnh tồn ${variant.sku}`} placeholder="+5 hoặc -2" value={delta} onChange={(event) => { pendingStockRequest.current = null; setDelta(event.target.value) }} />
       <button className={buttonClass} disabled={busy} onClick={() => void act('stock')} type="button">Cộng/trừ tồn</button>
     </div>
     {error && <p className="text-red-700">{error}</p>}
@@ -70,35 +74,33 @@ export default function AdminCatalogPage() {
   const [accessoriesText, setAccessoriesText] = useState('')
   const [newSKU, setNewSKU] = useState({ sku: '', color: '', size: '', stock: 0 })
 
-  const load = useCallback(async () => {
-    try {
-      const [nextCategories, nextProducts] = await Promise.all([adminCatalog.categories(), adminCatalog.products(productPage)])
-      setCategories(nextCategories); setProducts(nextProducts.items); setTotalPages(nextProducts.total_pages || 1); setAccessDenied(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
-      if (err instanceof AdminApiError && [401, 403].includes(err.status)) setAccessDenied(true)
-    } finally { setLoading(false) }
-  }, [productPage])
-  useEffect(() => {
-    let active = true
-    void Promise.all([adminCatalog.categories(), adminCatalog.products(productPage)])
+  // One sequence for effects, manual refreshes and post-write reloads.
+  // A response from a previous page is never allowed to overwrite newer data.
+  const requestSequence = useRef(0)
+  const load = useCallback((page = productPage): Promise<void> => {
+    const current = ++requestSequence.current
+    return Promise.all([adminCatalog.categories(), adminCatalog.products(page)])
       .then(([nextCategories, nextProducts]) => {
-        if (!active) return
+        if (current !== requestSequence.current) return
         setCategories(nextCategories)
         setProducts(nextProducts.items)
         setTotalPages(nextProducts.total_pages || 1)
         setAccessDenied(false)
+        setError('')
       })
       .catch((err: unknown) => {
-        if (!active) return
+        if (current !== requestSequence.current) return
         setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu')
         if (err instanceof AdminApiError && [401, 403].includes(err.status)) setAccessDenied(true)
       })
       .finally(() => {
-        if (active) setLoading(false)
+        if (current === requestSequence.current) setLoading(false)
       })
-    return () => { active = false }
   }, [productPage])
+  useEffect(() => {
+    void load(productPage)
+    return () => { requestSequence.current += 1 }
+  }, [load, productPage])
   function refresh() {
     setLoading(true)
     void load()
@@ -107,27 +109,29 @@ export default function AdminCatalogPage() {
   function selectCategory(id: string) {
     setError(''); setSuccess(''); setCategoryId(id)
     const value = categories.find((row) => row.id === id)
-    setCategory(value ? { name: value.name, slug: value.slug, description: value.description || '', parent_id: value.parent_id || '', is_active: value.is_active, sort_order: value.sort_order || 0, image: value.image } : { ...emptyCategory })
+    setCategory(value ? { name: value.name, slug: value.slug, description: value.description || '', parent_id: value.parent_id || '', is_active: value.is_active, sort_order: value.sort_order || 0, image: value.image || null, expected_version: value.version ?? 0 } : { ...emptyCategory })
   }
   function selectProduct(id: string) {
     setError(''); setSuccess(''); setProductId(id)
     const value = products.find((row) => row.id === id)
     setProduct(value ? {
       name: value.name, slug: value.slug, category_id: value.category_id, description: value.description || '', material: value.material || '',
-      price: Number(value.price), compare_at_price: value.compare_at_price == null ? null : Number(value.compare_at_price),
-      is_active: value.is_active, images: value.images || [], image: value.image || (value.images?.[0] ? { src: value.images[0], alt: value.name } : undefined),
+      price: Number(value.price), compare_at_price: value.compare_at_price == null ? (value.old_price == null ? null : Number(value.old_price)) : Number(value.compare_at_price),
+      is_active: value.is_active, images: value.images || [], image: value.image || (value.images?.[0] ? { src: value.images[0], alt: value.name } : null), expected_version: value.version ?? 0,
       gallery: value.gallery || [], colors: value.colors || [], accessories: value.accessories || [],
     } : { ...emptyProduct })
     setVariantsText('')
-    setGalleryText(value?.gallery?.map((item) => `${item.src} | ${item.alt}`).join('\n') || '')
+    setGalleryText(value ? editableGallery(value).map((item) => `${item.src} | ${item.alt}`).join('\n') : '')
     setColorsText(JSON.stringify(value?.colors || [], null, 2))
     setAccessoriesText(JSON.stringify(value?.accessories || [], null, 2))
   }
   async function submitCategory(event: FormEvent) {
     event.preventDefault();setBusy(true);setError('');setSuccess('')
     try {
-      if (categoryId) await adminCatalog.updateCategory(categoryId, category)
-      else await adminCatalog.createCategory(category)
+      if (categoryId) {
+        const updated = await adminCatalog.updateCategory(categoryId, category)
+        setCategory((current) => ({ ...current, expected_version: updated.version ?? 0 }))
+      } else await adminCatalog.createCategory(category)
       await load();setSuccess('Đã lưu danh mục vào MongoDB')
     } catch (err) {setError(err instanceof Error ? err.message : 'Không thể lưu danh mục')}
     finally {setBusy(false)}
@@ -141,8 +145,10 @@ export default function AdminCatalogPage() {
       if (!Array.isArray(colors) || !Array.isArray(accessories)) throw new Error('Màu/phụ kiện phải là mảng JSON')
       const images = [...new Set([...(product.image?.src ? [product.image.src] : []), ...gallery.map((item) => item.src)])]
       const data = { ...product, images, gallery, colors, accessories }
-      if (productId) await adminCatalog.updateProduct(productId, data)
-      else await adminCatalog.createProduct({ ...data, variants: parseVariantLines(variantsText) })
+      if (productId) {
+        const updated = await adminCatalog.updateProduct(productId, data)
+        setProduct((current) => ({ ...current, expected_version: updated.version ?? 0 }))
+      } else await adminCatalog.createProduct({ ...data, variants: parseVariantLines(variantsText) })
       await load();setSuccess('Đã lưu sản phẩm vào MongoDB')
     } catch (err) {setError(err instanceof Error ? err.message : 'Không thể lưu sản phẩm')}
     finally {setBusy(false)}
@@ -167,26 +173,26 @@ export default function AdminCatalogPage() {
             <div className="grid md:grid-cols-2 gap-4"><Entry title="Tên"><input className={inputClass} required value={category.name} onChange={(e) => setCategory({ ...category, name: e.target.value })}/></Entry><Entry title="Slug"><input className={inputClass} required value={category.slug} onChange={(e) => setCategory({ ...category, slug: e.target.value })}/></Entry></div>
             <Entry title="Mô tả"><textarea className={inputClass} value={category.description} onChange={(e) => setCategory({ ...category, description: e.target.value })}/></Entry>
             <div className="grid md:grid-cols-2 gap-4"><Entry title="Danh mục cha"><select className={inputClass} value={category.parent_id} onChange={(e) => setCategory({ ...category, parent_id: e.target.value })}><option value="">Không có</option>{categories.filter((v) => v.id !== categoryId).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Entry><Entry title="Thứ tự"><input className={inputClass} type="number" min="0" value={category.sort_order} onChange={(e) => setCategory({ ...category, sort_order: Number(e.target.value) })}/></Entry></div>
-            <div className="grid md:grid-cols-2 gap-4"><Entry title="URL hình danh mục"><input className={inputClass} value={category.image?.src || ''} onChange={(e) => setCategory({ ...category, image: e.target.value || category.image?.alt ? { src: e.target.value, alt: category.image?.alt || '' } : undefined })}/></Entry><Entry title="Alt hình danh mục"><input className={inputClass} value={category.image?.alt || ''} onChange={(e) => setCategory({ ...category, image: e.target.value || category.image?.src ? { src: category.image?.src || '', alt: e.target.value } : undefined })}/></Entry></div>
+            <div className="grid md:grid-cols-2 gap-4"><Entry title="URL hình danh mục"><input className={inputClass} value={category.image?.src || ''} onChange={(e) => setCategory({ ...category, image: e.target.value || category.image?.alt ? { src: e.target.value, alt: category.image?.alt || '' } : null })}/></Entry><Entry title="Alt hình danh mục"><input className={inputClass} value={category.image?.alt || ''} onChange={(e) => setCategory({ ...category, image: e.target.value || category.image?.src ? { src: category.image?.src || '', alt: e.target.value } : null })}/></Entry></div>
             <label className="flex gap-2"><input type="checkbox" checked={category.is_active} onChange={(e) => setCategory({ ...category, is_active: e.target.checked })}/>Hiển thị danh mục</label><button type="submit" disabled={busy} className={buttonClass}>Lưu danh mục</button>
           </form></div> : <div className="grid md:grid-cols-[17rem_1fr] gap-6">
           <aside className="bg-surface p-4 space-y-2"><h2 className="font-bold">Sản phẩm ({products.length})</h2><button onClick={() => selectProduct('')} className="underline" type="button">+ Tạo mới</button>{products.map((row) => <button key={row.id} onClick={() => selectProduct(row.id)} type="button" className={`block w-full text-left border p-2 ${row.id === productId ? 'border-primary' : 'border-outline/20'}`}>{row.name} {row.is_active ? '' : '· Đang ẩn'}</button>)}
-            <div className="flex items-center gap-3 pt-3"><button disabled={productPage <= 1} type="button" className="underline disabled:opacity-40" onClick={() => { setLoading(true); setProductPage((v) => v - 1) }}>Trước</button><span>{productPage}/{totalPages}</span><button disabled={productPage>=totalPages} type="button" className="underline disabled:opacity-40" onClick={() => { setLoading(true); setProductPage((v) => v + 1) }}>Sau</button></div></aside>
+            <div className="flex items-center gap-3 pt-3"><button disabled={productPage <= 1} type="button" className="underline disabled:opacity-40" onClick={() => { requestSequence.current++; setLoading(true); setProductPage((v) => v - 1) }}>Trước</button><span>{productPage}/{totalPages}</span><button disabled={productPage>=totalPages} type="button" className="underline disabled:opacity-40" onClick={() => { requestSequence.current++; setLoading(true); setProductPage((v) => v + 1) }}>Sau</button></div></aside>
           <div className="space-y-5"><form className="bg-surface p-5 space-y-4" onSubmit={(e) => void submitProduct(e)}><h2 className="text-xl font-bold">{productId ? 'Thông tin bán hàng' : 'Tạo sản phẩm'}</h2>
             <div className="grid md:grid-cols-2 gap-4"><Entry title="Tên sản phẩm"><input required className={inputClass} value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })}/></Entry><Entry title="Slug"><input required className={inputClass} value={product.slug} onChange={(e) => setProduct({ ...product, slug: e.target.value })}/></Entry></div>
             <Entry title="Danh mục"><select required className={inputClass} value={product.category_id} onChange={(e) => setProduct({ ...product, category_id: e.target.value })}><option value="">Chọn danh mục</option>{categories.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Entry>
             <Entry title="Mô tả"><textarea className={inputClass} value={product.description} onChange={(e) => setProduct({ ...product, description: e.target.value })}/></Entry>
             <div className="grid md:grid-cols-3 gap-4"><Entry title="Chất liệu"><input className={inputClass} value={product.material} onChange={(e) => setProduct({ ...product, material: e.target.value })}/></Entry><Entry title="Giá bán (VND)"><input className={inputClass} type="number" min="0" step="1" required value={product.price} onChange={(e) => setProduct({ ...product, price: Number(e.target.value) })}/></Entry><Entry title="Giá gốc (để trống nếu không có)"><input className={inputClass} type="number" min="0" step="1" value={product.compare_at_price ?? ''} onChange={(e) => setProduct({ ...product, compare_at_price: e.target.value === '' ? null : Number(e.target.value) })}/></Entry></div>
-            <div className="grid md:grid-cols-2 gap-4"><Entry title="URL hình chính"><input className={inputClass} value={product.image?.src || ''} onChange={(e) => setProduct({ ...product, image: e.target.value || product.image?.alt ? { src: e.target.value, alt: product.image?.alt || '' } : undefined })}/></Entry><Entry title="Alt hình chính"><input className={inputClass} value={product.image?.alt || ''} onChange={(e) => setProduct({ ...product, image: e.target.value || product.image?.src ? { src: product.image?.src || '', alt: e.target.value } : undefined })}/></Entry></div>
+            <div className="grid md:grid-cols-2 gap-4"><Entry title="URL hình chính"><input className={inputClass} value={product.image?.src || ''} onChange={(e) => setProduct({ ...product, image: e.target.value || product.image?.alt ? { src: e.target.value, alt: product.image?.alt || '' } : null })}/></Entry><Entry title="Alt hình chính"><input className={inputClass} value={product.image?.alt || ''} onChange={(e) => setProduct({ ...product, image: e.target.value || product.image?.src ? { src: product.image?.src || '', alt: e.target.value } : null })}/></Entry></div>
             <Entry title="Ảnh phụ (mỗi dòng URL | mô tả ảnh)"><textarea className={inputClass} rows={3} value={galleryText} onChange={(e) => setGalleryText(e.target.value)}/></Entry>
             <Entry title="Mã màu JSON (name và hex)"><textarea className={inputClass} rows={3} value={colorsText} onChange={(e) => setColorsText(e.target.value)}/></Entry>
-            <Entry title="Phụ kiện JSON (id, name, description, price, image)"><textarea className={inputClass} rows={4} value={accessoriesText} onChange={(e) => setAccessoriesText(e.target.value)}/></Entry>
+            <Entry title="Phụ kiện JSON (id, name, description, price, image tùy chọn, tag, tag_variant)"><textarea className={inputClass} rows={4} value={accessoriesText} onChange={(e) => setAccessoriesText(e.target.value)}/></Entry>
             {!productId && <Entry title="SKU ban đầu (mỗi dòng SKU | màu | cỡ | tồn kho)"><textarea className={inputClass} rows={4} value={variantsText} onChange={(e) => setVariantsText(e.target.value)} placeholder="AO-DO-M | Đỏ | M | 10" /></Entry>}
             <label className="flex gap-2"><input type="checkbox" checked={product.is_active} onChange={(e) => setProduct({ ...product, is_active: e.target.checked })}/>Đang bán</label>
             {productId && <p className="text-sm text-secondary">Lưu thông tin sẽ không thay đổi tồn kho, danh sách SKU, rating hay review_count.</p>}
             <button type="submit" disabled={busy} className={buttonClass}>Lưu sản phẩm</button></form>
             {chosen && <section className="bg-surface p-5 space-y-3"><h2 className="text-xl font-bold">SKU & tồn kho — tổng {chosen.stock}</h2><p className="text-sm text-secondary">Điều chỉnh tồn bằng số chênh lệch, không nhập đè số tồn cũ.</p>
-              {(chosen.variants || []).map((v) => <VariantRow key={v.sku} productId={chosen.id} variant={v} onSaved={load}/>)}
+              {(chosen.variants || []).map((v) => <VariantRow key={`${chosen.id}:${v.sku}`} productId={chosen.id} variant={v} onSaved={load}/>)}
               <div className="border-t pt-3 space-y-2"><h3 className="font-bold">Thêm SKU (tồn = 0)</h3><div className="grid md:grid-cols-3 gap-2"><input className={inputClass} placeholder="SKU" value={newSKU.sku} onChange={(e) => setNewSKU({ ...newSKU, sku: e.target.value })}/><input className={inputClass} placeholder="Màu" value={newSKU.color} onChange={(e) => setNewSKU({ ...newSKU, color: e.target.value })}/><input className={inputClass} placeholder="Cỡ" value={newSKU.size} onChange={(e) => setNewSKU({ ...newSKU, size: e.target.value })}/></div><button className={buttonClass} disabled={busy} type="button" onClick={() => void addSKU()}>Thêm SKU</button></div>
             </section>}
           </div></div>}

@@ -61,7 +61,7 @@ func main() {
 		Handler: httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService, *log),
 			// KR-01 supplies a verified role-based authorizer when available.
 			// Default denies admin access; never expose unauthenticated writes.
-			httpapi.WithAdminCatalog(adminService, nil, *log)),
+			httpapi.WithAdminCatalog(adminService, nil, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

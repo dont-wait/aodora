@@ -40,7 +40,7 @@ func (f *fakeRepo) UpdateVariant(context.Context, string, string, VariantDetails
 	f.edited = true
 	return map[string]any{}, nil
 }
-func (f *fakeRepo) AdjustInventory(context.Context, string, string, int64) (map[string]any, error) {
+func (f *fakeRepo) AdjustInventory(context.Context, string, string, int64, string) (map[string]any, error) {
 	f.adjusted = true
 	return map[string]any{}, nil
 }
@@ -76,12 +76,12 @@ func TestRejectInvalidWritesBeforeRepository(t *testing.T) {
 func TestStockIsAdjustedOnlyByDelta(t *testing.T) {
 	repo := &fakeRepo{}
 	service := NewService(repo)
-	_, err := service.AdjustInventory(context.Background(), "id", "sku", 0)
+	_, err := service.AdjustInventory(context.Background(), "id", "sku", 0, "1dea1234-1234-4123-8123-111111111111")
 	var invalid Invalid
 	if !errors.As(err, &invalid) || repo.adjusted {
 		t.Fatalf("zero delta must be rejected: %v", err)
 	}
-	_, err = service.AdjustInventory(context.Background(), "id", "sku", -2)
+	_, err = service.AdjustInventory(context.Background(), "id", "sku", -2, "1dea1234-1234-4123-8123-111111111111")
 	if err != nil || !repo.adjusted {
 		t.Fatalf("valid delta must reach repository: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestNewSKUHasZeroStock(t *testing.T) {
 	}
 }
 func TestRejectCategorySelfParent(t *testing.T) {
-	_, err := NewService(&fakeRepo{}).UpdateCategory(context.Background(), "abc", CategoryInput{Name: "Áo", Slug: "ao", ParentID: "abc"})
+	_, err := NewService(&fakeRepo{}).UpdateCategory(context.Background(), "abcdef123456abcdef123456", CategoryInput{Name: "Áo", Slug: "ao", ParentID: "ABCDEF123456ABCDEF123456"})
 	if err == nil {
 		t.Fatal("category self reference accepted")
 	}
@@ -106,5 +106,37 @@ func TestProductMetadataExcludesStockAndReviews(t *testing.T) {
 	v := goodCreate().ProductInput
 	if err := validateProduct(v); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOptionalColorsAndAccessoryImages(t *testing.T) {
+	v := goodCreate().ProductInput
+	v.Colors = []Color{{Name: "Đỏ"}}
+	v.Accessories = []Accessory{{ID: "one", Name: "Phụ kiện", Price: 1000, Tag: "lụa", TagVariant: "hồng"}}
+	if err := validateProduct(v); err != nil {
+		t.Fatalf("legacy colors/accessories must be editable: %v", err)
+	}
+	v.Colors[0].Hex = "invalid"
+	if err := validateProduct(v); err == nil {
+		t.Fatal("bad non-empty hex accepted")
+	}
+}
+func TestVersionRequiredForPut(t *testing.T) {
+	service := NewService(&fakeRepo{})
+	v := goodCreate().ProductInput
+	if _, err := service.UpdateProduct(context.Background(), "abcdef123456abcdef123456", v); err == nil {
+		t.Fatal("PUT without expected_version must be rejected")
+	}
+	zero := int64(0)
+	v.ExpectedVersion = &zero
+	if _, err := service.UpdateProduct(context.Background(), "abcdef123456abcdef123456", v); err != nil {
+		t.Fatalf("legacy version zero must be accepted: %v", err)
+	}
+}
+func TestInventoryRequiresRetryID(t *testing.T) {
+	service := NewService(&fakeRepo{})
+	_, err := service.AdjustInventory(context.Background(), "id", "sku", 3, "")
+	if err == nil {
+		t.Fatal("request without idempotency key accepted")
 	}
 }

@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"errors"
+	app "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,5 +54,34 @@ func TestAdminCatalogAuthorizerUsesServerDecision(t *testing.T) {
 	h.guard(func(http.ResponseWriter, *http.Request) { called = true })(w, r)
 	if !called {
 		t.Fatal("verified admin request was blocked")
+	}
+}
+
+func TestFullReplacementRejectsOmittedMetadata(t *testing.T) {
+	r := httptest.NewRequest("PUT", "/api/v1/admin/products/id", strings.NewReader(`{"name":"Áo","is_active":true}`))
+	r.Header.Set("Content-Type", "application/json")
+	var input app.ProductInput
+	err := adminRequestBody(r, &input, "name", "images", "is_active", "expected_version")
+	var invalid app.Invalid
+	if !errors.As(err, &invalid) || invalid.Field != "images" {
+		t.Fatalf("omitted array was not rejected: %v", err)
+	}
+}
+func TestCredentialedCORSPreflightRestrictsOrigin(t *testing.T) {
+	h := adminCatalogHandler{allowedOrigin: "https://shop.example.test"}
+	request := httptest.NewRequest("OPTIONS", "/api/v1/admin/products", nil)
+	request.Header.Set("Origin", "https://shop.example.test")
+	request.Header.Set("Access-Control-Request-Method", "PUT")
+	request.Header.Set("Access-Control-Request-Headers", "content-type")
+	w := httptest.NewRecorder()
+	h.preflight(w, request)
+	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Fatalf("allowed preflight: %d %v", w.Code, w.Header())
+	}
+	request.Header.Set("Origin", "https://attacker.example.test")
+	w = httptest.NewRecorder()
+	h.preflight(w, request)
+	if w.Code != http.StatusForbidden || w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("untrusted origin allowed: %d %v", w.Code, w.Header())
 	}
 }

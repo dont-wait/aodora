@@ -4,6 +4,7 @@ package catalogadmin
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -14,8 +15,9 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("catalog entity not found")
-	ErrConflict = errors.New("catalog write conflict")
+	ErrNotFound             = errors.New("catalog entity not found")
+	ErrConflict             = errors.New("catalog write conflict")
+	ErrTransactionsRequired = errors.New("category reparent requires MongoDB transactions")
 )
 
 type Invalid struct{ Field, Message string }
@@ -37,16 +39,19 @@ type Accessory struct {
 	Name        string `json:"name" bson:"name"`
 	Description string `json:"description" bson:"description"`
 	Price       int64  `json:"price" bson:"price"`
-	Image       Image  `json:"image" bson:"image"`
+	Image       *Image `json:"image,omitempty" bson:"image,omitempty"`
+	Tag         string `json:"tag,omitempty" bson:"tag,omitempty"`
+	TagVariant  string `json:"tag_variant,omitempty" bson:"tag_variant,omitempty"`
 }
 type CategoryInput struct {
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Description string `json:"description"`
-	ParentID    string `json:"parent_id"`
-	IsActive    bool   `json:"is_active"`
-	SortOrder   int64  `json:"sort_order"`
-	Image       *Image `json:"image"`
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	Description     string `json:"description"`
+	ParentID        string `json:"parent_id"`
+	IsActive        bool   `json:"is_active"`
+	SortOrder       int64  `json:"sort_order"`
+	Image           *Image `json:"image"`
+	ExpectedVersion *int64 `json:"expected_version,omitempty"`
 }
 type Variant struct {
 	SKU   string `json:"sku" bson:"sku"`
@@ -62,26 +67,28 @@ type VariantDetails struct {
 // ProductInput is a full metadata replacement. Neither the aggregate stock,
 // individual variant stock, ratings nor reviews can be modified with this DTO.
 type ProductInput struct {
-	Name           string      `json:"name"`
-	Slug           string      `json:"slug"`
-	CategoryID     string      `json:"category_id"`
-	Description    string      `json:"description"`
-	Material       string      `json:"material"`
-	Price          int64       `json:"price"`
-	CompareAtPrice *int64      `json:"compare_at_price"`
-	Images         []string    `json:"images"`
-	Image          *Image      `json:"image"`
-	Gallery        []Image     `json:"gallery"`
-	Colors         []Color     `json:"colors"`
-	Accessories    []Accessory `json:"accessories"`
-	IsActive       bool        `json:"is_active"`
+	Name            string      `json:"name"`
+	Slug            string      `json:"slug"`
+	CategoryID      string      `json:"category_id"`
+	Description     string      `json:"description"`
+	Material        string      `json:"material"`
+	Price           int64       `json:"price"`
+	CompareAtPrice  *int64      `json:"compare_at_price"`
+	Images          []string    `json:"images"`
+	Image           *Image      `json:"image"`
+	Gallery         []Image     `json:"gallery"`
+	Colors          []Color     `json:"colors"`
+	Accessories     []Accessory `json:"accessories"`
+	IsActive        bool        `json:"is_active"`
+	ExpectedVersion *int64      `json:"expected_version,omitempty"`
 }
 type ProductCreate struct {
 	ProductInput
 	Variants []Variant `json:"variants"`
 }
 type InventoryDelta struct {
-	Delta int64 `json:"delta"`
+	Delta     int64  `json:"delta"`
+	RequestID string `json:"request_id"`
 }
 
 type ProductPage struct {
@@ -102,7 +109,7 @@ type Repository interface {
 	UpdateProduct(context.Context, string, ProductInput) (map[string]any, error)
 	AddVariant(context.Context, string, Variant) (map[string]any, error)
 	UpdateVariant(context.Context, string, string, VariantDetails) (map[string]any, error)
-	AdjustInventory(context.Context, string, string, int64) (map[string]any, error)
+	AdjustInventory(context.Context, string, string, int64, string) (map[string]any, error)
 }
 type Service struct{ repo Repository }
 
@@ -218,7 +225,7 @@ func validateProduct(p ProductInput) error {
 		if err := field(c.Name, fmt.Sprintf("colors[%d].name", i), 80); err != nil {
 			return err
 		}
-		if !regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`).MatchString(c.Hex) {
+		if c.Hex != "" && !regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`).MatchString(c.Hex) {
 			return Invalid{"colors.hex", "Mã HEX phải có dạng #RRGGBB"}
 		}
 	}
@@ -232,7 +239,7 @@ func validateProduct(p ProductInput) error {
 		if a.Price < 0 {
 			return Invalid{"accessories.price", "Giá phụ kiện không được âm"}
 		}
-		if err := validateImage(&a.Image, fmt.Sprintf("accessories[%d].image", i)); err != nil {
+		if err := validateImage(a.Image, fmt.Sprintf("accessories[%d].image", i)); err != nil {
 			return err
 		}
 	}
@@ -273,8 +280,11 @@ func (s *Service) UpdateCategory(ctx context.Context, id string, v CategoryInput
 	if err := validateCategory(v); err != nil {
 		return nil, err
 	}
-	if id == v.ParentID {
+	if canonicalObjectID(id) != "" && canonicalObjectID(id) == canonicalObjectID(v.ParentID) {
 		return nil, Invalid{"parent_id", "Danh mục không thể là cha của chính nó"}
+	}
+	if err := expectedVersion(v.ExpectedVersion); err != nil {
+		return nil, err
 	}
 	return s.repo.UpdateCategory(ctx, id, v)
 }
@@ -316,6 +326,9 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, v ProductInput) 
 	if err := s.checkCategory(ctx, v.CategoryID); err != nil {
 		return nil, err
 	}
+	if err := expectedVersion(v.ExpectedVersion); err != nil {
+		return nil, err
+	}
 	return s.repo.UpdateProduct(ctx, id, v)
 }
 func (s *Service) AddVariant(ctx context.Context, id string, v Variant) (map[string]any, error) {
@@ -338,9 +351,32 @@ func (s *Service) UpdateVariant(ctx context.Context, id, sku string, v VariantDe
 	}
 	return s.repo.UpdateVariant(ctx, id, sku, v)
 }
-func (s *Service) AdjustInventory(ctx context.Context, id, sku string, delta int64) (map[string]any, error) {
+func (s *Service) AdjustInventory(ctx context.Context, id, sku string, delta int64, requestID string) (map[string]any, error) {
 	if delta == 0 || delta < -1000000000 || delta > 1000000000 {
 		return nil, Invalid{"delta", "Thay đổi tồn kho phải khác 0 và trong giới hạn cho phép"}
 	}
-	return s.repo.AdjustInventory(ctx, id, sku, delta)
+	// Retry identity is mandatory: a repeated network request must not apply
+	// a second delta, even if the previous response was lost.
+	if !uuidPattern.MatchString(requestID) {
+		return nil, Invalid{"request_id", "Cần mã yêu cầu UUID hợp lệ"}
+	}
+	return s.repo.AdjustInventory(ctx, id, sku, delta, strings.ToLower(requestID))
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+
+func expectedVersion(v *int64) error {
+	if v == nil || *v < 0 {
+		return Invalid{"expected_version", "Phải cung cấp phiên bản metadata không âm"}
+	}
+	return nil
+}
+func canonicalObjectID(v string) string {
+	if len(v) != 24 {
+		return ""
+	}
+	if _, err := hex.DecodeString(v); err != nil {
+		return ""
+	}
+	return strings.ToLower(v)
 }
