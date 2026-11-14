@@ -7,7 +7,7 @@ const title: Record<SectionName, string> = { story: 'Câu chuyện tác phẩm',
 export default function InfoTabs({ product }: { product: CatalogProduct }) {
   const sections = (['story', 'fabric', 'craft'] as const).filter((key) => {
     const value = product[key]
-    return !!(value && (value.title || value.description || value.paragraphs?.length || value.care?.length || value.steps?.length))
+    return !!(value && (value.eyebrow || value.title || value.description || value.image?.src || value.paragraphs?.length || value.care?.length || value.steps?.length))
   })
   const [active, setActive] = useState<SectionName>(sections[0] || 'story')
   if (!sections.length) return null
@@ -23,10 +23,11 @@ export default function InfoTabs({ product }: { product: CatalogProduct }) {
         <div className={content.image?.src ? 'lg:col-span-7 space-y-4' : 'lg:col-span-12 space-y-4'}>
           {content.eyebrow && <p className="text-secondary uppercase tracking-widest text-sm">{content.eyebrow}</p>}
           {content.title && <h2 className="font-headline-md text-headline-md text-primary">{content.title}</h2>}
-          {content.description && <p className="leading-relaxed text-on-surface-variant">{content.description}</p>}
-          {content.paragraphs?.map((paragraph, i) => <p key={i} className="leading-relaxed text-on-surface-variant">{paragraph}</p>)}
+          {content.description && <p className="leading-relaxed whitespace-pre-line text-on-surface-variant">{content.description}</p>}
+          {content.paragraphs?.map((paragraph, i) => <p key={i} className="leading-relaxed whitespace-pre-line text-on-surface-variant">{paragraph}</p>)}
           {(content.care || content.steps || []).map((item, i) => <div key={`${item.title}-${i}`} className="bg-surface p-4">
-            <h3 className="font-semibold text-primary">{item.title}</h3><p className="mt-1 text-on-surface-variant">{item.description}</p>
+            <h3 className="font-semibold text-primary">{current === 'craft' ? `Bước ${i + 1} · ` : ''}{item.title}</h3>
+            <p className="mt-1 text-on-surface-variant whitespace-pre-line">{item.description}</p>
           </div>)}
         </div>
         {content.image?.src && <div className="lg:col-span-5"><CatalogImage src={content.image.src} alt={content.image.alt || title[current]} className="w-full aspect-[4/5]" /></div>}

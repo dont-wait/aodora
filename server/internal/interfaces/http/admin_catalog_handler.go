@@ -45,6 +45,8 @@ func WithAdminCatalog(service *app.Service, authorize AdminAuthorizer, log zerol
 			{"GET /api/v1/admin/products", h.products},
 			{"POST /api/v1/admin/products", h.createProduct},
 			{"PUT /api/v1/admin/products/{id}", h.updateProduct},
+			{"GET /api/v1/admin/products/{id}/content", h.productContent},
+			{"PUT /api/v1/admin/products/{id}/content", h.updateProductContent},
 			{"POST /api/v1/admin/products/{id}/variants", h.addVariant},
 			{"PATCH /api/v1/admin/products/{id}/variants/{sku}", h.updateVariant},
 			{"POST /api/v1/admin/products/{id}/inventory/{sku}", h.changeInventory},
@@ -139,7 +141,7 @@ func adminRequestBody(r *http.Request, out any, required ...string) error {
 	}
 	for _, key := range required {
 		value, ok := fields[key]
-		if !ok || (string(value) == "null" && key != "image" && key != "compare_at_price" && key != "gallery" && key != "colors" && key != "accessories" && key != "images") {
+		if !ok || (string(value) == "null" && key != "image" && key != "compare_at_price" && key != "gallery" && key != "colors" && key != "accessories" && key != "images" && key != "story" && key != "fabric" && key != "craft") {
 			return app.Invalid{Field: key, Message: "Trường bắt buộc cho yêu cầu thay thế dữ liệu"}
 		}
 	}
@@ -262,4 +264,26 @@ func (h adminCatalogHandler) changeInventory(w http.ResponseWriter, r *http.Requ
 	}
 	data, err := h.service.AdjustInventory(r.Context(), r.PathValue("id"), r.PathValue("sku"), input.Delta, input.RequestID)
 	h.respond(w, "change_inventory", data, err, http.StatusOK)
+}
+
+func (h adminCatalogHandler) productContent(w http.ResponseWriter, r *http.Request) {
+	data, err := h.service.ProductContent(r.Context(), r.PathValue("id"))
+	if err != nil {
+		h.respond(w, "read_product_content", nil, err, 0)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": data})
+}
+
+func (h adminCatalogHandler) updateProductContent(w http.ResponseWriter, r *http.Request) {
+	var input app.ProductContent
+	if h.badBody(w, r, &input, "story", "fabric", "craft", "expected_version") {
+		return
+	}
+	data, err := h.service.UpdateProductContent(r.Context(), r.PathValue("id"), input)
+	if err != nil {
+		h.respond(w, "update_product_content", nil, err, 0)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": data})
 }

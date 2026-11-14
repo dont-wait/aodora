@@ -1,3 +1,4 @@
+import type { ProductContentInput, ProductContentRecord } from './content'
 export type Image = { src: string; alt: string }
 export type CategoryInput = {
   name: string; slug: string; description: string; parent_id: string
@@ -38,6 +39,8 @@ export const adminCatalog = {
   products: (page = 1) => request<ProductPage>(`/products?page=${page}&page_size=50`),
   createCategory: (v: CategoryInput) => request<Category>('/categories', 'POST', v),
   updateCategory: (id: string, v: CategoryInput) => request<Category>(`/categories/${encodeURIComponent(id)}`, 'PUT', v),
+  content: (id: string) => request<ProductContentRecord>(`/products/${encodeURIComponent(id)}/content`),
+  updateContent: (id: string, v: ProductContentInput) => request<ProductContentRecord>(`/products/${encodeURIComponent(id)}/content`, 'PUT', v),
   createProduct: (v: ProductInput & { variants: Variant[] }) => request<Product>('/products', 'POST', v),
   updateProduct: (id: string, v: ProductInput) => request<Product>(`/products/${encodeURIComponent(id)}`, 'PUT', v),
   addVariant: (id: string, v: Variant) => request<Product>(`/products/${encodeURIComponent(id)}/variants`, 'POST', v),

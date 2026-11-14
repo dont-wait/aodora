@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import ProductContentEditor from './ProductContentEditor'
 import { adminCatalog, AdminApiError, editableGallery, parseImageLines, parseVariantLines,
   type Category, type CategoryInput, type Product, type ProductInput, type Variant } from '@/features/admin/catalog'
 
@@ -14,7 +15,7 @@ const buttonClass = 'bg-primary px-4 py-2 text-on-primary disabled:opacity-50 ro
 function Entry({ title, children }: { title: string; children: ReactNode }) {
   return <label className="flex flex-col gap-1.5 text-sm font-medium">{title}{children}</label>
 }
-function VariantRow({ productId, variant, onSaved }: { productId: string; variant: Variant; onSaved: () => Promise<void> }) {
+function VariantRow({ productId, variant, onSaved, onForbidden }: { productId: string; variant: Variant; onSaved: () => Promise<void>; onForbidden: () => void }) {
   const [color, setColor] = useState(variant.color)
   const [size, setSize] = useState(variant.size)
   const [delta, setDelta] = useState('')
@@ -35,7 +36,10 @@ function VariantRow({ productId, variant, onSaved }: { productId: string; varian
         setDelta('')
       }
       await onSaved()
-    } catch (err) { setError(err instanceof Error ? err.message : 'Không thể lưu') }
+    } catch (err) {
+      if (err instanceof AdminApiError && (err.status === 401 || err.status === 403)) onForbidden()
+      else setError(err instanceof Error ? err.message : 'Không thể lưu')
+    }
     finally { setBusy(false) }
   }
   return <div className="border border-outline/30 p-3 flex flex-col gap-2 text-sm">
@@ -133,7 +137,7 @@ export default function AdminCatalogPage() {
         setCategory((current) => ({ ...current, expected_version: updated.version ?? 0 }))
       } else await adminCatalog.createCategory(category)
       await load();setSuccess('Đã lưu danh mục vào MongoDB')
-    } catch (err) {setError(err instanceof Error ? err.message : 'Không thể lưu danh mục')}
+    } catch (err) { if (err instanceof AdminApiError && [401, 403].includes(err.status)) setAccessDenied(true); else setError(err instanceof Error ? err.message : 'Không thể lưu danh mục') }
     finally {setBusy(false)}
   }
   async function submitProduct(event: FormEvent) {
@@ -150,22 +154,24 @@ export default function AdminCatalogPage() {
         setProduct((current) => ({ ...current, expected_version: updated.version ?? 0 }))
       } else await adminCatalog.createProduct({ ...data, variants: parseVariantLines(variantsText) })
       await load();setSuccess('Đã lưu sản phẩm vào MongoDB')
-    } catch (err) {setError(err instanceof Error ? err.message : 'Không thể lưu sản phẩm')}
+    } catch (err) { if (err instanceof AdminApiError && [401, 403].includes(err.status)) setAccessDenied(true); else setError(err instanceof Error ? err.message : 'Không thể lưu sản phẩm') }
     finally {setBusy(false)}
   }
   async function addSKU() {
     if (!productId) return
     setBusy(true);setError('')
     try { await adminCatalog.addVariant(productId, newSKU);await load();setNewSKU({ sku: '', color: '', size: '', stock: 0 });setSuccess('Đã thêm SKU, tồn kho ban đầu bằng 0') }
-    catch (err) {setError(err instanceof Error ? err.message : 'Không thể thêm SKU')}
+    catch (err) { if (err instanceof AdminApiError && [401, 403].includes(err.status)) setAccessDenied(true); else setError(err instanceof Error ? err.message : 'Không thể thêm SKU') }
     finally {setBusy(false)}
   }
   const chosen = products.find((row) => row.id === productId)
+  const onForbidden = useCallback(() => setAccessDenied(true), [])
+  if (accessDenied) return <Navigate to="/403" replace />
   return <main className="min-h-screen bg-background px-5 py-10 text-on-surface">
     <div className="max-w-6xl mx-auto space-y-7">
       <div className="flex items-center justify-between gap-4"><div><p className="text-secondary uppercase tracking-wider text-sm">Aodora · Chủ cửa hàng</p><h1 className="text-3xl font-title-editorial text-primary">Quản trị danh mục & sản phẩm</h1></div><Link className="underline" to="/">Trang khách</Link></div>
       {loading && <p role="status">Đang kiểm tra quyền admin và tải dữ liệu...</p>}
-      {accessDenied ? <section className="bg-surface border p-6 space-y-3"><h2 className="text-xl text-primary">Chưa được cấp quyền quản trị</h2><p>API yêu cầu phiên đăng nhập chủ cửa hàng được KR-01 xác minh ở server. Không có quyền thì không hiển thị dữ liệu quản trị hoặc mở thao tác ghi.</p><button type="button" className={buttonClass} onClick={refresh}>Kiểm tra lại quyền</button></section> : !loading && <>
+      {!loading && <>
         <div className="flex gap-3"><button type="button" className={buttonClass} onClick={() => setTab('product')}>Sản phẩm</button><button type="button" className={buttonClass} onClick={() => setTab('category')}>Danh mục</button><button type="button" className="underline" onClick={refresh}>Tải lại</button></div>
         {tab === 'category' ? <div className="grid md:grid-cols-[17rem_1fr] gap-6">
           <aside className="bg-surface p-4 space-y-2"><h2 className="font-bold">Danh mục ({categories.length})</h2><button onClick={() => selectCategory('')} className="underline" type="button">+ Tạo mới</button>{categories.map((row) => <button key={row.id} type="button" onClick={() => selectCategory(row.id)} className={`block w-full text-left border p-2 ${row.id === categoryId ? 'border-primary' : 'border-outline/20'}`}>{row.name} {row.is_active ? '' : '· Đang ẩn'}</button>)}</aside>
@@ -192,9 +198,14 @@ export default function AdminCatalogPage() {
             {productId && <p className="text-sm text-secondary">Lưu thông tin sẽ không thay đổi tồn kho, danh sách SKU, rating hay review_count.</p>}
             <button type="submit" disabled={busy} className={buttonClass}>Lưu sản phẩm</button></form>
             {chosen && <section className="bg-surface p-5 space-y-3"><h2 className="text-xl font-bold">SKU & tồn kho — tổng {chosen.stock}</h2><p className="text-sm text-secondary">Điều chỉnh tồn bằng số chênh lệch, không nhập đè số tồn cũ.</p>
-              {(chosen.variants || []).map((v) => <VariantRow key={`${chosen.id}:${v.sku}`} productId={chosen.id} variant={v} onSaved={load}/>)}
+              {(chosen.variants || []).map((v) => <VariantRow key={`${chosen.id}:${v.sku}`} productId={chosen.id} variant={v} onSaved={load} onForbidden={onForbidden}/>)}
               <div className="border-t pt-3 space-y-2"><h3 className="font-bold">Thêm SKU (tồn = 0)</h3><div className="grid md:grid-cols-3 gap-2"><input className={inputClass} placeholder="SKU" value={newSKU.sku} onChange={(e) => setNewSKU({ ...newSKU, sku: e.target.value })}/><input className={inputClass} placeholder="Màu" value={newSKU.color} onChange={(e) => setNewSKU({ ...newSKU, color: e.target.value })}/><input className={inputClass} placeholder="Cỡ" value={newSKU.size} onChange={(e) => setNewSKU({ ...newSKU, size: e.target.value })}/></div><button className={buttonClass} disabled={busy} type="button" onClick={() => void addSKU()}>Thêm SKU</button></div>
             </section>}
+            {chosen && <ProductContentEditor key={chosen.id} productId={chosen.id} onForbidden={onForbidden}
+              onVersion={(version) => {
+                setProduct((current) => current.expected_version == null ? current : { ...current, expected_version: version })
+                setProducts((current) => current.map((row) => row.id === chosen.id ? { ...row, version } : row))
+              }}/>}
           </div></div>}
         {success && <p role="status" className="text-green-700">{success}</p>}
         {error && <p role="alert" className="text-red-700">{error}</p>}
