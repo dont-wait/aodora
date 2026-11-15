@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { NAV_ITEMS, ROUTES, SITE } from '@/data/site'
 import Icon from '@/components/ui/Icon'
 import BrandMark from './BrandMark'
@@ -12,8 +12,24 @@ export default function Header() {
   const navigate = useNavigate()
   const [showSearch, setShowSearch] = useState(false)
   const [search, setSearch] = useState('')
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
   const { user, logout } = useAuth()
   const { showToast } = useToast()
+  useEffect(() => {
+    function closeAccount(event: PointerEvent) {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false)
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAccountOpen(false)
+    }
+    document.addEventListener('pointerdown', closeAccount)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeAccount)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [])
   function submitSearch(e: FormEvent) {
     e.preventDefault()
     navigate(`${ROUTES.collection}?search=${encodeURIComponent(search.trim())}`)
@@ -61,11 +77,21 @@ export default function Header() {
           </button>
           <button aria-label="Danh sách yêu thích (chưa tích hợp)" disabled title="Chức năng yêu thích đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="favorite" size={20} /></button>
           <button aria-label="Giỏ hàng (chưa tích hợp)" disabled title="Chức năng giỏ hàng đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="shopping_bag" size={20} /></button>
-          {user ? <div className="flex items-center gap-2 ml-1">
+          {user ? <div ref={accountRef} className="relative flex items-center gap-2 ml-1">
             <span className="hidden lg:inline text-sm text-on-surface-variant max-w-28 truncate" title={user.full_name}>{user.full_name}</span>
-            <button aria-label="Đăng xuất" title="Đăng xuất" className="flex items-center" type="button" onClick={() => void logout().catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.'))}>
+            <button aria-label="Mở menu tài khoản" aria-expanded={accountOpen} aria-haspopup="menu" title="Tài khoản" className="flex items-center" type="button" onClick={() => setAccountOpen((value) => !value)}>
               <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Icon name="person" size={18} className="text-on-primary" /></span>
             </button>
+            {accountOpen && <div role="menu" aria-label="Menu tài khoản" className="absolute right-0 top-full mt-3 w-64 bg-surface border border-outline-variant shadow-lg p-2">
+              <div className="border-b border-outline-variant px-3 py-3">
+                <p className="font-semibold text-primary truncate">{user.full_name}</p>
+                <p className="text-sm text-on-surface-variant truncate">{user.email}</p>
+                <p className="text-xs uppercase tracking-widest text-secondary mt-1">{user.role === 'admin' ? 'Chủ cửa hàng' : 'Khách hàng'}</p>
+              </div>
+              <div role="menuitem" className="flex items-center gap-2 px-3 py-3 text-on-surface-variant"><Icon name="check" size={18} className="text-secondary" />Tài khoản đang dùng</div>
+              <button role="menuitem" type="button" className="w-full text-left px-3 py-3 text-on-surface-variant hover:bg-surface-container" onClick={() => void logout().then(() => { setAccountOpen(false); navigate(ROUTES.login) }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đổi tài khoản.'))}>Đổi tài khoản</button>
+              <button role="menuitem" type="button" className="w-full text-left px-3 py-3 text-red-700 hover:bg-surface-container" onClick={() => void logout().then(() => setAccountOpen(false)).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.'))}>Đăng xuất</button>
+            </div>}
           </div> : <button aria-label="Đăng nhập" title="Đăng nhập" className="flex items-center ml-1" type="button" onClick={() => navigate(ROUTES.login)}>
             <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Icon name="person" size={18} className="text-on-primary" /></span>
           </button>}
