@@ -10,6 +10,8 @@ export const ROUTES = {
   collection: '/bo-suu-tap',
   product: (slug: string) => `/san-pham/${slug}`,
   tailoring: '/dich-vu-may-do',
+  login: '/dang-nhap',
+  register: '/dang-ky',
 } as const
 
 export const NAV_ITEMS = [

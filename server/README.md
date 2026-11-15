@@ -35,7 +35,7 @@ make test
 
 `/healthz` chỉ xác nhận process đang sống. `/readyz` ping MongoDB và trả `503` khi database chưa sẵn sàng.
 
-Config được load từ `.env` ở project root nếu file tồn tại, sau đó đọc environment variables. Environment variables được ưu tiên; các key chính là `HTTP_ADDR`, `LOG_LEVEL`, `LOG_FORMAT`, `MONGO_URI`, `MONGO_DB`.
+Config được load từ `.env` ở project root nếu file tồn tại, sau đó đọc environment variables. Environment variables được ưu tiên; các key chính là `HTTP_ADDR`, `LOG_LEVEL`, `LOG_FORMAT`, `MONGO_URI`, `MONGO_DB`, `AUTH_SESSION_TTL`, `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`, `AUTH_ALLOWED_ORIGIN`.
 
 Logger mặc định ghi structured JSON ra stdout. Có thể dùng `LOG_FORMAT=text` khi development local; mỗi HTTP request được log với method, path, status và duration.
 
@@ -97,7 +97,7 @@ make seed-demo
 ```
 
 Seeder tải chín ảnh tham khảo từ Forher, upload vào RustFS và thêm ba danh mục,
-ba sản phẩm cùng SKU/tồn kho mẫu. Chạy lại giữ nguyên dữ liệu đã chỉnh.
+ba sản phẩm cùng SKU/tồn kho mẫu, một admin và một user demo. Chạy lại giữ nguyên dữ liệu đã chỉnh.
 Chi tiết nguồn ảnh, cấu hình URL và hành vi chạy lại: [seeds/README.md](seeds/README.md).
 
 ## Navicat qua trình duyệt
@@ -122,3 +122,28 @@ Chi tiết build, kết nối MongoDB và volume: [docker/navicat/README.md](doc
 ## Product catalog (PD-01)
 
 Public read-only endpoints: `GET /api/v1/categories`, `GET /api/v1/products`, and `GET /api/v1/products/{slug}`. Filters, pagination, detail fields and consistency rules: [docs/PD01_CATALOG_API.md](docs/PD01_CATALOG_API.md).
+
+## Authentication (KR-01)
+
+Public auth endpoints:
+
+```text
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
+```
+
+Sessions are stored in MongoDB and exposed to the browser through an `HttpOnly` cookie. For a separate frontend origin, set `AUTH_ALLOWED_ORIGIN` to the exact origin and use `AUTH_COOKIE_SECURE=true`. Run the auth migration before starting the API:
+
+```bash
+make migrate-up
+```
+
+Create or promote the store owner with:
+
+```bash
+go run ./cmd/admin -email owner@example.com -name "Store Owner"
+```
+
+Admin endpoints require the session of an account with `role=admin`; the role is never accepted from a client request.

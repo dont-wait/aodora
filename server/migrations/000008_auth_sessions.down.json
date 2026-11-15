@@ -1,0 +1,4 @@
+[
+  { "drop": "sessions" },
+  { "dropIndexes": "customers", "index": "uq_customers_email_normalized" }
+]

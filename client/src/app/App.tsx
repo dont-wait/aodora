@@ -7,6 +7,8 @@ import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
 import ForbiddenPage from '@/pages/admin/ForbiddenPage'
+import LoginPage from '@/pages/auth/LoginPage'
+import RegisterPage from '@/pages/auth/RegisterPage'
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
         <Route path="*" element={<Navigate to="/403" replace />} />
       </Route>
       <Route element={<Layout />}>
+        <Route path="dang-nhap" element={<LoginPage />} />
+        <Route path="dang-ky" element={<RegisterPage />} />
         <Route index element={<HomePage />} />
         <Route path="bo-suu-tap" element={<CollectionPage />} />
         <Route path="san-pham/:slug" element={<ProductDetailPage />} />

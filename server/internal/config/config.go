@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -24,10 +25,18 @@ type LogConfig struct {
 	Format string
 }
 
+type AuthConfig struct {
+	SessionTTL    time.Duration
+	CookieName    string
+	CookieSecure  bool
+	AllowedOrigin string
+}
+
 type Config struct {
 	HTTP  HTTPConfig
 	Log   LogConfig
 	Mongo MongoConfig
+	Auth  AuthConfig
 }
 
 type ConfigError struct {
@@ -72,11 +81,30 @@ func LoadAllConfig() (Config, error) {
 	} else {
 		cfg.Mongo = value
 	}
+	if value, err := LoadAuthConfig(); err != nil {
+		configErrors = append(configErrors, ConfigError{Name: "auth", Err: err})
+	} else {
+		cfg.Auth = value
+	}
 
 	if len(configErrors) > 0 {
 		return cfg, configErrors
 	}
 	return cfg, nil
+}
+
+func LoadAuthConfig() (AuthConfig, error) {
+	ttl, err := time.ParseDuration(envOr("AUTH_SESSION_TTL", "168h"))
+	if err != nil || ttl <= 0 {
+		return AuthConfig{}, errors.New("AUTH_SESSION_TTL must be a positive duration")
+	}
+	cookieName := strings.TrimSpace(envOr("AUTH_COOKIE_NAME", "aodora_session"))
+	if cookieName == "" {
+		return AuthConfig{}, errors.New("AUTH_COOKIE_NAME must not be empty")
+	}
+	secure := strings.EqualFold(envOr("AUTH_COOKIE_SECURE", "false"), "true")
+	origin := strings.TrimSuffix(strings.TrimSpace(envOr("AUTH_ALLOWED_ORIGIN", "")), "/")
+	return AuthConfig{SessionTTL: ttl, CookieName: cookieName, CookieSecure: secure, AllowedOrigin: origin}, nil
 }
 
 // LoadEnv imports .env when present. Real environment variables keep priority.

@@ -1,0 +1,49 @@
+[
+  {
+    "update": "customers",
+    "updates": [
+      {
+        "q": {},
+        "u": [
+          {
+            "$set": {
+              "email_normalized": { "$toLower": { "$trim": { "input": "$email" } } },
+              "role": { "$ifNull": ["$role", "customer"] }
+            }
+          }
+        ],
+        "multi": true
+      }
+    ]
+  },
+  {
+    "create": "sessions",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["token_hash", "customer_id", "created_at", "expires_at"],
+        "properties": {
+          "token_hash": { "bsonType": "string", "minLength": 64, "maxLength": 64 },
+          "customer_id": { "bsonType": "objectId" },
+          "created_at": { "bsonType": "date" },
+          "expires_at": { "bsonType": "date" }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "createIndexes": "customers",
+    "indexes": [
+      { "key": { "email_normalized": 1 }, "name": "uq_customers_email_normalized", "unique": true, "sparse": true }
+    ]
+  },
+  {
+    "createIndexes": "sessions",
+    "indexes": [
+      { "key": { "token_hash": 1 }, "name": "uq_sessions_token_hash", "unique": true },
+      { "key": { "expires_at": 1 }, "name": "ttl_sessions_expires_at", "expireAfterSeconds": 0 }
+    ]
+  }
+]

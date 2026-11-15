@@ -3,6 +3,8 @@ import { useState, type FormEvent } from 'react'
 import { NAV_ITEMS, ROUTES, SITE } from '@/data/site'
 import Icon from '@/components/ui/Icon'
 import BrandMark from './BrandMark'
+import { useAuth } from '@/features/auth/useAuth'
+import { useToast } from '@/hooks/useToast'
 
 const iconButton = 'relative text-on-surface-variant hover:text-primary transition-colors p-1'
 
@@ -10,6 +12,8 @@ export default function Header() {
   const navigate = useNavigate()
   const [showSearch, setShowSearch] = useState(false)
   const [search, setSearch] = useState('')
+  const { user, logout } = useAuth()
+  const { showToast } = useToast()
   function submitSearch(e: FormEvent) {
     e.preventDefault()
     navigate(`${ROUTES.collection}?search=${encodeURIComponent(search.trim())}`)
@@ -57,11 +61,14 @@ export default function Header() {
           </button>
           <button aria-label="Danh sách yêu thích (chưa tích hợp)" disabled title="Chức năng yêu thích đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="favorite" size={20} /></button>
           <button aria-label="Giỏ hàng (chưa tích hợp)" disabled title="Chức năng giỏ hàng đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="shopping_bag" size={20} /></button>
-          <button aria-label="Tài khoản" className="flex items-center ml-1" type="button">
-            <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <Icon name="person" size={18} className="text-on-primary" />
-            </span>
-          </button>
+          {user ? <div className="flex items-center gap-2 ml-1">
+            <span className="hidden lg:inline text-sm text-on-surface-variant max-w-28 truncate" title={user.full_name}>{user.full_name}</span>
+            <button aria-label="Đăng xuất" title="Đăng xuất" className="flex items-center" type="button" onClick={() => void logout().catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.'))}>
+              <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Icon name="person" size={18} className="text-on-primary" /></span>
+            </button>
+          </div> : <button aria-label="Đăng nhập" title="Đăng nhập" className="flex items-center ml-1" type="button" onClick={() => navigate(ROUTES.login)}>
+            <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Icon name="person" size={18} className="text-on-primary" /></span>
+          </button>}
         </div>
       </div>
       {showSearch && <form onSubmit={submitSearch} className="bg-surface-container-low px-margin-desktop py-3 flex gap-2" role="search">
