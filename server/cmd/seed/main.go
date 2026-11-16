@@ -1,4 +1,4 @@
-// Command seed adds the opt-in demo catalog without replacing existing records.
+// Command seed adds opt-in demo data without replacing existing records.
 package main
 
 import (
@@ -17,6 +17,7 @@ import (
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type category struct {
@@ -111,6 +112,29 @@ func run() error {
 		}
 		fmt.Printf("%s: inserted %d, preserved %d\n", group.name, inserted, int64(len(group.docs))-inserted)
 	}
+	customers, err := db.DB.ListCollectionNames(ctx, bson.M{"name": "customers"})
+	if err != nil {
+		return err
+	}
+	if len(customers) == 0 {
+		return fmt.Errorf("missing customers collection: run make migrate-up first")
+	}
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("password@123"), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	authUsers := authDocuments(string(passwordHash), time.Now().UTC())
+	inserted := int64(0)
+	for _, doc := range authUsers {
+		result, err := db.DB.Collection("customers").UpdateOne(ctx, bson.M{"$or": bson.A{
+			bson.M{"_id": doc["_id"]}, bson.M{"email_normalized": doc["email_normalized"]}, bson.M{"email": doc["email"]},
+		}}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))
+		if err != nil {
+			return fmt.Errorf("seed customer %s: %w", doc["email"], err)
+		}
+		inserted += result.UpsertedCount
+	}
+	fmt.Printf("customers: inserted %d, preserved %d\n", inserted, int64(len(authUsers))-inserted)
 	return nil
 }
 
@@ -173,6 +197,21 @@ func validate(seed manifest, baseURL, assetsPath string) error {
 func demoID(kind, key string) bson.ObjectID {
 	hash := sha256.Sum256([]byte("aodora:demo:forher:" + kind + ":" + key))
 	return bson.ObjectID(hash[:12])
+}
+
+func authDocuments(passwordHash string, now time.Time) []bson.M {
+	return []bson.M{
+		{
+			"_id": demoID("customer", "admin"), "full_name": "Aodora Admin", "email": "admin@aodora.local",
+			"email_normalized": "admin@aodora.local", "password_hash": passwordHash, "role": "admin", "phone": "0900000001",
+			"created_at": now, "updated_at": now,
+		},
+		{
+			"_id": demoID("customer", "user"), "full_name": "Aodora Demo User", "email": "user@aodora.local",
+			"email_normalized": "user@aodora.local", "password_hash": passwordHash, "role": "customer", "phone": "0900000002",
+			"created_at": now, "updated_at": now,
+		},
+	}
 }
 
 func documents(seed manifest, baseURL string, now time.Time) ([]bson.M, []bson.M) {

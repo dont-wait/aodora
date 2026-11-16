@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestDemoCatalogReferencesStockAndGallery(t *testing.T) {
@@ -68,6 +69,30 @@ func TestDemoCatalogReferencesStockAndGallery(t *testing.T) {
 		if !reflect.DeepEqual(products[i]["_id"], again[i]["_id"]) {
 			t.Fatal("rerunning would create duplicate product IDs")
 		}
+	}
+}
+
+func TestAuthDocumentsContainDemoAdminAndUser(t *testing.T) {
+	documents := authDocuments("hash", time.Now())
+	if len(documents) != 2 {
+		t.Fatalf("got %d auth documents, want 2", len(documents))
+	}
+	roles := map[string]string{}
+	for _, document := range documents {
+		roles[document["email"].(string)] = document["role"].(string)
+		if document["password_hash"] != "hash" || document["email"] != document["email_normalized"] {
+			t.Fatalf("invalid auth document: %v", document)
+		}
+	}
+	if roles["admin@aodora.local"] != "admin" || roles["user@aodora.local"] != "customer" {
+		t.Fatalf("unexpected demo roles: %v", roles)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte("password@123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := bcrypt.CompareHashAndPassword(hash, []byte("password@123")); err != nil {
+		t.Fatal(err)
 	}
 }
 

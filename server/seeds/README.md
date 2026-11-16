@@ -25,6 +25,8 @@ Lệnh này:
 4. Upload ảnh lên `s3://$RUSTFS_BUCKET/demo/forher/`.
 5. Thêm ba danh mục và ba sản phẩm có ảnh chính, gallery, thông tin giới thiệu,
    chất liệu và chín SKU (S/M/L), gồm một mẫu hết hàng để thử giao diện.
+6. Thêm tài khoản demo `admin@aodora.local` (role `admin`) và
+   `user@aodora.local` (role `customer`). Cả hai dùng mật khẩu `password@123`.
 
 MongoDB dùng `MONGO_URI`/`MONGO_DB`. Trình duyệt đọc ảnh qua
 `RUSTFS_PUBLIC_URL` (URL bucket công khai, không phải endpoint nội bộ Docker).
@@ -40,7 +42,7 @@ Kiểm tra đường dẫn router của frontend nếu chạy phiên bản giao 
 
 ## Chạy lại và bảo toàn dữ liệu
 
-ID được suy ra ổn định từ loại bản ghi và mã sản phẩm. Seeder dùng `$setOnInsert`:
+ID được suy ra ổn định từ loại bản ghi và mã sản phẩm/tài khoản. Seeder dùng `$setOnInsert`:
 chạy lại không tạo trùng, không ghi đè thông tin, version hoặc tồn kho đã chỉnh.
 Slug có tiền tố `demo-`, SKU có tiền tố `DEMO-`. Không xóa sản phẩm có sẵn.
 Nếu slug đã bị bản ghi khác chiếm, lệnh báo lỗi thay vì ghi đè bản ghi đó.

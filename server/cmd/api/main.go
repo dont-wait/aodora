@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	authapp "github.com/your-org/aodora/server/internal/application/auth"
 	"github.com/your-org/aodora/server/internal/application/catalog"
 	admin "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	"github.com/your-org/aodora/server/internal/application/health"
@@ -56,12 +57,16 @@ func main() {
 	service := health.NewService(db, *log)
 	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
 	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB))
+	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
+	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
+		Name: cfg.Auth.CookieName, Secure: cfg.Auth.CookieSecure, TTL: cfg.Auth.SessionTTL, AllowedOrigin: cfg.Auth.AllowedOrigin,
+	})
 	server := &http.Server{
 		Addr: cfg.HTTP.Addr,
-		Handler: httpapi.NewRouter(service, *log, httpapi.WithCatalog(catalogService, *log),
-			// KR-01 supplies a verified role-based authorizer when available.
-			// Default denies admin access; never expose unauthenticated writes.
-			httpapi.WithAdminCatalog(adminService, nil, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
+		Handler: httpapi.NewRouter(service, *log,
+			httpapi.WithAuth(authGuard),
+			httpapi.WithCatalog(catalogService, *log),
+			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
