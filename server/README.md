@@ -51,6 +51,8 @@ Tạo migration mới bằng `make migrate-create name=ten_thay_doi`. Lệnh sin
 
 Schema, validator, index và mapping field từ client được mô tả tại [docs/database-schema.md](docs/database-schema.md). `make migrate-up` tạo collection bán hàng, seed demo và thêm `tailoring_requests` để lưu form may đo. Database mặc định là `QuanLyBanQuanAo` theo tài liệu đề tài; có thể đổi bằng `MONGO_DB`.
 
+DW-01 bổ sung schema guest/COD/nhận tại quầy và môi trường MongoDB replica set riêng để kiểm tra transaction. Payload, hướng dẫn chạy test và rollback: [docs/DW01_ORDER_SCHEMA.md](docs/DW01_ORDER_SCHEMA.md).
+
 Sơ đồ có thể mở/chỉnh sửa bằng draw.io tại [docs/database-schema.drawio](docs/database-schema.drawio), hoặc xem nhanh bản [SVG](docs/database-schema.svg).
 
 Kết nối MongoDB local bằng Compass/Navicat: sử dụng host/port và authentication database theo cấu hình MongoDB của môi trường, lấy tên database từ `MONGO_DB`. Thông tin tài khoản và mật khẩu được quản lý riêng trong biến môi trường/`.env`, không ghi trực tiếp vào tài liệu chung.

@@ -6,7 +6,7 @@ export AODORA_MIGRATION_NAME := $(value name)
 export AODORA_LEGACY_FINGERPRINT := $(value legacy_fingerprint)
 unexport name MIGRATIONS_PATH legacy_fingerprint
 
-.PHONY: run build test test-migrations fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
+.PHONY: run build test test-migrations transactions-up transactions-down test-integration fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
 
 run:
 	go run ./cmd/api
@@ -77,3 +77,13 @@ navicat-up: navicat-build
 
 navicat-down:
 	docker compose --profile tools stop navicat
+
+# Isolated transaction-capable database for DW integration tests.
+transactions-up:
+	docker compose -f docker-compose.transactions.yml up -d --wait mongo
+	docker compose -f docker-compose.transactions.yml run --rm mongo-init
+
+transactions-down:
+	docker compose -f docker-compose.transactions.yml down
+
+test-integration: test-migrations

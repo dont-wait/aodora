@@ -266,6 +266,8 @@ Giữ nguyên hai nhóm quyền: người dùng và admin là chủ cửa hàng.
 
 ## 4. Task của Dontwait
 
+**Kế hoạch triển khai:** [dontwait-plan.md](dontwait-plan.md), đối chiếu checkout ngày 16/11/2026. Thứ tự bắt buộc: viết issue trước → triển khai theo issue → tạo PR liên kết issue. Chưa đánh dấu task hoàn thành khi mới lập kế hoạch hoặc chỉ qua build/test tĩnh.
+
 ### DW-01 — Điều chỉnh schema đơn hàng
 
 **Mục tiêu nghiệp vụ:** DB lưu được đơn không có tài khoản, COD và đơn thu tại quầy bằng dữ liệu thật.
@@ -461,6 +463,6 @@ Một task chỉ hoàn thành khi:
 - [ ] Chạy kiểm tra phù hợp: trong `client/`, `npm run build` và `npm run lint`; trong `server/`, `make test` cho thay đổi Go, kiểm tra migration riêng nếu có.
 - [ ] PR theo template repository, có mã task, kết quả thay đổi, cách kiểm tra, giới hạn chưa kiểm chứng và quyết định Q liên quan.
 
-**Phối hợp file và migration:** Người sửa collection chịu trách nhiệm migration tương ứng; thống nhất số thứ tự trước khi tạo. `router.go`, route client và kiểu dùng chung cần ghép có trao đổi. Phân quyền và cấu trúc request dùng chung không được mỗi người tự định nghĩa một cách.
+**Phối hợp file và migration:** Người sửa collection chịu trách nhiệm migration tương ứng; tạo bằng `make migrate-create name=...` để dùng UUID và khai báo phụ thuộc; không chọn số tăng tiếp theo. `router.go`, route client và kiểu dùng chung cần ghép có trao đổi. Phân quyền và cấu trúc request dùng chung không được mỗi người tự định nghĩa một cách.
 
 **Tổng hợp nghiệm thu:** Mỗi người báo kết quả task và IT do mình phụ trách; Dontwait tổng hợp mức đáp ứng AC-01–10. Chỉ sửa `system.md` khi có thay đổi yêu cầu được thống nhất; lỗi triển khai không phải lý do tự đổi specs để đạt nghiệm thu.

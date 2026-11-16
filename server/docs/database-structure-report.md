@@ -1,8 +1,8 @@
 # Báo cáo cấu trúc cơ sở dữ liệu MongoDB
 
 - **Cơ sở dữ liệu:** `QuanLyBanQuanAo`
-- **Phiên bản schema:** migration `4`
-- **Nguồn cấu trúc:** các migration `000001_init`, `000002_clothing_store`, `000004_client_fields` trong `server/migrations`.
+- **Phiên bản schema:** phần nền được lập từ migration `4`; mục orders/index đã cập nhật theo các migration UUID `order_checkout` và `order_checkout_access`. Các phần khác giữ nguồn tương ứng, không coi đây là snapshot live DB.
+- **Nguồn cấu trúc:** migration legacy và các migration checkout UUID trong `server/migrations`; hợp đồng hiện tại: [DW01_ORDER_SCHEMA.md](DW01_ORDER_SCHEMA.md), [DW_ORDER_CHECKOUT_CONTRACT.md](DW_ORDER_CHECKOUT_CONTRACT.md).
 - **Quy ước:** BSON type mô tả kiểu được validator cho phép. `bắt buộc` nghĩa là nằm trong `required` của validator; các field còn lại là tùy chọn. Với MongoDB, `null` chỉ được phép khi ghi rõ `| null`.
 
 ## Tổng quan collections
@@ -146,7 +146,7 @@ Các object `measurement_profile` và `measurements` (trong đơn hàng/giỏ h�
 
 | Đường dẫn field | BSON type | Bắt buộc | Ràng buộc / ghi chú |
 |---|---|---:|---|
-| `customer_id` | ObjectId | Có | Tham chiếu logic đến `customers._id`. |
+| `customer_id` | ObjectId \| null | Không | Có tài khoản thì tham chiếu customers; guest thiếu/null. |
 | `items[]` | object | Có | Mảng phải có ít nhất 1 phần tử. Mỗi item bắt buộc `product_id:ObjectId`, `product_name:string`, `sku:string`, `quantity:int\|long` (tối thiểu 1), `unit_price:int\|long\|decimal` (tối thiểu 0). |
 | `items[].size`, `items[].color` | string \| null | Không | Thuộc tính sản phẩm được chụp tại thời điểm mua. |
 | `items[].color_hex` | string \| null | Không | Mã màu. |
@@ -154,12 +154,12 @@ Các object `measurement_profile` và `measurements` (trong đơn hàng/giỏ h�
 | `items[].fulfillment_mode` | string | Không | Enum `ready`, `custom`. |
 | `items[].measurements` | object | Không | Có thể nhúng số đo dùng chung. |
 | `subtotal` | int \| long \| decimal | Có | Tối thiểu 0. |
-| `shipping_fee` | int \| long \| decimal | Có | Tối thiểu 0. |
+| `shipping_fee` | int \| long \| decimal | Có | Tối thiểu 0; cash_at_counter bắt buộc 0. |
 | `total` | int \| long \| decimal | Có | Tối thiểu 0. |
 | `status` | string | Có | Enum `pending`, `confirmed`, `shipping`, `delivered`, `cancelled`. |
-| `payment_method` | string | Có | Enum `cod`, `bank_transfer`, `card`, `e_wallet`. |
+| `payment_method` | string | Có | Enum `cod`, `cash_at_counter`, `bank_transfer`, `card`, `e_wallet`; document có checkout marker chỉ nhận cod/cash_at_counter. |
 | `payment_status` | string | Có | Enum `unpaid`, `paid`, `refunded`. |
-| `shipping_address` | object | Có | Bắt buộc `recipient`, `phone`, `line1`, `city` kiểu string; `ward`, `district` kiểu string hoặc null tùy chọn. Snapshot địa chỉ tại thời điểm đặt hàng. |
+| `shipping_address` | object | Có | Bắt buộc `recipient`, `phone` kiểu string; nhận tại quầy không cần line1/city, các phương thức giao hàng vẫn cần hai field đó; `ward`, `district` kiểu string hoặc null tùy chọn. Snapshot địa chỉ tại thời điểm đặt hàng. |
 | `created_at` | date | Có | Thời điểm tạo. |
 | `updated_at` | date | Có | Thời điểm cập nhật. |
 | `note` | string \| null | Không | Ghi chú đơn hàng. |
@@ -167,6 +167,10 @@ Các object `measurement_profile` và `measurements` (trong đơn hàng/giỏ h�
 | `fulfillment_mode` | string | Không | Enum `ready`, `custom`. |
 | `tailoring_request_id` | ObjectId \| null | Không | Tham chiếu logic đến `tailoring_requests._id`. |
 | `measurement_profile` | object | Không | Có thể nhúng số đo dùng chung. |
+| `checkout.scope` | string | Khi có checkout | customer:ObjectId hoặc guest:SHA256, khớp danh tính/hash của đơn; server tính. |
+| `checkout.request_id` | string UUID lowercase | Khi có checkout | Key chống gửi lặp từ Idempotency-Key. |
+| `checkout.request_hash` | string SHA-256 hex | Khi có checkout | Fingerprint payload chuẩn hóa, không chứa credential plaintext. |
+| `guest_access_hash` | string SHA-256 hex | Guest có checkout | Hash credential; account có checkout không được có field này. |
 
 ## `carts`
 
@@ -236,6 +240,7 @@ Các object `measurement_profile` và `measurements` (trong đơn hàng/giỏ h�
 | `customers` | phone index | `phone` | Sparse. |
 | `orders` | customer timeline | `customer_id`, `created_at` giảm dần | Lịch sử đơn theo khách. |
 | `orders` | status timeline | `status`, `created_at` giảm dần | Lọc đơn theo trạng thái/thời gian. |
+| `orders` | `uq_orders_checkout_scope_request` | `checkout.scope`, `checkout.request_id` | Unique partial: chỉ hai field kiểu string, legacy thiếu marker không bị gom thành key null. |
 | `carts` | unique customer | `customer_id` | Mỗi khách một cart. |
 | `reviews` | product timeline | `product_id`, `created_at` giảm dần | Lấy đánh giá theo sản phẩm/thời gian. |
 | `reviews` | unique customer/product | `customer_id`, `product_id` | Một khách tối đa một review cho mỗi sản phẩm. |
