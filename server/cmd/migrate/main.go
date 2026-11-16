@@ -15,11 +15,21 @@ import (
 )
 
 func main() {
-	command := flag.String("command", "up", "migration command: up, up-by-one, or down")
+	command := flag.String("command", "up", "migration command: create, up, up-by-one, or down")
 	path := flag.String("path", "migrations", "migration directory")
+	name := flag.String("name", "", "name for a new UUID migration")
 	flag.Parse()
 
 	log := logger.New("info", "json")
+	if *command == "create" {
+		id, err := migration.Create(*path, *name)
+		if err != nil {
+			log.Error().Err(err).Msg("create migration")
+			os.Exit(1)
+		}
+		log.Info().Str("id", id).Str("name", *name).Msg("created UUID migration")
+		return
+	}
 	if err := config.LoadEnv(); err != nil {
 		log.Fatal().Err(err).Msg("load environment")
 	}
