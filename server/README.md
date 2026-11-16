@@ -1,6 +1,6 @@
 # Aodora server
 
-Go API base theo Clean Architecture, MongoDB và [go-migrate](https://github.com/golang-migrate/migrate).
+Go API base theo Clean Architecture, MongoDB và migration JSON dùng UUID.
 
 ## Cấu trúc
 
@@ -46,6 +46,8 @@ make migrate-up
 make migrate-up-one
 make migrate-down
 ```
+
+Tạo migration mới bằng `make migrate-create name=ten_thay_doi`. Lệnh sinh UUID, thư mục gồm up/down và metadata phụ thuộc; không chọn số tăng tiếp theo. Các file số cũ được giữ nguyên; DB cũ cần đối chiếu manifest và chạy migrate-adopt với fingerprint đã xác nhận trước khi dùng lịch sử UUID. Cách chạy, phụ thuộc giữa nhánh, rollback và xử lý dirty state: [docs/UUID_MIGRATIONS.md](docs/UUID_MIGRATIONS.md).
 
 Schema, validator, index và mapping field từ client được mô tả tại [docs/database-schema.md](docs/database-schema.md). `make migrate-up` tạo collection bán hàng, seed demo và thêm `tailoring_requests` để lưu form may đo. Database mặc định là `QuanLyBanQuanAo` theo tài liệu đề tài; có thể đổi bằng `MONGO_DB`.
 
@@ -116,7 +118,7 @@ Chi tiết build, kết nối MongoDB và volume: [docker/navicat/README.md](doc
 - Mỗi business capability có package riêng trong `internal/domain` và `internal/application`.
 - Repository interface đặt ở layer sử dụng nó; MongoDB implementation đặt trong `internal/infrastructure`.
 - Handler chỉ parse request, gọi use case, map response/error; không chứa business rule.
-- Mọi thay đổi schema/index/validator phải có cặp migration `.up.json` và `.down.json`, tên theo số thứ tự.
+- Mọi thay đổi schema/index/validator mới phải tạo bằng `make migrate-create name=...`, commit cả thư mục UUID gồm `up.json`, `down.json` và `meta.json` với phụ thuộc; không đánh số tiếp theo hoặc sửa file đã áp dụng.
 - Không chạy migration tự động khi API boot; migration chạy riêng trong deploy/release step.
 
 ## Product catalog (PD-01)
