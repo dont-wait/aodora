@@ -35,4 +35,4 @@ src/
 - Các trang sản phẩm sử dụng API PD-01 thay cho danh sách mẫu; hợp đồng ghép giỏ hàng nằm ở `features/catalog/selection.ts`.
 - Hướng dẫn dữ liệu và tích hợp: `docs/PD02_CATALOG_UI.md`.
 - Test nghiệp vụ catalog: `npm run test:catalog` (Node.js 22+).
-- Vite chuyển tiếp `/api` đến Go qua `API_PROXY_TARGET` (mặc định `http://localhost:8081`).
+- Vite chuyển tiếp `/api` đến Go qua `API_PROXY_TARGET` (mặc định `http://localhost:8080`).

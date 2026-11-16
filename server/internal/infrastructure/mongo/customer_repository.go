@@ -53,6 +53,9 @@ func (r *CustomerRepository) Profile(ctx context.Context, userID string) (app.Pr
 
 func profileFromDocument(doc customerProfileDocument) app.Profile {
 	addresses := append([]app.Address(nil), doc.Addresses...)
+	if addresses == nil {
+		addresses = []app.Address{}
+	}
 	for i := range addresses {
 		if addresses[i].ID == "" {
 			addresses[i].ID = fmt.Sprintf("legacy-%d", i)
