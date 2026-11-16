@@ -29,6 +29,9 @@ func Run(databaseURL string, migrations fs.FS, command string) error {
 	case "up-by-one":
 		migrationErr = runner.Steps(1)
 	case "down":
+		if err := checkDownCompatibility(databaseURL, source, runner); err != nil {
+			return err
+		}
 		migrationErr = runner.Steps(-1)
 	default:
 		return fmt.Errorf("unsupported migration command %q", command)

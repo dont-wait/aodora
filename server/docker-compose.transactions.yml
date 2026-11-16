@@ -1,0 +1,57 @@
+name: aodora-transactions
+
+# Opt-in local/test database. Never mounts the existing server_mongo_data volume.
+services:
+  mongo:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_TEST_USERNAME:-aodora_test}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_TEST_PASSWORD:-aodora_test}
+    ports:
+      - "127.0.0.1:${MONGO_TEST_PORT:-27018}:27017"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    entrypoint: ["bash", "-ec"]
+    command:
+      - |
+        if [ ! -s /data/configdb/replica.key ]; then
+          umask 077
+          head -c 512 /dev/urandom | base64 > /data/configdb/replica.key
+        fi
+        chown mongodb:mongodb /data/configdb/replica.key
+        chmod 400 /data/configdb/replica.key
+        exec /usr/local/bin/docker-entrypoint.sh mongod --replSet aodora-rs --bind_ip_all --keyFile /data/configdb/replica.key
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"if (!db.adminCommand('ping').ok) quit(1)\""]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_TEST_USERNAME: ${MONGO_TEST_USERNAME:-aodora_test}
+      MONGO_TEST_PASSWORD: ${MONGO_TEST_PASSWORD:-aodora_test}
+    entrypoint: ["bash", "-ec"]
+    command:
+      - |
+        mongosh --quiet --host mongo --username "$$MONGO_TEST_USERNAME" --password "$$MONGO_TEST_PASSWORD" --authenticationDatabase admin --eval '
+          try { rs.status(); } catch (error) {
+            if (error.code !== 94) throw error;
+            rs.initiate({_id: "aodora-rs", members: [{_id: 0, host: "mongo:27017"}]});
+          }
+          for (let attempt = 0; attempt < 60; attempt++) {
+            if (db.hello().isWritablePrimary) quit(0);
+            sleep(500);
+          }
+          throw new Error("Replica set did not elect a primary");
+        '
+
+volumes:
+  mongo_data:
+  mongo_config:

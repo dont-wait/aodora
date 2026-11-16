@@ -103,6 +103,8 @@ Lưu snapshot khi chốt đơn, để sửa catalog sau này không thay đổi 
 
 Các field fulfillment và đo may là schema mở rộng để hỗ trợ luồng mua sẵn/may đo của product detail; client hiện chưa gửi đơn hàng lên API.
 
+Migration `000009_order_checkout` cho `customer_id` thiếu/null với guest, thêm `cash_at_counter` (phí 0), giữ tên/điện thoại trong `shipping_address` và chỉ bắt buộc `line1/city` khi giao hàng. Enum thanh toán cũ vẫn đọc/lưu được để tương thích dữ liệu. Chi tiết mapping, document mẫu, kiểm tra transaction và giới hạn rollback: [DW01_ORDER_SCHEMA.md](DW01_ORDER_SCHEMA.md).
+
 ### `reviews`
 
 Map review card: `customer_id`, `product_id`, `rating`, `content`, `display_name`, `initials`, `location`, `meta`, `purchase_mode` (`ready`/`custom`), `purchase_size`, `verified_purchase`, `images[]` (`src`, `alt`), `created_at`, `updated_at`. Mỗi khách chỉ có một review trên một sản phẩm theo unique index.

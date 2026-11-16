@@ -266,6 +266,8 @@ Giữ nguyên hai nhóm quyền: người dùng và admin là chủ cửa hàng.
 
 ## 4. Task của Dontwait
 
+**Kế hoạch triển khai:** [dontwait-plan.md](dontwait-plan.md), đối chiếu checkout ngày 16/11/2026. Thứ tự bắt buộc: viết issue trước → triển khai theo issue → tạo PR liên kết issue. Chưa đánh dấu task hoàn thành khi mới lập kế hoạch hoặc chỉ qua build/test tĩnh.
+
 ### DW-01 — Điều chỉnh schema đơn hàng
 
 **Mục tiêu nghiệp vụ:** DB lưu được đơn không có tài khoản, COD và đơn thu tại quầy bằng dữ liệu thật.
