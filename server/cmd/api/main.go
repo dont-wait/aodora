@@ -15,7 +15,9 @@ import (
 	admin "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	customerapp "github.com/your-org/aodora/server/internal/application/customer"
 	"github.com/your-org/aodora/server/internal/application/health"
+	orderapp "github.com/your-org/aodora/server/internal/application/order"
 	"github.com/your-org/aodora/server/internal/config"
+	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
 	catalogMongo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
 	httpapi "github.com/your-org/aodora/server/internal/interfaces/http"
@@ -62,6 +64,25 @@ func main() {
 	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
 	customerService := customerapp.NewService(catalogMongo.NewCustomerRepository(db.DB))
 	cartService := cartapp.NewService(catalogMongo.NewCartRepository(db.DB))
+
+	var quoteSigner *domainorder.QuoteSigner
+	if cfg.Order.QuoteSecret != nil {
+		var err error
+		quoteSigner, err = domainorder.NewQuoteSigner(cfg.Order.QuoteSecret)
+		if err != nil {
+			log.Error().Err(err).Msg("create quote signer")
+			os.Exit(1)
+		}
+	} else {
+		log.Warn().Msg("ORDER_QUOTE_SECRET is not configured; order quoting and creation will be unavailable")
+	}
+	if cfg.Order.CODShippingFee == nil {
+		log.Warn().Msg("ORDER_COD_SHIPPING_FEE is not configured; COD orders will be unavailable")
+	}
+
+	orderRepo := catalogMongo.NewOrderRepository(db.Client, db.DB)
+	orderService := orderapp.NewService(orderRepo, orderRepo, quoteSigner, cfg.Order.QuoteTTL, cfg.Order.CODShippingFee, nil, nil)
+
 	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
 		Name: cfg.Auth.CookieName, Secure: cfg.Auth.CookieSecure, TTL: cfg.Auth.SessionTTL, AllowedOrigin: cfg.Auth.AllowedOrigin,
 	})
@@ -72,7 +93,8 @@ func main() {
 			httpapi.WithCustomer(customerService, authGuard),
 			httpapi.WithCart(cartService, authGuard),
 			httpapi.WithCatalog(catalogService, *log),
-			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
+			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithOrders(orderService, authGuard, *log)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

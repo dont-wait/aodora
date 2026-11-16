@@ -88,7 +88,7 @@ transactions-down:
 
 test-orders:
 	@test -n "$${MONGO_TEST_URI:-}" || { echo "MONGO_TEST_URI is required"; exit 1; }
-	go test -race -tags=integration ./internal/infrastructure/mongo -count=1 -v
+	go test -race -tags=integration ./internal/infrastructure/mongo ./internal/interfaces/http -count=1 -v
 
 standalone-up:
 	docker compose -f docker-compose.transactions.yml up -d --wait mongo-standalone
