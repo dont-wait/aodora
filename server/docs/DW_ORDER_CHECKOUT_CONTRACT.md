@@ -1,6 +1,6 @@
 # Hợp đồng checkout, guest access và chống gửi lặp
 
-DW-01 bàn giao schema/index và hợp đồng này cho [DW-02 #19](https://github.com/dont-wait/aodora/issues/19), DW-03 và KR-04. **Các endpoint dưới đây là hợp đồng để triển khai, chưa được đăng ký trong router.** Không dùng document DB mẫu làm request tạo đơn; server phải lấy giá, tên/SKU và danh tính từ nguồn có thẩm quyền.
+DW-01 bàn giao schema/index và hợp đồng này cho [DW-02 #19](https://github.com/dont-wait/aodora/issues/19), DW-03 và KR-04. **Các endpoint dưới đây đã được triển khai và đăng ký trong router theo tài liệu [DW02_ORDER_API.md](DW02_ORDER_API.md).** Không dùng document DB mẫu làm request tạo đơn; server phải lấy giá, tên/SKU và danh tính từ nguồn có thẩm quyền.
 
 ## Phương thức nhận và tiền
 

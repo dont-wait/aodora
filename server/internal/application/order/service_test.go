@@ -110,9 +110,7 @@ func newFakeStore(products map[string]Product) *fakeStore {
 	prodCopy := make(map[string]Product)
 	for k, v := range products {
 		var vars []Variant
-		for _, vr := range v.Variants {
-			vars = append(vars, vr)
-		}
+		vars = append(vars, v.Variants...)
 		v.Variants = vars
 		prodCopy[k] = v
 	}
@@ -150,9 +148,7 @@ func (s *fakeStore) cloneProducts() map[string]Product {
 	res := make(map[string]Product)
 	for k, v := range s.products {
 		var vars []Variant
-		for _, vr := range v.Variants {
-			vars = append(vars, vr)
-		}
+		vars = append(vars, v.Variants...)
 		v.Variants = vars
 		res[k] = v
 	}
@@ -172,9 +168,7 @@ func (s *fakeStore) getProducts(productIDs []string) map[string]Product {
 	for _, id := range productIDs {
 		if p, ok := s.products[id]; ok {
 			var vars []Variant
-			for _, vr := range p.Variants {
-				vars = append(vars, vr)
-			}
+			vars = append(vars, p.Variants...)
 			p.Variants = vars
 			res[id] = p
 		}

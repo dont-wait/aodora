@@ -82,7 +82,6 @@ func (g *AuthGuard) Session(r *http.Request) (user app.User, presented bool, ok 
 	if err != nil || cookie.Value == "" {
 		return app.User{}, false, false
 	}
-	presented = true
 	if u, exists := r.Context().Value(authContextKey{}).(app.User); exists {
 		return u, true, true
 	}

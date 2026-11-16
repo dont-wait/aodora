@@ -103,7 +103,7 @@ func (r *OrderRepository) SellableProducts(ctx context.Context, productIDs []str
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	result := make(map[string]apporder.Product)
 	for cursor.Next(ctx) {
@@ -583,7 +583,7 @@ func (r *OrderRepository) ListByCustomer(ctx context.Context, customerID string,
 	if err != nil {
 		return nil, 0, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	var orders []domainorder.Order
 	for cursor.Next(ctx) {
