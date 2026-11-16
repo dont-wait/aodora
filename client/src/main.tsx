@@ -5,13 +5,16 @@ import './index.css'
 import App from './app/App'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { WishlistProvider } from './features/account/WishlistProvider'
+import { CartProvider } from './features/cart/CartProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <WishlistProvider>
-          <App />
+          <CartProvider>
+            <App />
+          </CartProvider>
         </WishlistProvider>
       </AuthProvider>
     </BrowserRouter>

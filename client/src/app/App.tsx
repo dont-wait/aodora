@@ -12,6 +12,7 @@ import RegisterPage from '@/pages/auth/RegisterPage'
 import AccountAccessGuard from '@/pages/account/AccountAccessGuard'
 import AccountPage from '@/pages/account/AccountPage'
 import WishlistPage from '@/pages/wishlist/WishlistPage'
+import CartPage from '@/pages/cart/CartPage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="dang-nhap" element={<LoginPage />} />
         <Route path="dang-ky" element={<RegisterPage />} />
+        <Route path="gio-hang" element={<CartPage />} />
         <Route element={<AccountAccessGuard />}>
           <Route path="tai-khoan" element={<AccountPage />} />
           <Route path="yeu-thich" element={<WishlistPage />} />

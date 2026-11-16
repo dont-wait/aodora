@@ -6,6 +6,7 @@ import BrandMark from './BrandMark'
 import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { useWishlist } from '@/features/account/useWishlist'
+import { useCart } from '@/features/cart/useCart'
 
 const iconButton = 'relative text-on-surface-variant hover:text-primary transition-colors p-1'
 
@@ -18,6 +19,7 @@ export default function Header() {
   const { user, logout } = useAuth()
   const { showToast } = useToast()
   const { items: wishlistItems } = useWishlist()
+  const { itemCount: cartItemCount } = useCart()
   useEffect(() => {
     function closeAccount(event: PointerEvent) {
       if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false)
@@ -78,7 +80,7 @@ export default function Header() {
             <Icon name="search" size={20} />
           </button>
           <button aria-label="Danh sách yêu thích" title="Danh sách yêu thích" className={`${iconButton} flex items-center gap-0.5`} type="button" onClick={() => navigate(user ? ROUTES.wishlist : `${ROUTES.login}?next=${encodeURIComponent(ROUTES.wishlist)}`)}><Icon name="favorite" size={20} />{user && wishlistItems.length > 0 && <span className="text-[10px] text-primary">{wishlistItems.length}</span>}</button>
-          <button aria-label="Giỏ hàng (chưa tích hợp)" disabled title="Chức năng giỏ hàng đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="shopping_bag" size={20} /></button>
+          <button aria-label="Giỏ hàng" title="Giỏ hàng" className={`${iconButton} flex items-center gap-0.5`} type="button" onClick={() => navigate(ROUTES.cart)}><Icon name="shopping_bag" size={20} />{cartItemCount > 0 && <span className="text-[10px] text-primary">{cartItemCount}</span>}</button>
           {user ? <div ref={accountRef} className="relative flex items-center gap-2 ml-1">
             <span className="hidden lg:inline text-sm text-on-surface-variant max-w-28 truncate" title={user.full_name}>{user.full_name}</span>
             <button aria-label="Mở menu tài khoản" aria-expanded={accountOpen} aria-haspopup="menu" title="Tài khoản" className="flex items-center" type="button" onClick={() => setAccountOpen((value) => !value)}>
