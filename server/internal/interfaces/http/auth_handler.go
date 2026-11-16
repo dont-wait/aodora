@@ -77,20 +77,25 @@ func (g *AuthGuard) Identity(r *http.Request) (app.User, bool) {
 	return g.authenticate(r)
 }
 
-func (g *AuthGuard) authenticate(r *http.Request) (app.User, bool) {
-	if user, ok := r.Context().Value(authContextKey{}).(app.User); ok {
-		return user, true
-	}
+func (g *AuthGuard) Session(r *http.Request) (user app.User, presented bool, ok bool) {
 	cookie, err := r.Cookie(g.cookie.Name)
 	if err != nil || cookie.Value == "" {
-		return app.User{}, false
+		return app.User{}, false, false
 	}
-	user, err := g.service.Authenticate(r.Context(), cookie.Value)
+	if u, exists := r.Context().Value(authContextKey{}).(app.User); exists {
+		return u, true, true
+	}
+	user, err = g.service.Authenticate(r.Context(), cookie.Value)
 	if err != nil {
-		return app.User{}, false
+		return app.User{}, true, false
 	}
 	*r = *r.WithContext(context.WithValue(r.Context(), authContextKey{}, user))
-	return user, true
+	return user, true, true
+}
+
+func (g *AuthGuard) authenticate(r *http.Request) (app.User, bool) {
+	user, _, ok := g.Session(r)
+	return user, ok
 }
 
 type authHandler struct{ guard *AuthGuard }
@@ -105,7 +110,7 @@ func (h authHandler) withOrigin(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (h authHandler) cors(w http.ResponseWriter, r *http.Request) bool {
+func (g *AuthGuard) cors(w http.ResponseWriter, r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true
@@ -114,7 +119,7 @@ func (h authHandler) cors(w http.ResponseWriter, r *http.Request) bool {
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.Path != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return false
 	}
-	if h.guard.cookie.AllowedOrigin == origin {
+	if g.cookie.AllowedOrigin == origin {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Add("Vary", "Origin")
@@ -123,8 +128,12 @@ func (h authHandler) cors(w http.ResponseWriter, r *http.Request) bool {
 	return parsed.Host == r.Host && (parsed.Scheme == "http" || r.TLS != nil)
 }
 
-func (h authHandler) preflight(w http.ResponseWriter, r *http.Request) {
-	if !h.cors(w, r) || r.Header.Get("Origin") == "" {
+func (h authHandler) cors(w http.ResponseWriter, r *http.Request) bool {
+	return h.guard.cors(w, r)
+}
+
+func (g *AuthGuard) handlePreflight(w http.ResponseWriter, r *http.Request, extraHeaders []string, allowHeaders string) {
+	if !g.cors(w, r) || r.Header.Get("Origin") == "" {
 		respondError(w, http.StatusForbidden, "ORIGIN_FORBIDDEN", "", "Nguồn truy cập không được cấp phép")
 		return
 	}
@@ -132,17 +141,28 @@ func (h authHandler) preflight(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "INVALID_PREFLIGHT", "", "Phương thức không được hỗ trợ")
 		return
 	}
+	allowed := map[string]bool{
+		"content-type": true,
+		"accept":       true,
+	}
+	for _, h := range extraHeaders {
+		allowed[strings.ToLower(strings.TrimSpace(h))] = true
+	}
 	for _, header := range strings.Split(r.Header.Get("Access-Control-Request-Headers"), ",") {
 		header = strings.TrimSpace(strings.ToLower(header))
-		if header != "" && header != "content-type" && header != "accept" {
+		if header != "" && !allowed[header] {
 			respondError(w, http.StatusBadRequest, "INVALID_PREFLIGHT", "", "Header không được hỗ trợ")
 			return
 		}
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+	w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h authHandler) preflight(w http.ResponseWriter, r *http.Request) {
+	h.guard.handlePreflight(w, r, nil, "Content-Type, Accept")
 }
 
 type registerRequest struct {

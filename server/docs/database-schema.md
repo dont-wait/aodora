@@ -103,7 +103,7 @@ Lưu snapshot khi chốt đơn, để sửa catalog sau này không thay đổi 
 
 Các field fulfillment và đo may là schema mở rộng để hỗ trợ luồng mua sẵn/may đo của product detail; client hiện chưa gửi đơn hàng lên API.
 
-Migration `order_checkout` (UUID) cho `customer_id` thiếu/null với guest, thêm `cash_at_counter` (phí 0), giữ tên/điện thoại trong `shipping_address` và chỉ bắt buộc `line1/city` khi giao hàng. Enum thanh toán cũ vẫn đọc/lưu được để tương thích dữ liệu. Migration `order_checkout_access` thêm checkout scope/request_id/request_hash, guest_access_hash và unique partial index theo scope/key; marker mới chỉ nhận COD/tại quầy. Chi tiết mapping, document mẫu, kiểm tra transaction và giới hạn rollback: [DW01_ORDER_SCHEMA.md](DW01_ORDER_SCHEMA.md).
+Migration `order_checkout` (UUID) cho `customer_id` thiếu/null với guest, thêm `cash_at_counter` (phí 0), giữ tên/điện thoại trong `shipping_address` và chỉ bắt buộc `line1/city` khi giao hàng. Enum thanh toán cũ vẫn đọc/lưu được để tương thích dữ liệu. Migration `order_checkout_access` thêm checkout scope/request_id/request_hash, guest_access_hash và unique partial index theo scope/key; marker mới chỉ nhận COD/tại quầy. Migration `order_number_unique` (`274a441a-5afb-4394-9384-9f440f7424db`) bổ sung index `uq_orders_order_number` partial unique trên `{order_number: 1}` (chỉ áp dụng khi `order_number` có kiểu string). Chi tiết mapping, document mẫu, kiểm tra transaction và giới hạn rollback: [DW01_ORDER_SCHEMA.md](DW01_ORDER_SCHEMA.md).
 
 ### `reviews`
 
@@ -111,7 +111,7 @@ Map review card: `customer_id`, `product_id`, `rating`, `content`, `display_name
 
 ## Index và quan hệ
 
-- Unique: category slug, product slug, customer email, một cart/khách, một review/khách/sản phẩm.
+- Unique: category slug, product slug, customer email, một cart/khách, một review/khách/sản phẩm, `uq_orders_order_number` (partial chuỗi trên `orders.order_number`), `uq_orders_checkout_scope_request` (partial trên `orders.checkout.(scope, request_id)`).
 - Tìm kiếm/sắp xếp: product theo category và trạng thái, product text search, category theo parent, orders theo khách/trạng thái và thời gian, reviews theo sản phẩm, tailoring requests theo số điện thoại/trạng thái/thời gian.
 - Quan hệ tham chiếu: `products.category_id → categories._id`; `orders.customer_id`, `carts.customer_id`, `reviews.customer_id`, `tailoring_requests.customer_id → customers._id`; `reviews.product_id`, `orders.items[].product_id`, `carts.items[].product_id`, `tailoring_requests.product_id → products._id`.
 - MongoDB không enforce foreign keys. Application cần kiểm tra tham chiếu, tồn kho theo variant và tổng tiền trước khi ghi đơn.

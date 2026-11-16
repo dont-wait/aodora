@@ -6,7 +6,7 @@ export AODORA_MIGRATION_NAME := $(value name)
 export AODORA_LEGACY_FINGERPRINT := $(value legacy_fingerprint)
 unexport name MIGRATIONS_PATH legacy_fingerprint
 
-.PHONY: run build test test-migrations transactions-up transactions-down test-integration fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
+.PHONY: run build test test-migrations test-orders standalone-up test-orders-standalone transactions-up transactions-down test-integration fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
 
 run:
 	go run ./cmd/api
@@ -86,4 +86,15 @@ transactions-up:
 transactions-down:
 	docker compose -f docker-compose.transactions.yml down
 
-test-integration: test-migrations
+test-orders:
+	@test -n "$${MONGO_TEST_URI:-}" || { echo "MONGO_TEST_URI is required"; exit 1; }
+	go test -race -tags=integration ./internal/infrastructure/mongo ./internal/interfaces/http -count=1 -v
+
+standalone-up:
+	docker compose -f docker-compose.transactions.yml up -d --wait mongo-standalone
+
+test-orders-standalone:
+	@test -n "$${MONGO_STANDALONE_TEST_URI:-}" || { echo "MONGO_STANDALONE_TEST_URI is required"; exit 1; }
+	go test -race -tags=integration_standalone ./internal/infrastructure/mongo -count=1 -v
+
+test-integration: test-migrations test-orders

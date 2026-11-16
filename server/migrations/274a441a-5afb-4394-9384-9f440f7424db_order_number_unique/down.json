@@ -1,0 +1,6 @@
+[
+  {
+    "dropIndexes": "orders",
+    "index": "uq_orders_order_number"
+  }
+]

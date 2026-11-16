@@ -1,0 +1,85 @@
+{
+  "cases": [
+    {
+      "name": "cash_at_counter_minimal",
+      "description": "Tại quầy tối thiểu: chỉ tên và số điện thoại, 1 item, không note",
+      "input": {
+        "payment_method": "cash_at_counter",
+        "shipping_address": {
+          "recipient": "Nguyễn An",
+          "phone": "0900000001"
+        },
+        "items": [
+          {
+            "product_id": "680000000000000000000001",
+            "sku": "LUA-DO-M",
+            "quantity": 1
+          }
+        ],
+        "quote_token": "quote-token-example-1"
+      },
+      "canonical_json": "{\"payment_method\":\"cash_at_counter\",\"shipping_address\":{\"recipient\":\"Nguyễn An\",\"phone\":\"0900000001\"},\"items\":[{\"product_id\":\"680000000000000000000001\",\"sku\":\"LUA-DO-M\",\"quantity\":1}],\"quote_token\":\"quote-token-example-1\"}",
+      "request_hash": "9af1712055489e2f0684a44fef208b8191b20af5b68865f1751d339277577779"
+    },
+    {
+      "name": "cod_full_fields_merged_and_sorted_items",
+      "description": "COD đủ field + note + dòng trùng SKU + thứ tự dòng đảo",
+      "input": {
+        "payment_method": "cod",
+        "shipping_address": {
+          "recipient": "Trần Thị Bình",
+          "phone": "0900000002",
+          "line1": "123 Đường Lê Lợi",
+          "ward": "Phường Bến Nghé",
+          "district": "Quận 1",
+          "city": "TP. Hồ Chí Minh"
+        },
+        "items": [
+          {
+            "product_id": "680000000000000000000002",
+            "sku": "SKU-B",
+            "quantity": 1
+          },
+          {
+            "product_id": "680000000000000000000001",
+            "sku": "SKU-A",
+            "quantity": 2
+          },
+          {
+            "product_id": "680000000000000000000001",
+            "sku": "SKU-A",
+            "quantity": 3
+          }
+        ],
+        "note": "Giao giờ hành chính",
+        "quote_token": "quote-token-example-2"
+      },
+      "canonical_json": "{\"payment_method\":\"cod\",\"shipping_address\":{\"recipient\":\"Trần Thị Bình\",\"phone\":\"0900000002\",\"line1\":\"123 Đường Lê Lợi\",\"ward\":\"Phường Bến Nghé\",\"district\":\"Quận 1\",\"city\":\"TP. Hồ Chí Minh\"},\"items\":[{\"product_id\":\"680000000000000000000001\",\"sku\":\"SKU-A\",\"quantity\":5},{\"product_id\":\"680000000000000000000002\",\"sku\":\"SKU-B\",\"quantity\":1}],\"note\":\"Giao giờ hành chính\",\"quote_token\":\"quote-token-example-2\"}",
+      "request_hash": "3f3aaeb528c09a6d8bf5eb4932ce4d826051abfcfd04c461f660b4f06e761d93"
+    },
+    {
+      "name": "cod_special_characters_html_and_vietnamese",
+      "description": "Ca có ký tự tiếng Việt và <&>",
+      "input": {
+        "payment_method": "cod",
+        "shipping_address": {
+          "recipient": "Lê & Hoàng <VIP>",
+          "phone": "0900000003",
+          "line1": "45/6 <Hẻm Nhỏ & Hoa>",
+          "city": "Hà Nội"
+        },
+        "items": [
+          {
+            "product_id": "680000000000000000000003",
+            "sku": "AO-DAI-CAOCAP",
+            "quantity": 1
+          }
+        ],
+        "note": "Gói quà <Sang & Đẹp>",
+        "quote_token": "quote-token-example-3"
+      },
+      "canonical_json": "{\"payment_method\":\"cod\",\"shipping_address\":{\"recipient\":\"Lê & Hoàng <VIP>\",\"phone\":\"0900000003\",\"line1\":\"45/6 <Hẻm Nhỏ & Hoa>\",\"city\":\"Hà Nội\"},\"items\":[{\"product_id\":\"680000000000000000000003\",\"sku\":\"AO-DAI-CAOCAP\",\"quantity\":1}],\"note\":\"Gói quà <Sang & Đẹp>\",\"quote_token\":\"quote-token-example-3\"}",
+      "request_hash": "f2797039f222ecb15cd30f8af728370c8122314126c0428119ec3d5deab6a7b2"
+    }
+  ]
+}

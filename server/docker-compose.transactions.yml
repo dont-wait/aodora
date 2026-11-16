@@ -28,6 +28,10 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
   mongo-init:
     image: mongo:8.0
@@ -51,6 +55,27 @@ services:
           }
           throw new Error("Replica set did not elect a primary");
         '
+
+  mongo-standalone:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_TEST_USERNAME:-aodora_test}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_TEST_PASSWORD:-aodora_test}
+    ports:
+      - "127.0.0.1:${MONGO_STANDALONE_TEST_PORT:-27019}:27017"
+    tmpfs:
+      - /data/db
+      - /data/configdb
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"if (!db.adminCommand('ping').ok) quit(1)\""]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
 volumes:
   mongo_data:

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 )
 
 type HTTPConfig struct {
@@ -32,11 +33,18 @@ type AuthConfig struct {
 	AllowedOrigin string
 }
 
+type OrderConfig struct {
+	QuoteSecret    []byte
+	QuoteTTL       time.Duration
+	CODShippingFee *domainorder.Money
+}
+
 type Config struct {
 	HTTP  HTTPConfig
 	Log   LogConfig
 	Mongo MongoConfig
 	Auth  AuthConfig
+	Order OrderConfig
 }
 
 type ConfigError struct {
@@ -86,10 +94,46 @@ func LoadAllConfig() (Config, error) {
 	} else {
 		cfg.Auth = value
 	}
+	if value, err := LoadOrderConfig(); err != nil {
+		configErrors = append(configErrors, ConfigError{Name: "order", Err: err})
+	} else {
+		cfg.Order = value
+	}
 
 	if len(configErrors) > 0 {
 		return cfg, configErrors
 	}
+	return cfg, nil
+}
+
+func LoadOrderConfig() (OrderConfig, error) {
+	var cfg OrderConfig
+
+	secret := os.Getenv("ORDER_QUOTE_SECRET")
+	if strings.TrimSpace(secret) != "" {
+		secBytes := []byte(secret)
+		if len(secBytes) < 32 {
+			return OrderConfig{}, errors.New("ORDER_QUOTE_SECRET must be at least 32 bytes")
+		}
+		cfg.QuoteSecret = secBytes
+	}
+
+	ttlStr := envOr("ORDER_QUOTE_TTL", "15m")
+	ttl, err := time.ParseDuration(ttlStr)
+	if err != nil || ttl <= 0 {
+		return OrderConfig{}, errors.New("ORDER_QUOTE_TTL must be a positive duration")
+	}
+	cfg.QuoteTTL = ttl
+
+	feeStr := os.Getenv("ORDER_COD_SHIPPING_FEE")
+	if strings.TrimSpace(feeStr) != "" {
+		fee, err := domainorder.ParseMoney(strings.TrimSpace(feeStr))
+		if err != nil {
+			return OrderConfig{}, fmt.Errorf("ORDER_COD_SHIPPING_FEE is invalid: %w", err)
+		}
+		cfg.CODShippingFee = &fee
+	}
+
 	return cfg, nil
 }
 
