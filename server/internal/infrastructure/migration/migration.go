@@ -20,11 +20,17 @@ import (
 const historyCollection = "schema_migrations_uuid"
 
 type migrationState struct {
-	Head          string `bson:"head"`
-	Dirty         bool   `bson:"dirty"`
-	Pending       string `bson:"pending"`
-	Direction     string `bson:"direction"`
-	LegacyVersion int    `bson:"legacy_version"`
+	Head              string `bson:"head"`
+	Dirty             bool   `bson:"dirty"`
+	Pending           string `bson:"pending"`
+	Direction         string `bson:"direction"`
+	LegacyVersion     int    `bson:"legacy_version"`
+	LegacyFingerprint string `bson:"legacy_fingerprint,omitempty"`
+}
+
+type RunOptions struct {
+	LegacyFingerprint string
+	OperationTimeout  time.Duration
 }
 
 type appliedMigration struct {
@@ -33,13 +39,23 @@ type appliedMigration struct {
 	Checksum string `bson:"checksum"`
 }
 
-func Run(databaseURL string, files fs.FS, command string) error {
-	if command != "up" && command != "up-by-one" && command != "down" {
+func Run(databaseURL string, files fs.FS, command string, settings ...RunOptions) (result error) {
+	if command != "up" && command != "up-by-one" && command != "down" && command != "adopt-legacy" {
 		return fmt.Errorf("unsupported migration command %q", command)
 	}
 	all, err := Load(files)
 	if err != nil {
 		return fmt.Errorf("load migrations: %w", err)
+	}
+	opts := RunOptions{OperationTimeout: 5 * time.Minute}
+	if len(settings) > 1 {
+		return errors.New("only one migration options value is allowed")
+	}
+	if len(settings) == 1 {
+		opts = settings[0]
+	}
+	if opts.OperationTimeout < 0 {
+		return errors.New("operation timeout must not be negative")
 	}
 	driverURL, clientURL, databaseName, err := primaryURLs(databaseURL)
 	if err != nil {
@@ -55,8 +71,12 @@ func Run(databaseURL string, files fs.FS, command string) error {
 	if err := driver.Lock(); err != nil {
 		return fmt.Errorf("lock migrations: %w", err)
 	}
-	defer func() { _ = driver.Unlock() }()
-	client, err := mongo.Connect(options.Client().ApplyURI(clientURL).SetReadPreference(readpref.Primary()))
+	defer func() {
+		if err := driver.Unlock(); err != nil {
+			result = errors.Join(result, fmt.Errorf("release migration lock: %w", err))
+		}
+	}()
+	client, err := mongo.Connect(options.Client().ApplyURI(clientURL).SetReadPreference(readpref.Primary()).SetTimeout(opts.OperationTimeout))
 	if err != nil {
 		return fmt.Errorf("open migration history: %w", err)
 	}
@@ -65,17 +85,33 @@ func Run(databaseURL string, files fs.FS, command string) error {
 		defer cancel()
 		_ = client.Disconnect(ctx)
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	ctx := context.Background() // Client timeout applies to each operation, not the whole batch.
 	db := client.Database(databaseName)
 	history := db.Collection(historyCollection)
-	state, err := loadState(ctx, driver, history, all)
+	state, err := loadState(ctx, driver, history, all, files, command, opts)
 	if err != nil {
 		return err
 	}
 	applied, err := readApplied(ctx, history, all, state.Head)
 	if err != nil {
 		return err
+	}
+	if command == "adopt-legacy" {
+		return nil
+	}
+	if command == "up" || command == "up-by-one" {
+		for _, m := range all {
+			if _, exists := applied[m.ID]; exists {
+				continue
+			}
+			var commands []bson.D
+			if err := bson.UnmarshalExtJSON(m.Up, true, &commands); err != nil {
+				return err
+			}
+			if len(commands) == 0 {
+				return fmt.Errorf("migration %s (%s) has empty up commands; fill the generated template before running migrations", m.ID, m.Name)
+			}
+		}
 	}
 	if command == "down" {
 		if state.Head == "" {
@@ -171,7 +207,7 @@ func primaryURLs(raw string) (string, string, string, error) {
 	return driverURL, uri.String(), name, nil
 }
 
-func loadState(ctx context.Context, driver database.Driver, history *mongo.Collection, all []Migration) (migrationState, error) {
+func loadState(ctx context.Context, driver database.Driver, history *mongo.Collection, all []Migration, files fs.FS, command string, opts RunOptions) (migrationState, error) {
 	var state migrationState
 	legacyVersion, legacyDirty, err := driver.Version()
 	if err != nil {
@@ -188,6 +224,9 @@ func loadState(ctx context.Context, driver database.Driver, history *mongo.Colle
 		if legacyVersion != state.LegacyVersion {
 			return state, errors.New("legacy migration version changed after UUID adoption; do not mix old and new runners")
 		}
+		if command == "adopt-legacy" && (opts.LegacyFingerprint == "" || opts.LegacyFingerprint != state.LegacyFingerprint) {
+			return state, errors.New("legacy adoption fingerprint does not match the adopted history")
+		}
 		return state, nil
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
@@ -202,8 +241,20 @@ func loadState(ctx context.Context, driver database.Driver, history *mongo.Colle
 	if legacyVersion >= 0 && (len(legacy) == 0 || legacy[len(legacy)-1].LegacyVersion != legacyVersion) {
 		return state, fmt.Errorf("legacy version %d is missing from migration files; refusing to guess applied history", legacyVersion)
 	}
-	state = migrationState{LegacyVersion: legacyVersion, Dirty: true, Direction: "import"}
-	if _, err := history.InsertOne(ctx, bson.M{"_id": "state", "legacy_version": legacyVersion, "dirty": true, "direction": "import"}); err != nil {
+	fingerprint := ""
+	if legacyVersion >= 0 {
+		fingerprint, err = verifyLegacyManifest(files, all, legacyVersion)
+		if err != nil {
+			return state, err
+		}
+		if command != "adopt-legacy" || opts.LegacyFingerprint != fingerprint {
+			return state, fmt.Errorf("legacy history requires explicit reconciliation: verify deployed files/schema against legacy-manifest.json, then run adopt-legacy with -legacy-fingerprint %s", fingerprint)
+		}
+	} else if command == "adopt-legacy" {
+		return state, errors.New("database has no legacy migration history to adopt")
+	}
+	state = migrationState{LegacyVersion: legacyVersion, Dirty: true, Direction: "import", LegacyFingerprint: fingerprint}
+	if _, err := history.InsertOne(ctx, bson.M{"_id": "state", "legacy_version": legacyVersion, "dirty": true, "direction": "import", "legacy_fingerprint": fingerprint}); err != nil {
 		return state, err
 	}
 	for _, m := range legacy {

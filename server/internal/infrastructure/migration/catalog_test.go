@@ -3,6 +3,7 @@ package migration
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -20,6 +21,9 @@ func addTestMigration(files fstest.MapFS, id, name string, deps []string, up, do
 	files[stem+".up.json"] = &fstest.MapFile{Data: []byte(up)}
 	files[stem+".down.json"] = &fstest.MapFile{Data: []byte(down)}
 	if uuidPattern.MatchString(id) {
+		if deps == nil {
+			deps = []string{}
+		}
 		data, _ := json.Marshal(metadata{DependsOn: deps})
 		files[stem+".meta.json"] = &fstest.MapFile{Data: data}
 	}
@@ -48,7 +52,7 @@ func TestLoadUUIDDependenciesAndHistoricalIDs(t *testing.T) {
 }
 
 func TestLoadRejectsAmbiguousOrBrokenMigrations(t *testing.T) {
-	for _, name := range []string{"duplicate numeric", "duplicate UUID", "missing pair", "missing metadata", "missing parent", "cycle", "invalid commands", "invalid ID"} {
+	for _, name := range []string{"duplicate numeric", "duplicate UUID", "missing pair", "missing metadata", "missing parent", "cycle", "invalid commands", "invalid ID", "null dependencies", "missing dependencies", "trailing metadata"} {
 		t.Run(name, func(t *testing.T) {
 			files := fstest.MapFS{}
 			addTestMigration(files, testUUIDA, "a", nil, "[]", "[]")
@@ -71,9 +75,76 @@ func TestLoadRejectsAmbiguousOrBrokenMigrations(t *testing.T) {
 				addTestMigration(files, testUUIDA, "a", nil, "{}", "[]")
 			case "invalid ID":
 				addTestMigration(files, "not-a-uuid", "bad", nil, "[]", "[]")
+			case "null dependencies":
+				files[testUUIDA+"_a.meta.json"] = &fstest.MapFile{Data: []byte(`{"depends_on":null}`)}
+			case "missing dependencies":
+				files[testUUIDA+"_a.meta.json"] = &fstest.MapFile{Data: []byte(`{}`)}
+			case "trailing metadata":
+				files[testUUIDA+"_a.meta.json"] = &fstest.MapFile{Data: []byte(`{"depends_on":[]} {}`)}
 			}
 			if _, err := Load(files); err == nil {
 				t.Fatal("expected validation failure")
+			}
+		})
+	}
+}
+
+func TestInterruptedGenerationIsInvisibleToCatalog(t *testing.T) {
+	dir := t.TempDir()
+	staging, err := os.MkdirTemp(dir, ".migration-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staging, "up.json"), []byte("[]"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	id, err := Create(dir, "complete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := Load(os.DirFS(dir))
+	if err != nil || len(all) != 1 || all[0].ID != id {
+		t.Fatalf("partial staging blocked the catalog: %+v %v", all, err)
+	}
+	for _, name := range []string{"up.json", "down.json", "meta.json"} {
+		if _, err := os.Stat(filepath.Join(dir, id+"_complete", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestMigrationMakeArgumentsRemainLiteral(t *testing.T) {
+	makePath, err := exec.LookPath("make")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, syntax := range []string{"backticks", "make expression"} {
+		t.Run(syntax, func(t *testing.T) {
+			dir := t.TempDir()
+			capture := filepath.Join(dir, "args")
+			sentinel := filepath.Join(dir, "executed")
+			payload := "`touch " + sentinel + "`"
+			if syntax == "make expression" {
+				payload = "$(shell touch " + sentinel + ")"
+			}
+			if err := os.WriteFile(filepath.Join(dir, "go"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$AODORA_CAPTURE\"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(makePath, "-s", "-f", "../../../Makefile", "migrate-create", "name="+payload, "MIGRATIONS_PATH="+payload)
+			cmd.Env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"), "AODORA_CAPTURE="+capture)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("make: %v %s", err, output)
+			}
+			if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+				t.Fatal("argument executed instead of remaining literal")
+			}
+			data, err := os.ReadFile(capture)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := strings.Join([]string{"run", "./cmd/migrate", "-command", "create", "-name", payload, "-path", payload, ""}, "\n")
+			if string(data) != want {
+				t.Fatalf("arguments changed: %q", data)
 			}
 		})
 	}

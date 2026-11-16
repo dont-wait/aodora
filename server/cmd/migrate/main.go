@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/migration"
@@ -15,9 +16,11 @@ import (
 )
 
 func main() {
-	command := flag.String("command", "up", "migration command: create, up, up-by-one, or down")
+	command := flag.String("command", "up", "migration command: create, adopt-legacy, up, up-by-one, or down")
 	path := flag.String("path", "migrations", "migration directory")
 	name := flag.String("name", "", "name for a new UUID migration")
+	fingerprint := flag.String("legacy-fingerprint", "", "reviewed legacy manifest SHA-256 for explicit adoption")
+	operationTimeout := flag.Duration("operation-timeout", 5*time.Minute, "timeout per MongoDB operation; 0 disables it")
 	flag.Parse()
 
 	log := logger.New("info", "json")
@@ -48,7 +51,7 @@ func main() {
 		log.Error().Err(err).Msg("resolve migrations path")
 		os.Exit(1)
 	}
-	if err := migration.Run(databaseURL, os.DirFS(migrationsPath), *command); err != nil {
+	if err := migration.Run(databaseURL, os.DirFS(migrationsPath), *command, migration.RunOptions{LegacyFingerprint: *fingerprint, OperationTimeout: *operationTimeout}); err != nil {
 		log.Error().Err(err).Str("command", *command).Msg("run migration")
 		os.Exit(1)
 	}

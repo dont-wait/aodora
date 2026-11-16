@@ -19,11 +19,12 @@ import (
 )
 
 type Migration struct {
-	ID            string
-	Name          string
-	LegacyVersion int // -1 for UUID migrations
-	DependsOn     []string
-	Up, Down      []byte
+	ID                         string
+	Name                       string
+	LegacyVersion              int // -1 for UUID migrations
+	DependsOn                  []string
+	Up, Down                   []byte
+	UpPath, DownPath, MetaPath string
 }
 
 type metadata struct {
@@ -65,8 +66,22 @@ func Load(files fs.FS) ([]Migration, error) {
 		return nil, err
 	}
 	byID, stems := map[string]*Migration{}, map[string]string{}
+	type candidate struct {
+		stem, path, meta string
+		up               bool
+	}
+	var candidates []candidate
 	for _, entry := range entries {
-		if entry.IsDir() || (!strings.HasSuffix(entry.Name(), ".up.json") && !strings.HasSuffix(entry.Name(), ".down.json")) {
+		if entry.IsDir() {
+			key, _, _ := strings.Cut(entry.Name(), "_")
+			if uuidPattern.MatchString(key) {
+				for _, direction := range []string{"up", "down"} {
+					candidates = append(candidates, candidate{entry.Name(), entry.Name() + "/" + direction + ".json", entry.Name() + "/meta.json", direction == "up"})
+				}
+			}
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), ".up.json") && !strings.HasSuffix(entry.Name(), ".down.json") {
 			continue
 		}
 		up, suffix := strings.HasSuffix(entry.Name(), ".up.json"), ".down.json"
@@ -74,40 +89,46 @@ func Load(files fs.FS) ([]Migration, error) {
 			suffix = ".up.json"
 		}
 		stem := strings.TrimSuffix(entry.Name(), suffix)
+		candidates = append(candidates, candidate{stem, entry.Name(), stem + ".meta.json", up})
+	}
+	for _, file := range candidates {
+		stem, up := file.stem, file.up
 		key, name, ok := strings.Cut(stem, "_")
 		if !ok || name == "" {
-			return nil, fmt.Errorf("invalid migration filename %s", entry.Name())
+			return nil, fmt.Errorf("invalid migration filename %s", file.path)
 		}
 		id, version := key, -1
 		if !uuidPattern.MatchString(key) {
 			n, err := strconv.ParseUint(key, 10, 63)
 			if err != nil || uint64(int(n)) != n {
-				return nil, fmt.Errorf("migration %s must use a UUID or historical numeric version", entry.Name())
+				return nil, fmt.Errorf("migration %s must use a UUID or historical numeric version", file.path)
 			}
 			version, id = int(n), legacyID(int(n))
 		}
 		m := byID[id]
 		if m == nil {
-			m = &Migration{ID: id, Name: name, LegacyVersion: version}
+			m = &Migration{ID: id, Name: name, LegacyVersion: version, MetaPath: file.meta}
 			byID[id], stems[id] = m, stem
-		} else if stems[id] != stem {
+		} else if stems[id] != stem || m.MetaPath != file.meta {
 			return nil, fmt.Errorf("duplicate migration identity %s: %s and %s", id, stems[id], stem)
 		}
-		data, err := fs.ReadFile(files, entry.Name())
+		data, err := fs.ReadFile(files, file.path)
 		if err != nil {
 			return nil, err
 		}
 		var commands []bson.D
 		if !strings.HasPrefix(strings.TrimSpace(string(data)), "[") {
-			return nil, fmt.Errorf("migration %s must contain a command array", entry.Name())
+			return nil, fmt.Errorf("migration %s must contain a command array", file.path)
 		}
 		if err := bson.UnmarshalExtJSON(data, true, &commands); err != nil {
-			return nil, fmt.Errorf("decode migration %s: %w", entry.Name(), err)
+			return nil, fmt.Errorf("decode migration %s: %w", file.path, err)
 		}
 		if up {
 			m.Up = data
+			m.UpPath = file.path
 		} else {
 			m.Down = data
+			m.DownPath = file.path
 		}
 	}
 	var legacy []*Migration
@@ -119,15 +140,21 @@ func Load(files fs.FS) ([]Migration, error) {
 			legacy = append(legacy, m)
 			continue
 		}
-		data, err := fs.ReadFile(files, stems[id]+".meta.json")
+		data, err := fs.ReadFile(files, m.MetaPath)
 		if err != nil {
 			return nil, fmt.Errorf("read dependencies for %s: %w", id, err)
 		}
 		var meta metadata
 		decoder := json.NewDecoder(strings.NewReader(string(data)))
 		decoder.DisallowUnknownFields()
+		if !json.Valid(data) {
+			return nil, fmt.Errorf("invalid dependency JSON for %s", id)
+		}
 		if err := decoder.Decode(&meta); err != nil {
 			return nil, fmt.Errorf("decode dependencies for %s: %w", id, err)
+		}
+		if meta.DependsOn == nil {
+			return nil, fmt.Errorf("migration %s requires a non-null depends_on array", id)
 		}
 		m.DependsOn = meta.DependsOn
 		sort.Strings(m.DependsOn)
@@ -215,17 +242,19 @@ func Create(directory, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stem := filepath.Join(directory, id+"_"+name)
-	var created []string
-	for _, f := range []struct{ suffix, content string }{{".up.json", "[]\n"}, {".down.json", "[]\n"}, {".meta.json", string(data) + "\n"}} {
-		path := stem + f.suffix
+	staging, err := os.MkdirTemp(directory, ".migration-")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(staging) }()
+	for _, f := range []struct{ suffix, content string }{{"up.json", "[]\n"}, {"down.json", "[]\n"}, {"meta.json", string(data) + "\n"}} {
+		path := filepath.Join(staging, f.suffix)
 		if err := writeExclusive(path, f.content); err != nil {
-			for _, p := range created {
-				_ = os.Remove(p)
-			}
 			return "", err
 		}
-		created = append(created, path)
+	}
+	if err := os.Rename(staging, filepath.Join(directory, id+"_"+name)); err != nil {
+		return "", err
 	}
 	return id, nil
 }

@@ -4,6 +4,9 @@ package migration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"io/fs"
 	"net/url"
 	"os"
@@ -52,7 +55,38 @@ func uuidTestDatabase(t *testing.T) (*mongo.Database, string) {
 func uuidBaseFiles() fstest.MapFS {
 	files := fstest.MapFS{}
 	addTestMigration(files, "000041", "base", nil, `[{"create":"events"},{"insert":"events","documents":[{"_id":"legacy"}]}]`, `[{"drop":"events"}]`)
+	addTestLegacyManifest(files)
 	return files
+}
+
+func addTestLegacyManifest(files fstest.MapFS) {
+	all, err := Load(files)
+	if err != nil {
+		panic(err)
+	}
+	manifest := legacyManifest{}
+	for _, m := range all {
+		if m.LegacyVersion >= 0 {
+			manifest.Migrations = append(manifest.Migrations, legacyEntry{m.LegacyVersion, m.ID, m.Name, m.checksum()})
+		}
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		panic(err)
+	}
+	files["legacy-manifest.json"] = &fstest.MapFile{Data: data}
+}
+
+func adoptForTest(t *testing.T, uri string, files fs.FS) {
+	t.Helper()
+	data, err := fs.ReadFile(files, "legacy-manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(data)
+	if err := Run(uri, files, "adopt-legacy", RunOptions{LegacyFingerprint: hex.EncodeToString(digest[:])}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func applyWithLegacyRunner(t *testing.T, uri string, files fs.FS) {
@@ -75,6 +109,7 @@ func TestUUIDAdoptsRepositoryLegacyHistoryWithoutReplaying(t *testing.T) {
 	db, uri := uuidTestDatabase(t)
 	files := os.DirFS("../../../migrations")
 	applyWithLegacyRunner(t, uri, files)
+	adoptForTest(t, uri, files)
 	ctx := context.Background()
 	collections := []string{"products", "orders", "customers", "tailoring_requests"}
 	before := map[string]int64{}
@@ -170,6 +205,7 @@ func TestUUIDAdoptsLegacyAndAppliesLateMergedSibling(t *testing.T) {
 	db, uri := uuidTestDatabase(t)
 	files := uuidBaseFiles()
 	applyWithLegacyRunner(t, uri, files)
+	adoptForTest(t, uri, files)
 	addTestMigration(files, testUUIDA, "branch_a", []string{legacyID(41)}, `[{"insert":"events","documents":[{"_id":"a"}]}]`, `[{"delete":"events","deletes":[{"q":{"_id":"a"},"limit":1}]}]`)
 	if err := Run(uri, files, "up"); err != nil {
 		t.Fatal(err)
@@ -271,5 +307,59 @@ func TestUUIDMigrationReadsHistoryAfterAcquiringSharedLock(t *testing.T) {
 		}
 	case <-time.After(20 * time.Second):
 		t.Fatal("migration did not resume after lock release")
+	}
+}
+
+func TestLegacyAdoptionRequiresCompleteFilesAndExplicitFingerprint(t *testing.T) {
+	db, uri := uuidTestDatabase(t)
+	files := uuidBaseFiles()
+	addTestMigration(files, "000078", "next", nil, `[{"insert":"events","documents":[{"_id":"next"}]}]`, `[{"delete":"events","deletes":[{"q":{"_id":"next"},"limit":1}]}]`)
+	addTestLegacyManifest(files)
+	applyWithLegacyRunner(t, uri, files)
+	if err := Run(uri, files, "up"); err == nil || !strings.Contains(err.Error(), "explicit reconciliation") {
+		t.Fatalf("legacy history silently adopted: %v", err)
+	}
+	if err := Run(uri, files, "adopt-legacy", RunOptions{LegacyFingerprint: "wrong"}); err == nil {
+		t.Fatal("unreviewed fingerprint accepted")
+	}
+	up, down := files["000041_base.up.json"], files["000041_base.down.json"]
+	delete(files, "000041_base.up.json")
+	delete(files, "000041_base.down.json")
+	if err := Run(uri, files, "adopt-legacy", RunOptions{LegacyFingerprint: "wrong"}); err == nil || !strings.Contains(err.Error(), "committed manifest") {
+		t.Fatalf("missing earlier migration accepted: %v", err)
+	}
+	files["000041_base.up.json"], files["000041_base.down.json"] = up, down
+	files["000041_base.up.json"] = &fstest.MapFile{Data: []byte(`[{"create":"different_schema"}]`)}
+	if err := Run(uri, files, "adopt-legacy", RunOptions{LegacyFingerprint: "wrong"}); err == nil || !strings.Contains(err.Error(), "committed manifest") {
+		t.Fatalf("conflicting branch history accepted: %v", err)
+	}
+	files["000041_base.up.json"] = up
+	n, err := db.Collection(historyCollection).CountDocuments(context.Background(), bson.M{})
+	if err != nil || n != 0 {
+		t.Fatalf("failed adoption wrote history: %d %v", n, err)
+	}
+	adoptForTest(t, uri, files)
+	if err := Run(uri, files, "up"); err != nil {
+		t.Fatal(err)
+	}
+	n, err = db.Collection("events").CountDocuments(context.Background(), bson.M{})
+	if err != nil || n != 2 {
+		t.Fatalf("adoption replayed schema/seed: %d %v", n, err)
+	}
+}
+
+func TestUUIDEmptyTemplateIsNotRecordedAsApplied(t *testing.T) {
+	db, uri := uuidTestDatabase(t)
+	dir := t.TempDir()
+	id, err := Create(dir, "unfinished")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(uri, os.DirFS(dir), "up"); err == nil || !strings.Contains(err.Error(), "empty up commands") {
+		t.Fatalf("empty template accepted: %v", err)
+	}
+	n, err := db.Collection(historyCollection).CountDocuments(context.Background(), bson.M{"_id": id})
+	if err != nil || n != 0 {
+		t.Fatalf("empty template recorded as applied: %d %v", n, err)
 	}
 }
