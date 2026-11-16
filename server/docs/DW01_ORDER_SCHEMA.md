@@ -1,6 +1,6 @@
 # DW-01 — Đơn khách vãng lai, nhận tại quầy và nền transaction
 
-Issue: [#18](https://github.com/dont-wait/aodora/issues/18). Migration mới: `order_checkout` (UUID); không sửa các migration trước đó. Tài liệu này mô tả hợp đồng DB, chưa phải API đặt hàng (DW-02).
+Issue: [#18](https://github.com/dont-wait/aodora/issues/18). Migration mới: `order_checkout` (UUID); không sửa các migration trước đó. Tài liệu này mô tả hợp đồng DB; [hợp đồng checkout/API và quyền guest](DW_ORDER_CHECKOUT_CONTRACT.md) được bàn giao cho DW-02, endpoint tạo đơn chưa được đăng ký trong router.
 
 ## Field mapping và Q-02
 
@@ -72,7 +72,9 @@ Từ thư mục `server/`, trong Nix shell (`nix develop`):
 
 ```bash
 make transactions-up
-export MONGO_TEST_URI='mongodb://aodora_test:aodora_test@127.0.0.1:27018/?authSource=admin&replicaSet=aodora-rs&directConnection=true'
+read -r -s -p "MongoDB test URI (nhập riêng, không ghi vào Git): " MONGO_TEST_URI
+printf "\n"
+export MONGO_TEST_URI
 make test-integration
 ```
 
@@ -89,7 +91,7 @@ Runner lấy UUID áp dụng cuối từ ledger MongoDB, đọc file `down` củ
 ## Up/down và dữ liệu cũ
 
 1. Chụp backup và dừng writer trước khi thay validator. Với DB local đang dùng, kiểm tra URI/database và migration version trước; chỉ áp dụng bằng `make migrate-up` khi chủ động chọn DB đó.
-2. Up checkout UUID chỉ `collMod`, không rewrite/xóa đơn, không tạo khách giả, không đụng sản phẩm hoặc tồn. Index hiện tại được giữ nguyên. Field/index chống tạo lặp và guest access sẽ đi cùng hợp đồng DW-02/Q-03, trước khi có API phụ thuộc; migration này không tự quyết định schema review.
+2. Up checkout UUID chỉ `collMod`, không rewrite/xóa đơn, không tạo khách giả, không đụng sản phẩm hoặc tồn. Index hiện tại được giữ nguyên. Migration kế tiếp `order_checkout_access` bổ sung marker checkout, hash guest credential và unique partial index theo scope/request_id; xem hợp đồng bàn giao. Không đổi schema review của KR-04.
 3. Down khôi phục chính xác validator orders từ 000004. Chạy qua `make migrate-down` (runner repository): trước khi đổi validator, runner đọc validator của lệnh `collMod` trong down và truy vấn document không tương thích. Có document vi phạm thì báo lỗi, giữ nguyên validator/version sạch và dữ liệu.
 4. Guest thiếu/null `customer_id`, `cash_at_counter` hoặc địa chỉ thiếu phần giao hàng đều không tương thích schema cũ. Không đổi guest thành tài khoản giả, không đổi phương thức thu hoặc xóa đơn chỉ để down thành công. Nếu chưa có phương án chuyển dữ liệu hợp lệ và được thống nhất, giữ migration checkout đã áp dụng và khôi phục phiên bản ứng dụng tương thích version này.
 5. Preflight và DDL không nằm trong cùng transaction; phải dừng mọi writer suốt quá trình down. Không chạy trực tiếp JSON down bằng `mongosh`/CLI khác để bỏ qua kiểm tra này. MongoDB `collMod` tự nó không quét dữ liệu đã tồn tại.
@@ -99,3 +101,11 @@ Không chuyển database standalone đang dùng thành replica set trong thay đ
 ## Ghép runner UUID
 
 Runner UUID đã merge tại [PR #26](https://github.com/dont-wait/aodora/pull/26). Migration checkout nằm trong thư mục `ae74e773-1d52-45da-bd8d-07864eea7737_order_checkout`, phụ thuộc UUID của migration auth legacy được generator phát hiện. Thay đổi schema up/down giữ nguyên so với bản DW-01 trước khi đổi ID. DB cũ cần đối chiếu manifest và tiếp nhận lịch sử tường minh trước khi chạy; xem [UUID_MIGRATIONS.md](UUID_MIGRATIONS.md). Không chạy lại bản checkout số 000009 và UUID trên cùng DB; bản số chỉ tồn tại ở PR chưa merge và chưa được áp dụng vào DB đang dùng trong công việc này. Nếu đã tự áp dụng bản số đó ở môi trường khác, cần đối chiếu và chuyển metadata riêng, không xóa history để chạy lại.
+
+## Metadata checkout đã bàn giao
+
+Migration `order_checkout_access` (UUID `c8689b2b-f25a-49ee-9959-cd755fa0c999`) phụ thuộc checkout và bổ sung `checkout.scope/request_id/request_hash`, `guest_access_hash`, ràng buộc scope theo chủ đơn và unique partial index `uq_orders_checkout_scope_request`. Document có marker chỉ nhận COD/tại quầy; dữ liệu legacy không marker vẫn giữ enum cũ. Tạo đơn từ API sẽ bắt buộc marker và validator đầu vào ở DW-02; hiện chưa có endpoint tạo đơn và không coi DB cho phép legacy là cách nhận payload client.
+
+Up/down metadata không rewrite đơn. Down bỏ ràng buộc/index mới nhưng giữ field/hash đã lưu; phải dừng writer trước khi down. Chạy lại up cần bảo đảm trong lúc down không phát sinh duplicate scope/key. Test DB thật kiểm tra legacy không đổi, guest/account, phạm vi key, thiếu/hash sai, phương thức cũ bị từ chối với marker, down/reapply và giữ metadata.
+
+Quy trình [backup/restore](DW_BACKUP_RESTORE.md) khôi phục vào DB tên mới và kiểm tra dữ liệu/validator/ledger trước khi đổi ứng dụng. Không restore đè DB đang dùng để thử nghiệm.

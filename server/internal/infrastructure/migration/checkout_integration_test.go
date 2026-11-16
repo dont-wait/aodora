@@ -65,6 +65,10 @@ func checkoutTestDatabase(t *testing.T) (*mongo.Database, string, fs.FS) {
 
 // Discover checkout and its ancestors through the same catalog as the runner.
 func checkoutMigrationFiles(t *testing.T, files fs.FS) (fs.FS, fs.FS, string) {
+	return migrationFilesFor(t, files, "order_checkout")
+}
+
+func migrationFilesFor(t *testing.T, files fs.FS, name string) (fs.FS, fs.FS, string) {
 	t.Helper()
 	all, err := Load(files)
 	if err != nil {
@@ -74,15 +78,15 @@ func checkoutMigrationFiles(t *testing.T, files fs.FS) (fs.FS, fs.FS, string) {
 	target := ""
 	for _, m := range all {
 		known[m.ID] = m
-		if m.Name == "order_checkout" {
+		if m.Name == name {
 			if target != "" {
-				t.Fatal("more than one order_checkout migration found")
+				t.Fatalf("more than one %s migration found", name)
 			}
 			target = m.ID
 		}
 	}
 	if target == "" {
-		t.Fatal("order_checkout migration not found")
+		t.Fatalf("%s migration not found", name)
 	}
 	selected := map[string]bool{}
 	var visit func(string)

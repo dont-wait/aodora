@@ -124,3 +124,7 @@ Phần nhận/quản lý yêu cầu có thể triển khai sớm sau hợp đồ
 - Chưa có API đơn hàng, chống lặp hoặc quyền guest/review. Field/index kỹ thuật cho các phần này theo hợp đồng DW-02/Q-03 ở đợt tiếp theo; không tự chốt schema khi mới làm nền dữ liệu.
 
 Đã ghép main chứa runner UUID sau khi PR #26 merge (8af41d7). Migration checkout chuyển sang thư mục UUID, phụ thuộc auth legacy theo metadata; test DW đọc đúng ledger UUID và các migration cha. Phần DW-01 vẫn theo PR #24.
+
+## Hoàn thiện bàn giao DW-01
+
+Đã bổ sung migration UUID `order_checkout_access`: metadata guest/idempotency, scope gắn đúng chủ đơn, unique partial index và giới hạn hai phương thức cho checkout mới. Hợp đồng request/response/quyền/lỗi ở `server/docs/DW_ORDER_CHECKOUT_CONTRACT.md`, cùng hướng dẫn backup/restore DB mới. API quote/tạo/đọc đơn chưa triển khai; #19 sẽ dùng hợp đồng này, tính giá/phí từ server và tạo đơn/trừ tồn bằng transaction. Không đánh dấu API đã nghiệm thu chỉ vì có tài liệu hoặc schema.
