@@ -1,0 +1,19 @@
+[
+  {
+    "createIndexes": "orders",
+    "indexes": [
+      {
+        "key": {
+          "order_number": 1
+        },
+        "name": "uq_orders_order_number",
+        "unique": true,
+        "partialFilterExpression": {
+          "order_number": {
+            "$type": "string"
+          }
+        }
+      }
+    ]
+  }
+]
