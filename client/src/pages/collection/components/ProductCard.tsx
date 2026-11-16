@@ -5,19 +5,23 @@ import type { CatalogProductSummary } from '@/features/catalog/types'
 import { badgeVariant } from '@/features/catalog/types'
 import { formatVND } from '@/utils/format'
 import CatalogImage from '@/features/catalog/CatalogImage'
+import WishlistButton from '@/features/account/WishlistButton'
 
 export default function ProductCard({ product }: { product: CatalogProductSummary }) {
   const link = ROUTES.product(product.slug)
   const colors = product.colors?.filter((c) => !!c.hex) || []
   return <article className="group flex flex-col bg-surface-container-low transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-    <Link to={link} className="relative aspect-[3/4] bg-surface-container overflow-hidden block" aria-label={`Xem ${product.name}`}>
-      <CatalogImage src={product.image?.src} alt={product.image?.alt || product.name} className="w-full h-full"
-        imageClassName="transition-transform duration-700 group-hover:scale-105" />
+    <div className="relative aspect-[3/4] bg-surface-container overflow-hidden">
+      <Link to={link} className="block w-full h-full" aria-label={`Xem ${product.name}`}>
+        <CatalogImage src={product.image?.src} alt={product.image?.alt || product.name} className="w-full h-full"
+          imageClassName="transition-transform duration-700 group-hover:scale-105" />
+      </Link>
+      <WishlistButton productId={product.id} className="absolute top-3 right-3 w-9 h-9 bg-surface/90 text-primary" />
       {product.badge?.label && <Badge variant={badgeVariant(product.badge.variant)} className="absolute top-3 left-3 px-2.5 py-1 shadow-sm">{product.badge.label}</Badge>}
       {!!colors.length && <div className="absolute bottom-3 left-3 p-2 bg-surface/90 flex gap-2">
         {colors.map((c, i) => <span key={`${c.name}-${i}`} title={c.name} className="w-4 h-4 rounded-full border border-outline-variant" style={{ backgroundColor: c.hex }} />)}
       </div>}
-    </Link>
+    </div>
     <div className="p-5 flex flex-col flex-1 gap-2">
       {product.material && <span className="font-label-uppercase text-[10px] tracking-wider text-on-surface-variant">{product.material}</span>}
       <h3 className="font-headline-sm text-[20px] leading-tight group-hover:text-primary transition-colors"><Link to={link}>{product.name}</Link></h3>

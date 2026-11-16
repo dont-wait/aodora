@@ -5,6 +5,7 @@ import Icon from '@/components/ui/Icon'
 import BrandMark from './BrandMark'
 import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { useWishlist } from '@/features/account/useWishlist'
 
 const iconButton = 'relative text-on-surface-variant hover:text-primary transition-colors p-1'
 
@@ -16,6 +17,7 @@ export default function Header() {
   const accountRef = useRef<HTMLDivElement>(null)
   const { user, logout } = useAuth()
   const { showToast } = useToast()
+  const { items: wishlistItems } = useWishlist()
   useEffect(() => {
     function closeAccount(event: PointerEvent) {
       if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false)
@@ -75,7 +77,7 @@ export default function Header() {
           <button aria-label="Tìm kiếm" aria-expanded={showSearch} onClick={() => setShowSearch((v) => !v)} className={iconButton} type="button">
             <Icon name="search" size={20} />
           </button>
-          <button aria-label="Danh sách yêu thích (chưa tích hợp)" disabled title="Chức năng yêu thích đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="favorite" size={20} /></button>
+          <button aria-label="Danh sách yêu thích" title="Danh sách yêu thích" className={`${iconButton} flex items-center gap-0.5`} type="button" onClick={() => navigate(user ? ROUTES.wishlist : `${ROUTES.login}?next=${encodeURIComponent(ROUTES.wishlist)}`)}><Icon name="favorite" size={20} />{user && wishlistItems.length > 0 && <span className="text-[10px] text-primary">{wishlistItems.length}</span>}</button>
           <button aria-label="Giỏ hàng (chưa tích hợp)" disabled title="Chức năng giỏ hàng đang phát triển" className={`${iconButton} opacity-40 cursor-not-allowed`} type="button"><Icon name="shopping_bag" size={20} /></button>
           {user ? <div ref={accountRef} className="relative flex items-center gap-2 ml-1">
             <span className="hidden lg:inline text-sm text-on-surface-variant max-w-28 truncate" title={user.full_name}>{user.full_name}</span>
@@ -88,7 +90,7 @@ export default function Header() {
                 <p className="text-sm text-on-surface-variant truncate">{user.email}</p>
                 <p className="text-xs uppercase tracking-widest text-secondary mt-1">{user.role === 'admin' ? 'Chủ cửa hàng' : 'Khách hàng'}</p>
               </div>
-              <div role="menuitem" className="flex items-center gap-2 px-3 py-3 text-on-surface-variant"><Icon name="check" size={18} className="text-secondary" />Tài khoản đang dùng</div>
+              <Link role="menuitem" to={ROUTES.account} className="flex items-center gap-2 px-3 py-3 text-on-surface-variant hover:bg-surface-container" onClick={() => setAccountOpen(false)}><Icon name="person" size={18} className="text-secondary" />Tài khoản của tôi</Link>
               <button role="menuitem" type="button" className="w-full text-left px-3 py-3 text-on-surface-variant hover:bg-surface-container" onClick={() => void logout().then(() => { setAccountOpen(false); navigate(ROUTES.login) }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đổi tài khoản.'))}>Đổi tài khoản</button>
               <button role="menuitem" type="button" className="w-full text-left px-3 py-3 text-red-700 hover:bg-surface-container" onClick={() => void logout().then(() => setAccountOpen(false)).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.'))}>Đăng xuất</button>
             </div>}

@@ -12,6 +12,7 @@ import (
 	authapp "github.com/your-org/aodora/server/internal/application/auth"
 	"github.com/your-org/aodora/server/internal/application/catalog"
 	admin "github.com/your-org/aodora/server/internal/application/catalogadmin"
+	customerapp "github.com/your-org/aodora/server/internal/application/customer"
 	"github.com/your-org/aodora/server/internal/application/health"
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
@@ -58,6 +59,7 @@ func main() {
 	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
 	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB))
 	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
+	customerService := customerapp.NewService(catalogMongo.NewCustomerRepository(db.DB))
 	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
 		Name: cfg.Auth.CookieName, Secure: cfg.Auth.CookieSecure, TTL: cfg.Auth.SessionTTL, AllowedOrigin: cfg.Auth.AllowedOrigin,
 	})
@@ -65,6 +67,7 @@ func main() {
 		Addr: cfg.HTTP.Addr,
 		Handler: httpapi.NewRouter(service, *log,
 			httpapi.WithAuth(authGuard),
+			httpapi.WithCustomer(customerService, authGuard),
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,

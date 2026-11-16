@@ -12,6 +12,8 @@ export const ROUTES = {
   tailoring: '/dich-vu-may-do',
   login: '/dang-nhap',
   register: '/dang-ky',
+  account: '/tai-khoan',
+  wishlist: '/yeu-thich',
 } as const
 
 export const NAV_ITEMS = [

@@ -147,3 +147,7 @@ go run ./cmd/admin -email owner@example.com -name "Store Owner"
 ```
 
 Admin endpoints require the session of an account with `role=admin`; the role is never accepted from a client request.
+
+## Customer account (KR-02)
+
+Profile, address, measurement and wishlist contracts are documented at [docs/KR02_CUSTOMER_API.md](docs/KR02_CUSTOMER_API.md). All endpoints use the authenticated customer from the KR-01 session.
