@@ -10,6 +10,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -53,9 +54,10 @@ type NormalizedAddress struct {
 }
 
 type NormalizedItem struct {
-	ProductID string `json:"product_id"`
-	SKU       string `json:"sku"`
-	Quantity  int64  `json:"quantity"`
+	ProductID   string `json:"product_id"`
+	SKU         string `json:"sku"`
+	Quantity    int64  `json:"quantity"`
+	SourceIndex int    `json:"-"`
 }
 
 type NormalizedCheckout struct {
@@ -102,16 +104,37 @@ func Normalize(input CheckoutInput) (*NormalizedCheckout, error) {
 	if recipient == "" {
 		return nil, NewInvalidFieldError("shipping_address.recipient", "Tên người nhận không được để trống")
 	}
+	if utf8.RuneCountInString(recipient) > 120 {
+		return nil, NewInvalidFieldError("shipping_address.recipient", "Tên người nhận không được vượt quá 120 ký tự")
+	}
 
 	phone := strings.TrimSpace(input.ShippingAddress.Phone)
 	if phone == "" {
 		return nil, NewInvalidFieldError("shipping_address.phone", "Số điện thoại không được để trống")
 	}
+	if utf8.RuneCountInString(phone) > 30 {
+		return nil, NewInvalidFieldError("shipping_address.phone", "Số điện thoại không được vượt quá 30 ký tự")
+	}
 
 	line1 := strings.TrimSpace(input.ShippingAddress.Line1)
+	if utf8.RuneCountInString(line1) > 200 {
+		return nil, NewInvalidFieldError("shipping_address.line1", "Địa chỉ nhận hàng không được vượt quá 200 ký tự")
+	}
+
 	ward := strings.TrimSpace(input.ShippingAddress.Ward)
+	if utf8.RuneCountInString(ward) > 200 {
+		return nil, NewInvalidFieldError("shipping_address.ward", "Phường/xã không được vượt quá 200 ký tự")
+	}
+
 	district := strings.TrimSpace(input.ShippingAddress.District)
+	if utf8.RuneCountInString(district) > 200 {
+		return nil, NewInvalidFieldError("shipping_address.district", "Quận/huyện không được vượt quá 200 ký tự")
+	}
+
 	city := strings.TrimSpace(input.ShippingAddress.City)
+	if utf8.RuneCountInString(city) > 200 {
+		return nil, NewInvalidFieldError("shipping_address.city", "Tỉnh/thành phố không được vượt quá 200 ký tự")
+	}
 
 	if pm == PaymentMethodCOD {
 		if line1 == "" {
@@ -143,6 +166,9 @@ func Normalize(input CheckoutInput) (*NormalizedCheckout, error) {
 		if sku == "" {
 			return nil, NewInvalidFieldError(fmt.Sprintf("items[%d].sku", i), "Mã SKU không được để trống")
 		}
+		if utf8.RuneCountInString(sku) > 100 {
+			return nil, NewInvalidFieldError(fmt.Sprintf("items[%d].sku", i), "Mã SKU không được vượt quá 100 ký tự")
+		}
 
 		if it.Quantity < 1 {
 			return nil, NewInvalidFieldError(fmt.Sprintf("items[%d].quantity", i), "Số lượng sản phẩm phải lớn hơn hoặc bằng 1")
@@ -165,9 +191,10 @@ func Normalize(input CheckoutInput) (*NormalizedCheckout, error) {
 		} else {
 			mergedIndex[k] = len(mergedItems)
 			mergedItems = append(mergedItems, NormalizedItem{
-				ProductID: prodID,
-				SKU:       sku,
-				Quantity:  it.Quantity,
+				ProductID:   prodID,
+				SKU:         sku,
+				Quantity:    it.Quantity,
+				SourceIndex: i,
 			})
 		}
 	}
@@ -183,6 +210,11 @@ func Normalize(input CheckoutInput) (*NormalizedCheckout, error) {
 		return mergedItems[i].SKU < mergedItems[j].SKU
 	})
 
+	note := strings.TrimSpace(input.Note)
+	if utf8.RuneCountInString(note) > 1000 {
+		return nil, NewInvalidFieldError("note", "Ghi chú không được vượt quá 1000 ký tự")
+	}
+
 	return &NormalizedCheckout{
 		PaymentMethod: pm,
 		ShippingAddress: NormalizedAddress{
@@ -194,7 +226,7 @@ func Normalize(input CheckoutInput) (*NormalizedCheckout, error) {
 			City:      city,
 		},
 		Items:      mergedItems,
-		Note:       strings.TrimSpace(input.Note),
+		Note:       note,
 		QuoteToken: strings.TrimSpace(input.QuoteToken),
 	}, nil
 }

@@ -3,6 +3,7 @@ package order
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 	"strings"
 	"testing"
 )
@@ -203,5 +204,97 @@ func TestMoneyCmpAndEqual(t *testing.T) {
 	}
 	if m1.Cmp(m4) <= 0 {
 		t.Errorf("%s should be greater than %s", m1, m4)
+	}
+}
+
+func TestMoneyFromCoefficient(t *testing.T) {
+	// 500 * 10^3 = 500000
+	m1, err := MoneyFromCoefficient(big.NewInt(500), 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m1.String() != "500000" {
+		t.Errorf("500 * 10^3 = %s, want 500000", m1.String())
+	}
+
+	// 1999995 * 10^-1 = 199999.5
+	m2, err := MoneyFromCoefficient(big.NewInt(1999995), -1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m2.String() != "199999.5" {
+		t.Errorf("1999995 * 10^-1 = %s, want 199999.5", m2.String())
+	}
+
+	// 12300 * 10^-2 = 123 (trailing zeroes reduced)
+	m3, err := MoneyFromCoefficient(big.NewInt(12300), -2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m3.String() != "123" {
+		t.Errorf("12300 * 10^-2 = %s, want 123", m3.String())
+	}
+
+	// 0 * 10^0 = 0
+	m0, err := MoneyFromCoefficient(big.NewInt(0), 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m0.String() != "0" {
+		t.Errorf("0 * 10^0 = %s, want 0", m0.String())
+	}
+
+	// nil coeff = 0
+	mnil, err := MoneyFromCoefficient(nil, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mnil.String() != "0" {
+		t.Errorf("nil * 10^5 = %s, want 0", mnil.String())
+	}
+
+	// Negative coeff rejected
+	if _, err := MoneyFromCoefficient(big.NewInt(-10), 2); !errors.Is(err, ErrInvalidMoney) {
+		t.Errorf("expected ErrInvalidMoney for negative coeff, got %v", err)
+	}
+
+	// Overflow: > 34 digits
+	bigCoeff, _ := new(big.Int).SetString("1"+strings.Repeat("0", 34), 10)
+	if _, err := MoneyFromCoefficient(bigCoeff, 0); !errors.Is(err, ErrMoneyOverflow) {
+		t.Errorf("expected ErrMoneyOverflow, got %v", err)
+	}
+}
+
+func TestMoneyInt64(t *testing.T) {
+	mInt, _ := ParseMoney("500000")
+	val, ok := mInt.Int64()
+	if !ok || val != 500000 {
+		t.Errorf("expected (500000, true), got (%d, %v)", val, ok)
+	}
+
+	mZero := ZeroMoney
+	val, ok = mZero.Int64()
+	if !ok || val != 0 {
+		t.Errorf("expected (0, true), got (%d, %v)", val, ok)
+	}
+
+	mDec, _ := ParseMoney("199999.5")
+	val, ok = mDec.Int64()
+	if ok || val != 0 {
+		t.Errorf("expected (0, false) for decimal, got (%d, %v)", val, ok)
+	}
+
+	// Max int64
+	mMaxInt, _ := ParseMoney("9223372036854775807")
+	val, ok = mMaxInt.Int64()
+	if !ok || val != 9223372036854775807 {
+		t.Errorf("expected max int64, got (%d, %v)", val, ok)
+	}
+
+	// Max int64 + 1
+	mOverflowInt, _ := ParseMoney("9223372036854775808")
+	val, ok = mOverflowInt.Int64()
+	if ok || val != 0 {
+		t.Errorf("expected (0, false) for overflow int64, got (%d, %v)", val, ok)
 	}
 }

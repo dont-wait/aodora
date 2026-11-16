@@ -208,6 +208,98 @@ func TestNormalizeValidation(t *testing.T) {
 	if normUpper.Items[0].SKU != "SKU-A" {
 		t.Errorf("SKU case was modified: %s", normUpper.Items[0].SKU)
 	}
+
+	// 8. Rune length limits
+	// recipient > 120 runes
+	longRecipient := CheckoutInput{
+		PaymentMethod: PaymentMethodCashAtCounter,
+		ShippingAddress: ShippingAddressInput{
+			Recipient: strings.Repeat("A", 121),
+			Phone:     "0900000001",
+		},
+		Items: []OrderItemInput{validItem},
+	}
+	if _, err := Normalize(longRecipient); err == nil || !strings.Contains(err.Error(), "shipping_address.recipient") {
+		t.Errorf("expected error for recipient > 120 runes, got %v", err)
+	}
+
+	// phone > 30 runes
+	longPhone := CheckoutInput{
+		PaymentMethod: PaymentMethodCashAtCounter,
+		ShippingAddress: ShippingAddressInput{
+			Recipient: "A",
+			Phone:     strings.Repeat("1", 31),
+		},
+		Items: []OrderItemInput{validItem},
+	}
+	if _, err := Normalize(longPhone); err == nil || !strings.Contains(err.Error(), "shipping_address.phone") {
+		t.Errorf("expected error for phone > 30 runes, got %v", err)
+	}
+
+	// line1 > 200 runes
+	longLine1 := CheckoutInput{
+		PaymentMethod: PaymentMethodCOD,
+		ShippingAddress: ShippingAddressInput{
+			Recipient: "A",
+			Phone:     "1",
+			Line1:     strings.Repeat("Đ", 201),
+			City:      "Hà Nội",
+		},
+		Items: []OrderItemInput{validItem},
+	}
+	if _, err := Normalize(longLine1); err == nil || !strings.Contains(err.Error(), "shipping_address.line1") {
+		t.Errorf("expected error for line1 > 200 runes, got %v", err)
+	}
+
+	// sku > 100 runes
+	longSKU := CheckoutInput{
+		PaymentMethod:   PaymentMethodCashAtCounter,
+		ShippingAddress: ShippingAddressInput{Recipient: "A", Phone: "1"},
+		Items: []OrderItemInput{
+			{ProductID: "680000000000000000000001", SKU: strings.Repeat("S", 101), Quantity: 1},
+		},
+	}
+	if _, err := Normalize(longSKU); err == nil || !strings.Contains(err.Error(), "items[0].sku") {
+		t.Errorf("expected error for sku > 100 runes, got %v", err)
+	}
+
+	// note > 1000 runes
+	longNote := CheckoutInput{
+		PaymentMethod:   PaymentMethodCashAtCounter,
+		ShippingAddress: ShippingAddressInput{Recipient: "A", Phone: "1"},
+		Items:           []OrderItemInput{validItem},
+		Note:            strings.Repeat("N", 1001),
+	}
+	if _, err := Normalize(longNote); err == nil || !strings.Contains(err.Error(), "note") {
+		t.Errorf("expected error for note > 1000 runes, got %v", err)
+	}
+
+	// 9. SourceIndex tracking on merged items
+	multiLineInput := CheckoutInput{
+		PaymentMethod:   PaymentMethodCashAtCounter,
+		ShippingAddress: ShippingAddressInput{Recipient: "A", Phone: "1"},
+		Items: []OrderItemInput{
+			{ProductID: "680000000000000000000002", SKU: "SKU-2", Quantity: 1}, // index 0
+			{ProductID: "680000000000000000000001", SKU: "SKU-1", Quantity: 2}, // index 1
+			{ProductID: "680000000000000000000001", SKU: "SKU-1", Quantity: 3}, // index 2, merges with index 1
+		},
+	}
+	normMulti, err := Normalize(multiLineInput)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// After sorting:
+	// item 0: ProductID 6800...001, SKU-1, Quantity 5, SourceIndex should be 1!
+	// item 1: ProductID 6800...002, SKU-2, Quantity 1, SourceIndex should be 0!
+	if len(normMulti.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(normMulti.Items))
+	}
+	if normMulti.Items[0].ProductID != "680000000000000000000001" || normMulti.Items[0].SourceIndex != 1 {
+		t.Errorf("item[0] SourceIndex = %d, want 1", normMulti.Items[0].SourceIndex)
+	}
+	if normMulti.Items[1].ProductID != "680000000000000000000002" || normMulti.Items[1].SourceIndex != 0 {
+		t.Errorf("item[1] SourceIndex = %d, want 0", normMulti.Items[1].SourceIndex)
+	}
 }
 
 func TestCanonicalJSONAndFixture(t *testing.T) {

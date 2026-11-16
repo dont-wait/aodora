@@ -15,6 +15,64 @@ type Money struct {
 
 var ZeroMoney = Money{coeff: big.NewInt(0), scale: 0}
 
+// MoneyFromCoefficient constructs Money from a coefficient and a power-of-10 exponent:
+// value = coeff * 10^exp10.
+// Rejects negative values and enforces the 34 significant digits limit (Decimal128).
+func MoneyFromCoefficient(coeff *big.Int, exp10 int) (Money, error) {
+	if coeff == nil {
+		coeff = big.NewInt(0)
+	}
+	if coeff.Sign() < 0 {
+		return Money{}, ErrInvalidMoney
+	}
+	if coeff.Sign() == 0 {
+		return Money{coeff: big.NewInt(0), scale: 0}, nil
+	}
+
+	if exp10 >= 0 {
+		factor := new(big.Int).Exp(ten, big.NewInt(int64(exp10)), nil)
+		c := new(big.Int).Mul(coeff, factor)
+		if len(c.String()) > 34 {
+			return Money{}, ErrMoneyOverflow
+		}
+		return Money{coeff: c, scale: 0}, nil
+	}
+
+	// exp10 < 0
+	scale := -exp10
+	c := new(big.Int).Set(coeff)
+	div := new(big.Int)
+	mod := new(big.Int)
+	for scale > 0 {
+		div.DivMod(c, ten, mod)
+		if mod.Sign() == 0 {
+			c.Set(div)
+			scale--
+		} else {
+			break
+		}
+	}
+	if len(c.String()) > 34 {
+		return Money{}, ErrMoneyOverflow
+	}
+	return Money{coeff: c, scale: scale}, nil
+}
+
+// Int64 returns the integer value and true if Money is an integer that fits in int64.
+// If Money has a fractional part or overflows int64, returns (0, false).
+func (m Money) Int64() (int64, bool) {
+	if m.coeff == nil {
+		return 0, true
+	}
+	if m.scale > 0 {
+		return 0, false
+	}
+	if !m.coeff.IsInt64() {
+		return 0, false
+	}
+	return m.coeff.Int64(), true
+}
+
 // ParseMoney parses a decimal string into Money.
 // Rejects negative amounts, NaN/Inf, empty strings, and malformed characters.
 // Enforces a maximum of 34 significant digits (Decimal128 limit).
