@@ -91,6 +91,6 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
     {(!product.ready_available || mode === 'custom') && <p className="mb-4 text-on-surface-variant">{product.bespoke ? 'Mẫu này có hỗ trợ tư vấn may đo.' : 'Sản phẩm hiện không còn SKU may sẵn có thể mua.'}</p>}
     {error && <p role="alert" className="mb-4 text-red-700">{error}</p>}
     {product.bespoke && <Link to={`${ROUTES.tailoring}?${tailoringParams}`} className="block bg-surface-container-high text-primary py-3 px-5 text-center mb-4 font-semibold">Xem hướng dẫn may đo cho mẫu này</Link>}
-    <p className="text-xs text-on-surface-variant">Giá và tồn kho sẽ được kiểm tra lại khi đặt đơn. Giỏ hàng và yêu cầu may đo chỉ được lưu sau khi các module tương ứng tích hợp.</p>
+    <p className="text-xs text-on-surface-variant">Giá và tồn kho sẽ được kiểm tra lại khi đặt đơn. Giỏ hàng của bạn đã được lưu theo lựa chọn này.</p>
   </div>
 }

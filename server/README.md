@@ -155,3 +155,7 @@ Admin endpoints require the session of an account with `role=admin`; the role is
 ## Customer account (KR-02)
 
 Profile, address, measurement and wishlist contracts are documented at [docs/KR02_CUSTOMER_API.md](docs/KR02_CUSTOMER_API.md). All endpoints use the authenticated customer from the KR-01 session.
+
+## Cart (KR-03)
+
+Guest and account cart contracts are documented at [docs/KR03_CART_API.md](docs/KR03_CART_API.md). Cart operations do not reserve inventory or create orders.

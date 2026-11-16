@@ -14,6 +14,7 @@ export const ROUTES = {
   register: '/dang-ky',
   account: '/tai-khoan',
   wishlist: '/yeu-thich',
+  cart: '/gio-hang',
 } as const
 
 export const NAV_ITEMS = [
