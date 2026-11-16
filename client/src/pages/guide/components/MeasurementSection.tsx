@@ -1,22 +1,54 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import RichText from '@/components/ui/RichText'
 import { guideImages, measurementFormFields, measurements } from '@/data/guide'
 import { useToast } from '@/hooks/useToast'
+import { accountApi, type Measurements } from '@/features/account/api'
+import { useAuth } from '@/features/auth/useAuth'
 
 const input = 'w-full bg-surface-bright px-3 py-2 text-body-md text-on-surface focus:outline-none focus:bg-surface'
 const label = 'block font-label-regular text-label-regular text-on-surface-variant mb-1'
 
 export default function MeasurementSection() {
   const { showToast } = useToast()
+  const { user, refresh } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [step, setStep] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [form, setForm] = useState<Record<string, string>>({ name: '', phone: '', neck: '', bust: '', waist: '', hips: '', shoulder: '', sleeve: '', length: '', body: '', notes: '' })
   const current = measurements.find((m) => m.step === step)!
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    accountApi.measurements()
+      .then((data) => {
+        if (!active) return
+        const profile = data.measurement_profile || {}
+        setForm((previous) => ({ ...previous, name: user.full_name, phone: user.phone || '', ...measurementValues(profile), notes: data.measurement_notes || '' }))
+      })
+      .catch(() => { /* Hồ sơ chưa có dữ liệu vẫn dùng form trống. */ })
+    return () => { active = false }
+  }, [user])
+
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // TODO: gọi API lưu hồ sơ số đo
-    showToast('Đã lưu thành công hồ sơ số đo của bạn. Chuyên viên may đo AN SOIE sẽ liên hệ trong vòng 2 giờ.')
-    e.currentTarget.reset()
+    if (!user) {
+      navigate(`/dang-nhap?next=${encodeURIComponent(location.pathname + '#bang-so-do')}`)
+      return
+    }
+    setSaving(true); setError('')
+    try {
+      await accountApi.updateProfile({ full_name: form.name.trim(), phone: form.phone.trim() })
+      await accountApi.updateMeasurements({ measurement_profile: measurementPayload(form), measurement_notes: form.notes.trim() })
+      await refresh()
+      showToast('Đã lưu thành công hồ sơ số đo của bạn.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể lưu hồ sơ số đo.')
+    } finally { setSaving(false) }
   }
 
   return (
@@ -104,13 +136,13 @@ export default function MeasurementSection() {
                     <label className={label} htmlFor="m-name">
                       Họ và tên quý khách
                     </label>
-                    <input id="m-name" required type="text" className={`${input} px-4 py-2.5 border-none shadow-inner`} placeholder="Nguyễn Thị Thanh Hà" />
+                    <input id="m-name" required type="text" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={`${input} px-4 py-2.5 border-none shadow-inner`} placeholder="Nguyễn Thị Thanh Hà" />
                   </div>
                   <div>
                     <label className={label} htmlFor="m-phone">
                       Số điện thoại / Zalo
                     </label>
-                    <input id="m-phone" required type="tel" className={`${input} px-4 py-2.5 border-none shadow-inner`} placeholder="09xx xxx xxx" />
+                    <input id="m-phone" required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className={`${input} px-4 py-2.5 border-none shadow-inner`} placeholder="09xx xxx xxx" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
@@ -119,7 +151,7 @@ export default function MeasurementSection() {
                       <label className={label} htmlFor={`m-${f.id}`}>
                         {f.label}
                       </label>
-                      <input id={`m-${f.id}`} type={f.type} min={f.type === 'number' ? 0 : undefined} className={input} placeholder={f.placeholder} />
+                        <input id={`m-${f.id}`} type={f.type} min={f.type === 'number' ? 0 : undefined} value={form[f.id]} onChange={(event) => setForm({ ...form, [f.id]: event.target.value })} className={input} placeholder={f.placeholder} />
                     </div>
                   ))}
                 </div>
@@ -130,6 +162,8 @@ export default function MeasurementSection() {
                   <textarea
                     id="m-notes"
                     rows={2}
+                    value={form.notes}
+                    onChange={(event) => setForm({ ...form, notes: event.target.value })}
                     className={`${input} px-4 py-2.5 resize-none`}
                     placeholder="Ví dụ: Lưng hơi cong nhẹ, muốn tà xẻ cao kín cạp quần, thích mặc tà rộng truyền thống..."
                   />
@@ -141,11 +175,13 @@ export default function MeasurementSection() {
                   </span>
                   <button
                     type="submit"
+                    disabled={saving}
                     className="w-full sm:w-auto px-8 py-3 bg-primary text-on-primary font-label-uppercase text-label-uppercase tracking-widest shadow-md hover:bg-primary-container transition-colors"
                   >
-                    Gửi Hồ Sơ Số Đo Cho Nghệ Nhân
+                    {saving ? 'Đang lưu...' : user ? 'Lưu Hồ Sơ Số Đo' : 'Đăng nhập để lưu số đo'}
                   </button>
                 </div>
+                {error && <p role="alert" className="text-red-700">{error}</p>}
               </form>
             </div>
           </div>
@@ -154,3 +190,17 @@ export default function MeasurementSection() {
     </section>
   )
 }
+
+function measurementValues(profile: Measurements): Record<string, string> {
+  return {
+    neck: value(profile.neck_cm), bust: value(profile.bust_cm), waist: value(profile.waist_cm), hips: value(profile.hips_cm),
+    shoulder: value(profile.shoulder_cm), sleeve: value(profile.sleeve_cm), length: value(profile.garment_length_cm), body: profile.body || '',
+  }
+}
+
+function measurementPayload(form: Record<string, string>): Measurements {
+  const value = (key: string) => form[key] === '' ? undefined : Number(form[key])
+  return { neck_cm: value('neck'), bust_cm: value('bust'), waist_cm: value('waist'), hips_cm: value('hips'), shoulder_cm: value('shoulder'), sleeve_cm: value('sleeve'), garment_length_cm: value('length'), body: form.body.trim() || undefined }
+}
+
+function value(input?: number) { return input == null ? '' : String(input) }
