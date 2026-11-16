@@ -4,6 +4,7 @@ import { badgeVariant } from '@/features/catalog/types'
 import Badge from '@/components/ui/Badge'
 import CatalogImage from '@/features/catalog/CatalogImage'
 import { productGallery } from '@/features/catalog/gallery'
+import WishlistButton from '@/features/account/WishlistButton'
 export default function ProductGallery({ product }: { product: CatalogProduct }) {
   const [active, setActive] = useState(0)
   const images = productGallery(product)
@@ -11,6 +12,7 @@ export default function ProductGallery({ product }: { product: CatalogProduct })
   return <div className="lg:col-span-7 flex flex-col gap-5">
     <div className="relative aspect-[3/4] w-full overflow-hidden bg-surface-container shadow-sm">
       {product.badge?.label && <Badge variant={badgeVariant(product.badge.variant)} className="absolute z-10 top-4 left-4 px-3 py-1">{product.badge.label}</Badge>}
+      <WishlistButton productId={product.id} className="absolute z-10 top-4 right-4 w-10 h-10 bg-surface/90 text-primary" />
       <CatalogImage src={current?.src} alt={current?.alt || product.name} className="w-full h-full" imageClassName="object-top" loading="eager" />
     </div>
     {images.length > 1 && <div className="grid grid-cols-4 gap-3 sm:gap-4">

@@ -9,6 +9,9 @@ import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
 import ForbiddenPage from '@/pages/admin/ForbiddenPage'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
+import AccountAccessGuard from '@/pages/account/AccountAccessGuard'
+import AccountPage from '@/pages/account/AccountPage'
+import WishlistPage from '@/pages/wishlist/WishlistPage'
 
 export default function App() {
   return (
@@ -22,6 +25,10 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="dang-nhap" element={<LoginPage />} />
         <Route path="dang-ky" element={<RegisterPage />} />
+        <Route element={<AccountAccessGuard />}>
+          <Route path="tai-khoan" element={<AccountPage />} />
+          <Route path="yeu-thich" element={<WishlistPage />} />
+        </Route>
         <Route index element={<HomePage />} />
         <Route path="bo-suu-tap" element={<CollectionPage />} />
         <Route path="san-pham/:slug" element={<ProductDetailPage />} />

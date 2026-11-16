@@ -1,6 +1,6 @@
 # DW-01 — Đơn khách vãng lai, nhận tại quầy và nền transaction
 
-Issue: [#18](https://github.com/dont-wait/aodora/issues/18). Migration mới: `000009_order_checkout`; không sửa các migration trước đó. Tài liệu này mô tả hợp đồng DB, chưa phải API đặt hàng (DW-02).
+Issue: [#18](https://github.com/dont-wait/aodora/issues/18). Migration mới: `order_checkout` (UUID); không sửa các migration trước đó. Tài liệu này mô tả hợp đồng DB, chưa phải API đặt hàng (DW-02).
 
 ## Field mapping và Q-02
 
@@ -80,18 +80,22 @@ Compose `docker-compose.transactions.yml` dùng project `aodora-transactions`, v
 
 Member được công bố là `mongo:27017`. Khi gọi từ host qua port 27018, `directConnection=true` giữ kết nối tới cổng đã publish, tránh tự khám phá hostname nội bộ Docker. Từ container cùng network dùng host `mongo:27017`. Đây là replica set một node cho phát triển/test, không phải cấu hình HA.
 
-Test tạo database tên `aodora_dw01_test_<ObjectId>` mới, không dùng database trong URI, và chỉ dọn database đó. Chạy thiếu `MONGO_TEST_URI` hoặc nối standalone sẽ thất bại rõ, không skip để báo đạt giả. Test kiểm tra migration toàn bộ 000001–000008 → 000009 với dữ liệu cũ, document hợp lệ/không hợp lệ, rollback bị chặn, rollback/reapply thành công và commit/abort hai collection trên replica set thật. Test transaction chứng minh hạ tầng; chưa chứng minh nghiệp vụ chống bán vượt tồn của DW-02.
+Test tạo database tên `aodora_dw01_test_<ObjectId>` mới, không dùng database trong URI, và chỉ dọn database đó. Chạy thiếu `MONGO_TEST_URI` hoặc nối standalone sẽ thất bại rõ, không skip để báo đạt giả. Test kiểm tra migration toàn bộ legacy → migration checkout UUID với dữ liệu cũ, document hợp lệ/không hợp lệ, rollback bị chặn, rollback/reapply thành công và commit/abort hai collection trên replica set thật. Test transaction chứng minh hạ tầng; chưa chứng minh nghiệp vụ chống bán vượt tồn của DW-02.
 
-Runner tự lấy version hiện tại từ MongoDB, đọc file `down` của version đó và lấy collection/validator ngay từ các lệnh `collMod`; không gắn version, tên collection hoặc field nghiệp vụ trong code kiểm tra rollback. Test checkout tự tìm migration theo identifier `order_checkout`, lấy các migration trước nó và loại các migration sau nó, không cố định mốc 8/9. Có thêm test với collection/field/version khác để kiểm chứng cơ chế này. CLI nhận `-path`; Make hỗ trợ `MIGRATIONS_PATH` (mặc định `migrations`), còn integration test hỗ trợ `MONGO_MIGRATIONS_PATH` khi cần chọn thư mục khác.
+Runner lấy UUID áp dụng cuối từ ledger MongoDB, đọc file `down` của migration đó và lấy collection/validator ngay từ các lệnh `collMod`; không gắn version, tên collection hoặc field nghiệp vụ trong code kiểm tra rollback. Test checkout tự tìm migration theo tên `order_checkout`, lấy đúng các migration cha theo `depends_on`, không dựa vào số version hoặc thứ tự UUID. Có thêm test với collection/field/version khác để kiểm chứng cơ chế này. CLI nhận `-path`; Make hỗ trợ `MIGRATIONS_PATH` (mặc định `migrations`), còn integration test hỗ trợ `MONGO_MIGRATIONS_PATH` khi cần chọn thư mục khác.
 
 `make transactions-down` dừng stack riêng và giữ volume. Default `make infra-up` và MongoDB đang dùng được giữ nguyên. Muốn thử API/seed trên DB riêng, cấu hình `MONGO_URI` theo URI test và chọn `MONGO_DB` riêng rồi chạy migration bằng lệnh hiện có; không chạy vào DB đang dùng khi chỉ muốn kiểm tra.
 
 ## Up/down và dữ liệu cũ
 
 1. Chụp backup và dừng writer trước khi thay validator. Với DB local đang dùng, kiểm tra URI/database và migration version trước; chỉ áp dụng bằng `make migrate-up` khi chủ động chọn DB đó.
-2. Up 000009 chỉ `collMod`, không rewrite/xóa đơn, không tạo khách giả, không đụng sản phẩm hoặc tồn. Index hiện tại được giữ nguyên. Field/index chống tạo lặp và guest access sẽ đi cùng hợp đồng DW-02/Q-03, trước khi có API phụ thuộc; migration này không tự quyết định schema review.
+2. Up checkout UUID chỉ `collMod`, không rewrite/xóa đơn, không tạo khách giả, không đụng sản phẩm hoặc tồn. Index hiện tại được giữ nguyên. Field/index chống tạo lặp và guest access sẽ đi cùng hợp đồng DW-02/Q-03, trước khi có API phụ thuộc; migration này không tự quyết định schema review.
 3. Down khôi phục chính xác validator orders từ 000004. Chạy qua `make migrate-down` (runner repository): trước khi đổi validator, runner đọc validator của lệnh `collMod` trong down và truy vấn document không tương thích. Có document vi phạm thì báo lỗi, giữ nguyên validator/version sạch và dữ liệu.
-4. Guest thiếu/null `customer_id`, `cash_at_counter` hoặc địa chỉ thiếu phần giao hàng đều không tương thích schema cũ. Không đổi guest thành tài khoản giả, không đổi phương thức thu hoặc xóa đơn chỉ để down thành công. Nếu chưa có phương án chuyển dữ liệu hợp lệ và được thống nhất, giữ version 9 và khôi phục phiên bản ứng dụng tương thích version này.
+4. Guest thiếu/null `customer_id`, `cash_at_counter` hoặc địa chỉ thiếu phần giao hàng đều không tương thích schema cũ. Không đổi guest thành tài khoản giả, không đổi phương thức thu hoặc xóa đơn chỉ để down thành công. Nếu chưa có phương án chuyển dữ liệu hợp lệ và được thống nhất, giữ migration checkout đã áp dụng và khôi phục phiên bản ứng dụng tương thích version này.
 5. Preflight và DDL không nằm trong cùng transaction; phải dừng mọi writer suốt quá trình down. Không chạy trực tiếp JSON down bằng `mongosh`/CLI khác để bỏ qua kiểm tra này. MongoDB `collMod` tự nó không quét dữ liệu đã tồn tại.
 
 Không chuyển database standalone đang dùng thành replica set trong thay đổi này. Nếu cần chuyển dữ liệu thật sang môi trường replica set, thực hiện backup/restore và kiểm chứng riêng trước khi đổi cấu hình API; không tái sử dụng nhầm volume của repo khác.
+
+## Ghép runner UUID
+
+Runner UUID đã merge tại [PR #26](https://github.com/dont-wait/aodora/pull/26). Migration checkout nằm trong thư mục `ae74e773-1d52-45da-bd8d-07864eea7737_order_checkout`, phụ thuộc UUID của migration auth legacy được generator phát hiện. Thay đổi schema up/down giữ nguyên so với bản DW-01 trước khi đổi ID. DB cũ cần đối chiếu manifest và tiếp nhận lịch sử tường minh trước khi chạy; xem [UUID_MIGRATIONS.md](UUID_MIGRATIONS.md). Không chạy lại bản checkout số 000009 và UUID trên cùng DB; bản số chỉ tồn tại ở PR chưa merge và chưa được áp dụng vào DB đang dùng trong công việc này. Nếu đã tự áp dụng bản số đó ở môi trường khác, cần đối chiếu và chuyển metadata riêng, không xóa history để chạy lại.

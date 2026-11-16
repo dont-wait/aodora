@@ -54,7 +54,7 @@ Các field kỹ thuật mới cho chống lặp, guest access hoặc xác nhận
 
 ### Đợt 1 — Schema và nền giao dịch
 
-- [ ] Kiểm tra validator/index thực tế từ migration 000002/000004 và dữ liệu legacy; thống nhất số migration kế tiếp (checkout hiện đến 000008).
+- [ ] Kiểm tra validator/index thực tế từ migration 000002/000004 và dữ liệu legacy; tạo migration UUID bằng generator và khai báo phụ thuộc; giữ nguyên các file legacy đã áp dụng.
 - [ ] Viết migration up/down cho guest, `cash_at_counter`, địa chỉ có điều kiện; giữ giá trị thanh toán cũ khi đọc DB, chỉ cho hai phương thức mới được yêu cầu khi tạo.
 - [ ] Định nghĩa field/index chống gửi lặp và quyền truy cập guest theo hợp đồng đã chốt; index cho danh sách đơn/yêu cầu nếu index hiện có chưa đủ.
 - [ ] Chuẩn bị replica set riêng cho integration test; hướng dẫn nâng local có backup/khôi phục và không đổi tên volume hiện có.
@@ -116,9 +116,11 @@ Phần nhận/quản lý yêu cầu có thể triển khai sớm sau hợp đồ
 
 ## 6. Tiến độ đợt 1 — 16/11/2026
 
-Đã triển khai migration `000009_order_checkout`, preflight rollback đọc động version/collection/validator từ migration và Compose replica set riêng; hướng dẫn/mapping ở [DW01_ORDER_SCHEMA.md](server/docs/DW01_ORDER_SCHEMA.md). Chưa merge hoặc đánh dấu hoàn thành task; chưa áp dụng migration vào DB đang dùng.
+Đã triển khai migration `order_checkout` (UUID), preflight rollback đọc động version/collection/validator từ migration và Compose replica set riêng; hướng dẫn/mapping ở [DW01_ORDER_SCHEMA.md](server/docs/DW01_ORDER_SCHEMA.md). Chưa merge hoặc đánh dấu hoàn thành task; chưa áp dụng migration vào DB đang dùng.
 
 - `nix develop --command make test`: đạt toàn bộ Go test với race detector.
-- Integration test trên MongoDB 8 replica set thật: đạt kiểm tra dữ liệu cũ, guest/COD/tại quầy, rollback/reapply và transaction commit/abort. Fixture collection/version khác cũng đạt, xác nhận runner không gắn riêng với orders hoặc version 9.
+- Integration test trên MongoDB 8 replica set thật: đạt kiểm tra dữ liệu cũ, guest/COD/tại quầy, rollback/reapply và transaction commit/abort. Fixture collection/version khác cũng đạt, xác nhận runner không gắn riêng với orders hoặc một version cố định.
 - Lint package migration gồm integration test: 0 issues. Lint toàn server còn 7 lỗi baseline ở file không thay đổi (errcheck/staticcheck); lỗi mới đã xử lý.
 - Chưa có API đơn hàng, chống lặp hoặc quyền guest/review. Field/index kỹ thuật cho các phần này theo hợp đồng DW-02/Q-03 ở đợt tiếp theo; không tự chốt schema khi mới làm nền dữ liệu.
+
+Đã ghép main chứa runner UUID sau khi PR #26 merge (8af41d7). Migration checkout chuyển sang thư mục UUID, phụ thuộc auth legacy theo metadata; test DW đọc đúng ledger UUID và các migration cha. Phần DW-01 vẫn theo PR #24.

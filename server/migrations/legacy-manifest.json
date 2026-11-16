@@ -1,0 +1,52 @@
+{
+  "migrations": [
+    {
+      "version": 1,
+      "id": "7c8dbc79-bda7-5c21-8c73-0dacac98f782",
+      "name": "init",
+      "checksum": "1b93b1e07ebe0127a47788f34848907fb814f28450028c54d77bf7ebc23be578"
+    },
+    {
+      "version": 2,
+      "id": "a4a4fbee-1ed9-52eb-bc5b-bcac8f08ed42",
+      "name": "clothing_store",
+      "checksum": "0c16640060cf37d2cc1416a4e48fe1cb9c7289b841c70da00f43a86bb66560c1"
+    },
+    {
+      "version": 3,
+      "id": "049203d4-8e0b-5d10-ba91-580292d0c294",
+      "name": "demo_seed",
+      "checksum": "8d8706ee4c73461f3a8d9c593109668edf3b52c02342e4d9bff8476aa8aea9aa"
+    },
+    {
+      "version": 4,
+      "id": "6e0b63bc-cb26-5361-b8ea-141603e0f9b4",
+      "name": "client_fields",
+      "checksum": "b3b7aea5290b6936fee4a7b8eb84cbfad07e4a60112a38fe3792dae86d1d79c9"
+    },
+    {
+      "version": 5,
+      "id": "26ba0a46-4672-5c71-bede-5813bcf8e285",
+      "name": "catalog_query_indexes",
+      "checksum": "2219cdfce974dc96279b02ea7453e845d068a10bd19bfe15af8c9eb7ab6babcc"
+    },
+    {
+      "version": 6,
+      "id": "ac9a09bd-31b6-53e4-88d2-9e0e11eb60b3",
+      "name": "catalog_vietnamese_name_indexes",
+      "checksum": "21d84260d4a48a99f40351a06f7555fabfe0fb424fdc0ff2f2a1fcaf9f68b441"
+    },
+    {
+      "version": 7,
+      "id": "9d5e924a-576a-50ab-928c-f08220bfa208",
+      "name": "catalog_admin_legacy_metadata",
+      "checksum": "3bcdfd30b590005095aa779ac21d2fa24466a675d27cc99d9e20e4265832f33c"
+    },
+    {
+      "version": 8,
+      "id": "125a6ffb-fa32-5b4c-975c-789dc3603b7a",
+      "name": "auth_sessions",
+      "checksum": "e2d34d08da9d11a2074a2ee1607d37d0646addb86b5f3dc755d97ff39e044aa2"
+    }
+  ]
+}

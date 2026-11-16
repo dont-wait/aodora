@@ -59,6 +59,16 @@ func (g *AuthGuard) RequireAuth(r *http.Request) bool {
 	return ok
 }
 
+func (g *AuthGuard) Require(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := g.Identity(r); !ok {
+			respondError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "", "Vui lòng đăng nhập")
+			return
+		}
+		next(w, r)
+	}
+}
+
 func (g *AuthGuard) Identity(r *http.Request) (app.User, bool) {
 	user, ok := r.Context().Value(authContextKey{}).(app.User)
 	if ok {
@@ -118,7 +128,7 @@ func (h authHandler) preflight(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, "ORIGIN_FORBIDDEN", "", "Nguồn truy cập không được cấp phép")
 		return
 	}
-	if !slices.Contains([]string{"GET", "POST"}, r.Header.Get("Access-Control-Request-Method")) {
+	if !slices.Contains([]string{"GET", "POST", "PUT", "PATCH", "DELETE"}, r.Header.Get("Access-Control-Request-Method")) {
 		respondError(w, http.StatusBadRequest, "INVALID_PREFLIGHT", "", "Phương thức không được hỗ trợ")
 		return
 	}
@@ -129,7 +139,7 @@ func (h authHandler) preflight(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.WriteHeader(http.StatusNoContent)

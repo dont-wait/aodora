@@ -14,7 +14,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4/source"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -64,44 +63,64 @@ func checkoutTestDatabase(t *testing.T) (*mongo.Database, string, fs.FS) {
 	return db, uri.String(), os.DirFS(path)
 }
 
-// Discover the migration under test by its identifier, not its numeric slot.
-// Later migrations are excluded so rollback always targets checkout itself.
-func checkoutMigrationFiles(t *testing.T, all fs.FS) (fs.FS, fs.FS, uint) {
+// Discover checkout and its ancestors through the same catalog as the runner.
+func checkoutMigrationFiles(t *testing.T, files fs.FS) (fs.FS, fs.FS, string) {
 	t.Helper()
-	entries, err := fs.ReadDir(all, ".")
+	all, err := Load(files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var target uint
-	found := false
-	for _, entry := range entries {
-		migration, err := source.DefaultParse(entry.Name())
-		if err == nil && migration.Identifier == "order_checkout" && migration.Direction == source.Up {
-			if found {
-				t.Fatal("more than one order_checkout up migration found")
+	known := map[string]Migration{}
+	target := ""
+	for _, m := range all {
+		known[m.ID] = m
+		if m.Name == "order_checkout" {
+			if target != "" {
+				t.Fatal("more than one order_checkout migration found")
 			}
-			target, found = migration.Version, true
+			target = m.ID
 		}
 	}
-	if !found {
-		t.Fatal("order_checkout up migration not found")
+	if target == "" {
+		t.Fatal("order_checkout migration not found")
 	}
-	before, through := fstest.MapFS{}, fstest.MapFS{}
-	for _, entry := range entries {
-		migration, err := source.DefaultParse(entry.Name())
-		if entry.IsDir() || err != nil || migration.Version > target {
+	selected := map[string]bool{}
+	var visit func(string)
+	visit = func(id string) {
+		if selected[id] {
+			return
+		}
+		selected[id] = true
+		for _, dep := range known[id].DependsOn {
+			visit(dep)
+		}
+	}
+	visit(target)
+	prior, through := fstest.MapFS{}, fstest.MapFS{}
+	for _, m := range all {
+		if !selected[m.ID] {
 			continue
 		}
-		data, err := fs.ReadFile(all, entry.Name())
-		if err != nil {
-			t.Fatal(err)
+		paths := []string{m.UpPath, m.DownPath}
+		if m.LegacyVersion < 0 {
+			paths = append(paths, m.MetaPath)
 		}
-		through[entry.Name()] = &fstest.MapFile{Data: data}
-		if migration.Version < target {
-			before[entry.Name()] = &fstest.MapFile{Data: data}
+		for _, path := range paths {
+			data, err := fs.ReadFile(files, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			through[path] = &fstest.MapFile{Data: data}
+			if m.ID != target {
+				prior[path] = &fstest.MapFile{Data: data}
+			}
 		}
 	}
-	return before, through, target
+	if data, err := fs.ReadFile(files, "legacy-manifest.json"); err == nil {
+		prior["legacy-manifest.json"] = &fstest.MapFile{Data: data}
+		through["legacy-manifest.json"] = &fstest.MapFile{Data: data}
+	}
+	return prior, through, target
 }
 
 func checkoutOrder() bson.M {
@@ -240,14 +259,11 @@ func TestCheckoutMigrationCompatibilityAndRollback(t *testing.T) {
 	if !reflect.DeepEqual(beforeDown, readOrders(t, db)) {
 		t.Fatal("failed rollback changed orders")
 	}
-	var version struct {
-		Version int64 `bson:"version"`
-		Dirty   bool  `bson:"dirty"`
-	}
-	if err := db.Collection("schema_migrations").FindOne(ctx, bson.M{}).Decode(&version); err != nil {
+	var version migrationState
+	if err := db.Collection(historyCollection).FindOne(ctx, bson.M{"_id": "state"}).Decode(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version.Version != int64(targetVersion) || version.Dirty {
+	if version.Head != targetVersion || version.Dirty {
 		t.Fatalf("blocked rollback changed migration state: %v", version)
 	}
 	// Test-owned fixtures only: the runner never deletes/transforms orders.
