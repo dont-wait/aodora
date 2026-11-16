@@ -53,7 +53,7 @@ type Cart struct {
 	Items     []Item `json:"items"`
 	ItemCount int64  `json:"item_count"`
 	Subtotal  int64  `json:"subtotal"`
-	Issues    []Item `json:"issues,omitempty"`
+	Issues    []Item `json:"issues"`
 }
 
 type Repository interface {

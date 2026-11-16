@@ -6,6 +6,7 @@ import { CartContext } from './context'
 
 const STORAGE_KEY = 'aodora.cart.v1'
 const emptyCart: CartData = { items: [], issues: [], item_count: 0, subtotal: 0 }
+const normalizeCart = (cart: CartData): CartData => ({ ...emptyCart, ...cart, items: cart.items || [], issues: cart.issues || [] })
 
 function readGuestSelections(): CartSelection[] {
   try {
@@ -45,7 +46,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const refreshGuest = useCallback(async (items = guestSelections) => {
     if (!items.length) { setGuestCart(emptyCart); setLoading(false); return }
     setLoading(true)
-    try { setGuestCart(await cartApi.validate(items)); setError('') }
+    try { setGuestCart(normalizeCart(await cartApi.validate(items))); setError('') }
     catch (err) { setError(err instanceof Error ? err.message : 'Không thể kiểm tra giỏ hàng') }
     finally { setLoading(false) }
   }, [guestSelections])
@@ -53,7 +54,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const refreshAccount = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    try { setAccountCart(await cartApi.get()); setError('') }
+    try { setAccountCart(normalizeCart(await cartApi.get())); setError('') }
     catch (err) { setError(err instanceof Error ? err.message : 'Không thể tải giỏ hàng') }
     finally { setLoading(false) }
   }, [user])
@@ -77,7 +78,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           else localStorage.removeItem(STORAGE_KEY)
         } else next = await cartApi.get()
         if (!active) return
-        setAccountCart(next)
+        setAccountCart(normalizeCart(next))
         if (local.length && !(next.issues || []).length) setGuestSelections([])
         setError('')
       } catch (err) {
@@ -92,14 +93,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 		if (user || !guestSelections.length) return
 		let active = true
 		cartApi.validate(guestSelections)
-			.then((next) => { if (active) { setGuestCart(next); setError('') } })
+			.then((next) => { if (active) { setGuestCart(normalizeCart(next)); setError('') } })
 			.catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : 'Không thể kiểm tra giỏ hàng') })
 			.finally(() => { if (active) setLoading(false) })
 		return () => { active = false }
 	}, [user, guestSelections])
 
   useEffect(() => registerCartAddHandler(async (selection) => {
-    if (user) setAccountCart(await cartApi.add(selection))
+    if (user) setAccountCart(normalizeCart(await cartApi.add(selection)))
     else {
       const next = mergeLocal(guestSelections, selection)
       setGuestSelections(next); writeGuestSelections(next)
@@ -110,7 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback(async (selection: CartSelection) => {
     try {
-      if (user) setAccountCart(await cartApi.update(selection))
+      if (user) setAccountCart(normalizeCart(await cartApi.update(selection)))
       else {
         const next = changeLocal(guestSelections, selection)
         setGuestSelections(next); writeGuestSelections(next)
@@ -125,7 +126,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const next = removeLocal(guestSelections, productId, sku)
         setGuestSelections(next); writeGuestSelections(next)
         setAccountCart((current) => ({ ...current, issues: current.issues.filter((item) => item.product_id !== productId || item.sku !== sku) }))
-      } else if (user) setAccountCart(await cartApi.remove(productId, sku))
+      } else if (user) setAccountCart(normalizeCart(await cartApi.remove(productId, sku)))
       else {
         const next = removeLocal(guestSelections, productId, sku)
         setGuestSelections(next); writeGuestSelections(next)
