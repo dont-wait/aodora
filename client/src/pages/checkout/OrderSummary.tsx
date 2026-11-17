@@ -1,28 +1,17 @@
 import { formatOrderMoney } from '@/features/orders/money'
+import OrderStatusLabels from '@/features/orders/OrderStatusLabels'
+import { formatOrderDate, orderDeliveryAddress, orderPaymentLabel } from '@/features/orders/presentation'
 import type { Order } from '@/features/orders/types'
-
-const statuses: Record<string, string> = {
-  pending: 'Chờ xác nhận',
-  confirmed: 'Đã xác nhận',
-  shipping: 'Đang giao áo',
-  delivered: 'Đã nhận áo',
-  cancelled: 'Đã hủy',
-}
-const payments: Record<string, string> = { unpaid: 'Chưa thu tiền', paid: 'Đã thu đủ tiền', refunded: 'Đã hoàn tiền' }
 
 export default function OrderSummary({ order }: { order: Order }) {
   return (
     <div className="space-y-6">
-      <dl className="grid sm:grid-cols-2 gap-4 border border-outline-variant p-5">
-        <div>
-          <dt className="text-sm text-on-surface-variant">Giao nhận</dt>
-          <dd className="text-primary font-semibold">{statuses[order.status] || order.status}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-on-surface-variant">Thanh toán</dt>
-          <dd className="text-primary font-semibold">{payments[order.payment_status] || order.payment_status}</dd>
-        </div>
-      </dl>
+      <p className="text-on-surface-variant">
+        Ngày đặt: <time dateTime={order.created_at}>{formatOrderDate(order.created_at)}</time>
+      </p>
+      <div className="border border-outline-variant p-5">
+        <OrderStatusLabels order={order} />
+      </div>
       <div>
         <h2 className="font-headline-md text-2xl text-primary">Áo đã đặt</h2>
         <ul className="divide-y divide-outline-variant mt-3">
@@ -56,14 +45,8 @@ export default function OrderSummary({ order }: { order: Order }) {
         <p>
           {order.shipping_address.recipient} · {order.shipping_address.phone}
         </p>
-        <p>{order.payment_method === 'cash_at_counter' ? 'Nhận và thanh toán tại quầy' : 'Giao tận nơi · Thanh toán khi nhận áo'}</p>
-        {order.payment_method !== 'cash_at_counter' && (
-          <p>
-            {[order.shipping_address.line1, order.shipping_address.ward, order.shipping_address.district, order.shipping_address.city]
-              .filter(Boolean)
-              .join(', ')}
-          </p>
-        )}
+        <p>{orderPaymentLabel(order.payment_method)}</p>
+        {orderDeliveryAddress(order) && <p>{orderDeliveryAddress(order)}</p>}
         {order.note && <p>Ghi chú: {order.note}</p>}
       </section>
     </div>

@@ -15,6 +15,8 @@ import WishlistPage from '@/pages/wishlist/WishlistPage'
 import CartPage from '@/pages/cart/CartPage'
 import CheckoutPage from '@/pages/checkout/CheckoutPage'
 import CheckoutResultPage from '@/pages/checkout/CheckoutResultPage'
+import MyOrdersPage from '@/pages/orders/MyOrdersPage'
+import OrderDetailPage from '@/pages/orders/OrderDetailPage'
 
 export default function App() {
   return (
@@ -31,8 +33,10 @@ export default function App() {
         <Route path="gio-hang" element={<CartPage />} />
         <Route path="thanh-toan" element={<CheckoutPage />} />
         <Route path="dat-hang-thanh-cong/:id" element={<CheckoutResultPage />} />
+        <Route path="don-hang/:id" element={<OrderDetailPage />} />
         <Route element={<AccountAccessGuard />}>
           <Route path="tai-khoan" element={<AccountPage />} />
+          <Route path="tai-khoan/don-hang" element={<MyOrdersPage />} />
           <Route path="yeu-thich" element={<WishlistPage />} />
         </Route>
         <Route index element={<HomePage />} />

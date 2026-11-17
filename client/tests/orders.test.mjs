@@ -22,7 +22,9 @@ import {
 } from '../src/features/orders/checkout.ts'
 import { completeCheckout } from '../src/features/orders/completion.ts'
 import { consumeAccountPurchase } from '../src/features/orders/cartCleanup.ts'
-import { loadCheckoutResult } from '../src/features/orders/result.ts'
+import { loadCheckoutResult, loadOrderDetail } from '../src/features/orders/result.ts'
+import { loadMyOrders, orderPageCount, readOrdersPage, startOrderRead } from '../src/features/orders/read.ts'
+import { formatOrderDate, orderDeliveryAddress, orderLoginPath, orderPaymentLabel, orderStatusLabels } from '../src/features/orders/presentation.ts'
 
 function memoryStorage() {
   const data = new Map()
@@ -613,4 +615,188 @@ test('guest thiếu token riêng không dùng mã đơn/receipt cũ để cấp 
       },
     )
   })
+})
+
+test('danh sách của tôi chỉ dùng cookie; giữ phân trang server trả và tổng tiền exact', async () => {
+  await withStorage(async (storage) => {
+    saveOrderToken('order-1', createGuestToken(), storage)
+    await withFetch(
+      async (url, options) => {
+        assert.ok(url.endsWith('/api/v1/orders?page=2&page_size=200'))
+        assert.equal(options.method, 'GET')
+        assert.equal(options.credentials, 'include')
+        assert.ok(!('X-Order-Access-Token' in options.headers))
+        return response({
+          data: [{ ...order(), total: '900719925474099312345678901234.56', status: 'delivered', payment_status: 'unpaid' }],
+          total: 201,
+          page: 2,
+          page_size: 100,
+        })
+      },
+      async () => {
+        const result = await loadMyOrders(2, 200)
+        assert.equal(result.kind, 'ready')
+        assert.equal(result.page.page, 2)
+        assert.equal(result.page.page_size, 100)
+        assert.equal(result.page.total, 201)
+        assert.equal(orderPageCount(result.page), 3)
+        assert.equal(formatOrderMoney(result.page.data[0].total), '900.719.925.474.099.312.345.678.901.234,56 ₫')
+        assert.deepEqual(orderStatusLabels(result.page.data[0]), { fulfillment: 'Đã nhận áo', payment: 'Chưa thu tiền' })
+      },
+    )
+  })
+})
+
+test('danh sách rỗng và số trang lấy từ metadata, không từ số dòng ở trang hiện tại', async () => {
+  await withFetch(
+    async () => response({ data: [], total: 0, page: 1, page_size: 20 }),
+    async () => {
+      const result = await loadMyOrders(1, 20)
+      assert.equal(result.kind, 'ready')
+      assert.deepEqual(result.page.data, [])
+      assert.equal(result.page.total, 0)
+      assert.equal(orderPageCount(result.page), 1)
+    },
+  )
+  assert.equal(orderPageCount({ total: 41, page_size: 20 }), 3)
+  assert.equal(readOrdersPage('2'), 2)
+  assert.equal(readOrdersPage('100000'), 100000)
+  for (const invalid of [null, '', '0', '-1', '1.5', '1e2', '100001', 'not-a-page']) assert.equal(readOrdersPage(invalid), 1)
+})
+
+test('danh sách 401 xóa kết quả để chuyển đăng nhập; network/5xx không giữ đơn cũ', async () => {
+  let count = 0
+  await withFetch(
+    async () => {
+      count++
+      if (count === 1) return response({ data: [order()], total: 1, page: 1, page_size: 20 })
+      if (count === 2) return response({ error: { code: 'AUTH_REQUIRED' } }, 401)
+      if (count === 3) return response({ error: { code: 'ORDER_UNAVAILABLE' } }, 503)
+      throw new TypeError('network disconnected')
+    },
+    async () => {
+      assert.equal((await loadMyOrders(1, 20)).kind, 'ready')
+      assert.deepEqual(await loadMyOrders(1, 20), { kind: 'unauthenticated' })
+      assert.deepEqual(await loadMyOrders(1, 20), { kind: 'error' })
+      assert.deepEqual(await loadMyOrders(1, 20), { kind: 'error' })
+    },
+  )
+})
+
+test('nhãn nhận áo và tiền độc lập cho đầy đủ enum, kể cả delivered + unpaid', () => {
+  const delivery = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', shipping: 'Đang giao áo', delivered: 'Đã nhận áo', cancelled: 'Đã hủy' }
+  const payment = { unpaid: 'Chưa thu tiền', paid: 'Đã thu đủ tiền', refunded: 'Đã hoàn tiền' }
+  for (const [status, fulfillment] of Object.entries(delivery))
+    for (const [payment_status, label] of Object.entries(payment)) {
+      assert.deepEqual(orderStatusLabels({ status, payment_status }), { fulfillment, payment: label })
+    }
+})
+
+test('chi tiết chỉ hiện địa chỉ giao khi COD, tại quầy không hiện dù response còn field địa chỉ', () => {
+  const address = { recipient: 'Khách', phone: '0900000000', line1: '12 Đường A', ward: 'Phường B', district: 'Quận C', city: 'Thành phố D' }
+  assert.equal(orderDeliveryAddress({ payment_method: 'cod', shipping_address: address }), '12 Đường A, Phường B, Quận C, Thành phố D')
+  assert.equal(orderDeliveryAddress({ payment_method: 'cash_at_counter', shipping_address: address }), null)
+  assert.equal(orderPaymentLabel('cash_at_counter'), 'Nhận và thanh toán tại quầy')
+  assert.ok(orderPaymentLabel('cod').includes('COD'))
+  assert.ok(formatOrderDate('2026-11-17T00:00:00Z').includes('2026'))
+  assert.equal(formatOrderDate('invalid-date'), 'Chưa có ngày tạo')
+})
+
+test('đổi id chi tiết guest chỉ dùng token của id mới; thiếu token không gọi server bằng token cũ', async () => {
+  await withStorage(async (storage) => {
+    const first = createGuestToken()
+    const second = createGuestToken()
+    const calls = []
+    saveOrderToken('first-order', first, storage)
+    saveOrderToken('second-order', second, storage)
+    await withFetch(
+      async (url, options) => {
+        calls.push(url)
+        const isFirst = url.endsWith('/first-order')
+        assert.ok(options.headers['X-Order-Access-Token'] === (isFirst ? first : second), 'token matches only the requested id')
+        return response({ data: { ...order(), id: isFirst ? 'first-order' : 'second-order' } })
+      },
+      async () => {
+        assert.equal((await loadOrderDetail('first-order', null)).order.id, 'first-order')
+        assert.equal((await loadOrderDetail('second-order', null)).order.id, 'second-order')
+        assert.deepEqual(await loadOrderDetail('unknown-order', null), { kind: 'not-found' })
+      },
+    )
+    assert.equal(calls.length, 2)
+  })
+})
+
+test('chi tiết tài khoản không gửi token guest của id khác; server 404 không lộ đơn cũ', async () => {
+  await withStorage(async (storage) => {
+    saveOrderToken('order-1', createGuestToken(), storage)
+    await withFetch(
+      async (_url, options) => {
+        assert.equal(options.credentials, 'include')
+        assert.ok(!('X-Order-Access-Token' in options.headers))
+        return response({ error: { code: 'NOT_FOUND' } }, 404)
+      },
+      async () => {
+        assert.deepEqual(await loadOrderDetail('order-1', 'account-b'), { kind: 'not-found' })
+      },
+    )
+  })
+})
+
+test('đổi id/phiên/trang hủy nhận response cũ, response về muộn không ghi đè kết quả mới', async () => {
+  let oldResolve
+  let nextResolve
+  const old = new Promise((resolve) => {
+    oldResolve = resolve
+  })
+  const next = new Promise((resolve) => {
+    nextResolve = resolve
+  })
+  const received = []
+  const cancelOld = startOrderRead(
+    () => old,
+    (result) => received.push(result),
+  )
+  cancelOld()
+  const cancelNext = startOrderRead(
+    () => next,
+    (result) => received.push(result),
+  )
+  nextResolve({ kind: 'ready', order: { id: 'next-id' } })
+  oldResolve({ kind: 'ready', order: { id: 'old-id' } })
+  await Promise.all([old, next])
+  assert.deepEqual(received, [{ kind: 'ready', order: { id: 'next-id' } }])
+  cancelNext()
+})
+
+test('response danh sách cũ không khôi phục PII sau khi request mới nhận 401', async () => {
+  let resolveOld
+  const old = new Promise((resolve) => {
+    resolveOld = resolve
+  })
+  let visible
+  const cancel = startOrderRead(
+    () => old,
+    (result) => {
+      visible = result
+    },
+  )
+  cancel()
+  await withFetch(
+    async () => response({ error: { code: 'AUTH_REQUIRED' } }, 401),
+    async () => {
+      visible = await loadMyOrders(2, 20)
+      resolveOld({ kind: 'ready', page: { data: [order()], total: 1, page: 1, page_size: 20 } })
+      await old
+      assert.deepEqual(visible, { kind: 'unauthenticated' })
+    },
+  )
+})
+
+test('link đăng nhập giữ next đúng chi tiết hoặc danh sách và không thêm secret', () => {
+  for (const path of ['/don-hang/order-1', '/tai-khoan/don-hang?page=2']) {
+    const url = new URL(orderLoginPath(path), 'https://shop.example')
+    assert.equal(url.pathname, '/dang-nhap')
+    assert.equal(url.searchParams.get('next'), path)
+    assert.deepEqual([...url.searchParams.keys()], ['next'])
+  }
 })

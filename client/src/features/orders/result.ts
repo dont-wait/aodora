@@ -6,7 +6,7 @@ export type CheckoutResult = { kind: 'ready'; order: Order; receipt: OrderReceip
 
 // Receipt metadata only controls the cleanup warning. Permission and every
 // displayed order field ALWAYS come from GET /orders/{id}, including on reload.
-export async function loadCheckoutResult(id: string, customerId: string | null): Promise<CheckoutResult> {
+export async function loadOrderDetail(id: string, customerId: string | null): Promise<CheckoutResult> {
   let receipt: OrderReceipt | null = null
   try {
     receipt = readReceipt(id)
@@ -34,3 +34,6 @@ export async function loadCheckoutResult(id: string, customerId: string | null):
     return { kind: 'error' }
   }
 }
+
+// Retain the checkout caller contract while sharing all detail reads.
+export const loadCheckoutResult = loadOrderDetail
