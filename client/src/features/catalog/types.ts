@@ -34,6 +34,12 @@ export interface CatalogProduct extends CatalogProductSummary {
   story?: CatalogContent; fabric?: CatalogContent; craft?: CatalogContent
   reviews: { count: number; average: number }; updated_at: string
 }
+export interface CatalogReview {
+  id: string; rating: number; content?: string; display_name: string; images: Img[]; verified_purchase: boolean; created_at: string
+}
+export interface CatalogReviewPage {
+  items: CatalogReview[]; total: number; page: number; page_size: number; average: number
+}
 export interface CatalogPage {
   data: CatalogProductSummary[]; total: number; page: number; page_size: number; total_pages: number
 }

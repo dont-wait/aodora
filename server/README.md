@@ -159,3 +159,7 @@ Profile, address, measurement and wishlist contracts are documented at [docs/KR0
 ## Cart (KR-03)
 
 Guest and account cart contracts are documented at [docs/KR03_CART_API.md](docs/KR03_CART_API.md). Cart operations do not reserve inventory or create orders.
+
+## Reviews (KR-04 phase 1)
+
+Public review and authenticated post-delivery review contracts are documented at [docs/KR04_REVIEW_API.md](docs/KR04_REVIEW_API.md). Guest review and admin moderation are not enabled in this phase.
