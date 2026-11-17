@@ -55,6 +55,7 @@ func adminError(err error) error {
 	}
 	return fmt.Errorf("%w: %w", ErrOrderUnavailable, err)
 }
+
 func validAdminID(id string) bool {
 	if len(id) != 24 {
 		return false
@@ -62,6 +63,7 @@ func validAdminID(id string) bool {
 	_, err := hex.DecodeString(id)
 	return err == nil
 }
+
 func (s *AdminService) Get(ctx context.Context, id string) (*domain.Order, error) {
 	if !validAdminID(id) {
 		return nil, ErrNotFound
@@ -75,6 +77,7 @@ func (s *AdminService) Get(ctx context.Context, id string) (*domain.Order, error
 	}
 	return o, nil
 }
+
 func (s *AdminService) List(ctx context.Context, f AdminFilter) ([]domain.Order, int64, int64, int64, error) {
 	switch f.Status {
 	case "", domain.StatusPending, domain.StatusConfirmed, domain.StatusShipping, domain.StatusDelivered, domain.StatusCancelled:
@@ -101,6 +104,7 @@ func (s *AdminService) List(ctx context.Context, f AdminFilter) ([]domain.Order,
 	orders, total, err := s.store.ListAdmin(ctx, f)
 	return orders, total, f.Page, f.PageSize, adminError(err)
 }
+
 func (s *AdminService) mutate(ctx context.Context, id string, action AdminAction, target string) (*domain.Order, error) {
 	if !validAdminID(id) {
 		return nil, ErrNotFound
@@ -147,6 +151,7 @@ func (s *AdminService) mutate(ctx context.Context, id string, action AdminAction
 	o, err := s.store.MutateAdmin(ctx, id, action, target)
 	return o, adminError(err)
 }
+
 func (s *AdminService) SetStatus(ctx context.Context, id, target string) (*domain.Order, error) {
 	if target == domain.StatusPending || target == domain.StatusCancelled {
 		return nil, ErrStateConflict
@@ -156,12 +161,15 @@ func (s *AdminService) SetStatus(ctx context.Context, id, target string) (*domai
 	}
 	return s.mutate(ctx, id, AdminSetStatus, target)
 }
+
 func (s *AdminService) Cancel(ctx context.Context, id string) (*domain.Order, error) {
 	return s.mutate(ctx, id, AdminCancel, "")
 }
+
 func (s *AdminService) ConfirmRestock(ctx context.Context, id string) (*domain.Order, error) {
 	return s.mutate(ctx, id, AdminConfirmRestock, "")
 }
+
 func (s *AdminService) SetPayment(ctx context.Context, id, target string) (*domain.Order, error) {
 	if target == domain.PaymentUnpaid {
 		return nil, ErrPaymentConflict
