@@ -6,6 +6,8 @@ import HomePage from '@/pages/home/HomePage'
 import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
+import AdminOrdersPage from '@/pages/admin/AdminOrdersPage'
+import AdminOrderDetailPage from '@/pages/admin/AdminOrderDetailPage'
 import ForbiddenPage from '@/pages/admin/ForbiddenPage'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
@@ -25,6 +27,8 @@ export default function App() {
       <Route path="admin" element={<AdminAccessGuard />}>
         <Route index element={<Navigate to="/admin/catalog" replace />} />
         <Route path="catalog" element={<AdminCatalogPage />} />
+        <Route path="orders" element={<AdminOrdersPage />} />
+        <Route path="orders/:id" element={<AdminOrderDetailPage />} />
         <Route path="*" element={<Navigate to="/403" replace />} />
       </Route>
       <Route element={<Layout />}>
