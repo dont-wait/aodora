@@ -81,6 +81,7 @@ func main() {
 	}
 
 	orderRepo := catalogMongo.NewOrderRepository(db.Client, db.DB)
+	orderAdminService := orderapp.NewAdminService(orderRepo)
 	orderService := orderapp.NewService(orderRepo, orderRepo, quoteSigner, cfg.Order.QuoteTTL, cfg.Order.CODShippingFee, nil, nil)
 
 	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
@@ -94,7 +95,8 @@ func main() {
 			httpapi.WithCart(cartService, authGuard),
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
-			httpapi.WithOrders(orderService, authGuard, *log)),
+			httpapi.WithOrders(orderService, authGuard, *log),
+			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

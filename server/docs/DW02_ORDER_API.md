@@ -2,6 +2,8 @@
 
 Tài liệu kỹ thuật và hướng dẫn tích hợp API đơn hàng may sẵn cho hệ thống Aodora theo Issue [#19](https://github.com/dont-wait/aodora/issues/19), tuân thủ hợp đồng [DW_ORDER_CHECKOUT_CONTRACT.md](DW_ORDER_CHECKOUT_CONTRACT.md).
 
+API quản trị issue #20: xem [DW03_ADMIN_ORDER_API.md](DW03_ADMIN_ORDER_API.md); DTO khách hiện có giữ nguyên.
+
 ---
 
 ## 1. Mục đích và phạm vi

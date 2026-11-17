@@ -474,13 +474,14 @@ func decodeOrder(doc bson.M) (domainorder.Order, error) {
 			return domainorder.Order{}, fmt.Errorf("decode item unit_price: %w", err)
 		}
 		items = append(items, domainorder.OrderItem{
-			ProductID:   asID(itDoc["product_id"]),
-			ProductName: asString(itDoc["product_name"]),
-			SKU:         asString(itDoc["sku"]),
-			Color:       asString(itDoc["color"]),
-			Size:        asString(itDoc["size"]),
-			Quantity:    asInt64(itDoc["quantity"]),
-			UnitPrice:   uPrice,
+			FulfillmentMode: asString(itDoc["fulfillment_mode"]),
+			ProductID:       asID(itDoc["product_id"]),
+			ProductName:     asString(itDoc["product_name"]),
+			SKU:             asString(itDoc["sku"]),
+			Color:           asString(itDoc["color"]),
+			Size:            asString(itDoc["size"]),
+			Quantity:        asInt64(itDoc["quantity"]),
+			UnitPrice:       uPrice,
 		})
 	}
 
@@ -500,22 +501,27 @@ func decodeOrder(doc bson.M) (domainorder.Order, error) {
 	updatedAt := asTime(doc["updated_at"])
 
 	return domainorder.Order{
-		ID:              idHex,
-		OrderNumber:     orderNum,
-		CustomerID:      custID,
-		GuestAccessHash: guestHash,
-		Status:          status,
-		PaymentMethod:   payMethod,
-		PaymentStatus:   payStatus,
-		Subtotal:        subtotal,
-		ShippingFee:     shippingFee,
-		Total:           total,
-		ShippingAddress: addr,
-		Items:           items,
-		Note:            note,
-		Checkout:        checkout,
-		CreatedAt:       createdAt,
-		UpdatedAt:       updatedAt,
+		CancelledAt:          optionalOrderTime(doc, "cancelled_at"),
+		InventoryRestock:     asString(doc["inventory_restock"]),
+		InventoryRestockedAt: optionalOrderTime(doc, "inventory_restocked_at"),
+		PaidAt:               optionalOrderTime(doc, "paid_at"),
+		RefundedAt:           optionalOrderTime(doc, "refunded_at"),
+		ID:                   idHex,
+		OrderNumber:          orderNum,
+		CustomerID:           custID,
+		GuestAccessHash:      guestHash,
+		Status:               status,
+		PaymentMethod:        payMethod,
+		PaymentStatus:        payStatus,
+		Subtotal:             subtotal,
+		ShippingFee:          shippingFee,
+		Total:                total,
+		ShippingAddress:      addr,
+		Items:                items,
+		Note:                 note,
+		Checkout:             checkout,
+		CreatedAt:            createdAt,
+		UpdatedAt:            updatedAt,
 	}, nil
 }
 
@@ -598,4 +604,244 @@ func (r *OrderRepository) ListByCustomer(ctx context.Context, customerID string,
 		orders = append(orders, order)
 	}
 	return orders, total, cursor.Err()
+}
+
+var errAdminRetry = errors.New("admin order changed concurrently")
+var _ apporder.AdminStore = (*OrderRepository)(nil)
+
+func (r *OrderRepository) ListAdmin(ctx context.Context, f apporder.AdminFilter) ([]domainorder.Order, int64, error) {
+	filter := bson.M{}
+	if f.Status != "" {
+		filter["status"] = f.Status
+	}
+	if f.PaymentStatus != "" {
+		filter["payment_status"] = f.PaymentStatus
+	}
+	total, err := r.orders.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	cur, err := r.orders.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "_id", Value: -1}}).SetSkip((f.Page-1)*f.PageSize).SetLimit(f.PageSize))
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	orders := make([]domainorder.Order, 0)
+	for cur.Next(ctx) {
+		var doc bson.M
+		if err := cur.Decode(&doc); err != nil {
+			return nil, 0, err
+		}
+		o, err := decodeOrder(doc)
+		if err != nil {
+			return nil, 0, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, total, cur.Err()
+}
+func restockItems(o *domainorder.Order) []domainorder.OrderItem {
+	if o.Checkout.Scope == "" {
+		return nil
+	}
+	var lines []domainorder.OrderItem
+	for _, it := range o.Items {
+		if it.FulfillmentMode != "custom" {
+			lines = append(lines, it)
+		}
+	}
+	return lines
+}
+func (r *OrderRepository) MutateAdmin(ctx context.Context, id string, action apporder.AdminAction, target string) (*domainorder.Order, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		before, err := r.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if before == nil {
+			return nil, apporder.ErrNotFound
+		}
+		transactional := action == apporder.AdminConfirmRestock || (action == apporder.AdminCancel && (before.Status == domainorder.StatusPending || before.Status == domainorder.StatusConfirmed) && len(restockItems(before)) > 0)
+		var result *domainorder.Order
+		run := func(runCtx context.Context) error {
+			var runErr error
+			result, runErr = r.mutateAdminOnce(runCtx, id, action, target)
+			return runErr
+		}
+		if transactional {
+			err = r.RunCheckout(ctx, func(txCtx context.Context, _ apporder.CheckoutTx) error { return run(txCtx) })
+		} else {
+			err = run(ctx)
+		}
+		if errors.Is(err, errAdminRetry) {
+			continue
+		}
+		return result, err
+	}
+	return nil, apporder.ErrOrderUnavailable
+}
+func (r *OrderRepository) mutateAdminOnce(ctx context.Context, id string, action apporder.AdminAction, target string) (*domainorder.Order, error) {
+	o, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if o == nil {
+		return nil, apporder.ErrNotFound
+	}
+	itemID, _ := oid(id)
+	filter := bson.M{"_id": itemID}
+	now := time.Now().UTC()
+	set := bson.M{"updated_at": now}
+	var lines []domainorder.OrderItem
+	switch action {
+	case apporder.AdminSetStatus:
+		if !domainorder.NextStatusAllowed(o.PaymentMethod, o.Status, target) {
+			return nil, apporder.ErrStateConflict
+		}
+		if o.Status == target {
+			return o, nil
+		}
+		filter["status"] = o.Status
+		set["status"] = target
+	case apporder.AdminSetPayment:
+		if !domainorder.NextPaymentAllowed(o.PaymentStatus, target) {
+			return nil, apporder.ErrPaymentConflict
+		}
+		if o.PaymentStatus == target {
+			return o, nil
+		}
+		filter["payment_status"] = o.PaymentStatus
+		set["payment_status"] = target
+		if target == domainorder.PaymentPaid {
+			set["paid_at"] = now
+		} else {
+			set["refunded_at"] = now
+		}
+	case apporder.AdminCancel:
+		if o.Status == domainorder.StatusCancelled {
+			return o, nil
+		}
+		if o.Status != domainorder.StatusPending && o.Status != domainorder.StatusConfirmed && o.Status != domainorder.StatusShipping {
+			return nil, apporder.ErrStateConflict
+		}
+		filter["status"] = o.Status
+		set["status"] = domainorder.StatusCancelled
+		set["cancelled_at"] = now
+		lines = restockItems(o)
+		switch {
+		case len(lines) == 0:
+			set["inventory_restock"] = domainorder.InventoryNotApplicable
+		case o.Status == domainorder.StatusShipping:
+			set["inventory_restock"] = domainorder.InventoryAwaitingReturn
+			lines = nil
+		default:
+			set["inventory_restock"] = domainorder.InventoryRestocked
+			set["inventory_restocked_at"] = now
+		}
+	case apporder.AdminConfirmRestock:
+		if o.Status != domainorder.StatusCancelled {
+			return nil, apporder.ErrStateConflict
+		}
+		if o.InventoryRestock == domainorder.InventoryRestocked {
+			return o, nil
+		}
+		if o.InventoryRestock != domainorder.InventoryAwaitingReturn {
+			return nil, apporder.ErrStateConflict
+		}
+		filter["status"] = o.Status
+		filter["inventory_restock"] = domainorder.InventoryAwaitingReturn
+		set["inventory_restock"] = domainorder.InventoryRestocked
+		set["inventory_restocked_at"] = now
+		lines = restockItems(o)
+	default:
+		return nil, apporder.ErrStateConflict
+	}
+	var doc bson.M
+	err = r.orders.FindOneAndUpdate(ctx, filter, bson.M{"$set": set}, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&doc)
+	if errors.Is(err, driver.ErrNoDocuments) {
+		return nil, errAdminRetry
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) > 0 {
+		if err := r.incrementOrderStock(ctx, lines); err != nil {
+			return nil, err
+		}
+	}
+	updated, err := decodeOrder(doc)
+	return &updated, err
+}
+func (r *OrderRepository) incrementOrderStock(ctx context.Context, lines []domainorder.OrderItem) error {
+	groups := map[string]map[string]int64{}
+	var ids []string
+	for _, it := range lines {
+		if it.Quantity <= 0 {
+			return apporder.ErrRestockUnavailable
+		}
+		if groups[it.ProductID] == nil {
+			groups[it.ProductID] = map[string]int64{}
+			ids = append(ids, it.ProductID)
+		}
+		groups[it.ProductID][it.SKU] += it.Quantity
+	}
+	for _, id := range ids {
+		pID, err := oid(id)
+		if err != nil {
+			return apporder.ErrRestockUnavailable
+		}
+		var product bson.M
+		err = r.products.FindOne(ctx, bson.M{"_id": pID}).Decode(&product)
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return apporder.ErrRestockUnavailable
+		}
+		if err != nil {
+			return err
+		}
+		quantities := groups[id]
+		var total int64
+		for _, q := range quantities {
+			total += q
+		}
+		filter := bson.M{"_id": pID}
+		inc := bson.M{"stock": total}
+		opts := options.UpdateOne()
+		if len(asSlice(product["variants"])) > 0 {
+			matches := bson.A{}
+			filters := []any{}
+			i := 0
+			for sku, q := range quantities {
+				tag := fmt.Sprintf("v%d", i)
+				i++
+				matches = append(matches, bson.M{"$elemMatch": bson.M{"sku": sku}})
+				filters = append(filters, bson.M{tag + ".sku": sku})
+				inc["variants.$["+tag+"].stock"] = q
+			}
+			filter["variants"] = bson.M{"$all": matches}
+			opts.SetArrayFilters(filters)
+		} else {
+			filter["$or"] = bson.A{bson.M{"variants": bson.M{"$exists": false}}, bson.M{"variants": bson.M{"$size": 0}}}
+			if len(quantities) != 1 {
+				return apporder.ErrRestockUnavailable
+			}
+			for sku := range quantities {
+				filter["sku"] = sku
+			}
+		}
+		res, err := r.products.UpdateOne(ctx, filter, bson.M{"$inc": inc, "$set": bson.M{"updated_at": time.Now().UTC()}}, opts)
+		if err != nil {
+			return err
+		}
+		if res.MatchedCount != 1 {
+			return apporder.ErrRestockUnavailable
+		}
+	}
+	return nil
+}
+func optionalOrderTime(doc bson.M, key string) *time.Time {
+	if doc[key] == nil {
+		return nil
+	}
+	t := asTime(doc[key])
+	return &t
 }
