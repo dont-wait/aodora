@@ -8,8 +8,8 @@ Tài liệu kỹ thuật và hợp đồng API cho chức năng may đo theo Iss
 
 Issue #22 (DW-04) gồm 5 bước triển khai tuần tự:
 1. **Bước 1 (Xong)**: API gửi yêu cầu may đo công khai (`POST /api/v1/tailoring-requests`), hỗ trợ khách vãng lai và khách có tài khoản; hợp đồng API và mapping schema.
-2. **Bước 2 (Hiện tại)**: API quản trị may đo (admin list, filter status, paging, detail, update appointment/notes/measurements/status; xác nhận số đo chủ động `measurement_confirmed`).
-3. **Bước 3**: Admin tạo đơn custom (`orders.fulfillment_mode = custom`, liên kết `tailoring_request_id`, snapshot số đo, chốt giá, không trừ tồn kho sẵn, chống tạo trùng khi retry).
+2. **Bước 2 (Xong)**: API quản trị may đo (admin list, filter status, paging, detail, update appointment/notes/measurements/status; xác nhận số đo chủ động `measurement_confirmed`).
+3. **Bước 3 (Hiện tại)**: Admin tạo đơn custom (`orders.fulfillment_mode = custom`, liên kết `tailoring_request_id`, snapshot số đo, chốt giá, không trừ tồn kho sẵn, chống tạo trùng khi retry).
 4. **Bước 4**: Tích hợp client (form GuidePage, nút tư vấn ở chi tiết áo, trang admin quản trị yêu cầu may đo).
 5. **Bước 5**: Nghiệm thu xuyên suốt, bằng chứng DB test, kiểm tra trình duyệt.
 
@@ -283,3 +283,82 @@ Mọi ghi dùng điều kiện trên `status` và `updated_at` đã đọc (`Upd
 ## 7.8. Index
 
 `tailoring_requests` có `ix_tailoring_requests_status_created {status:1, created_at:-1}` phục vụ lọc theo status. Danh sách **không lọc** sắp theo `created_at, _id` không có index riêng (quét + sắp xếp trong bộ nhớ); với quy mô cửa hàng hiện tại chấp nhận được, nếu cần index `{created_at:-1,_id:-1}` thì phải thêm migration mới (chưa làm, xem result.md "Chưa chắc").
+
+---
+
+# Bước 3 — Admin Tạo Đơn Custom Từ Yêu Cầu May Đo
+
+## 8. Đơn custom: thiết kế (khảo sát validator thật)
+
+Nguồn: `000004_client_fields`, `order_checkout`, `order_checkout_access`, `order_number_unique`, `order_repository.go`. **Không cần migration mới, không đổi enum.**
+
+### 8.1. Field của đơn custom
+
+| Field | Giá trị |
+| --- | --- |
+| `fulfillment_mode` (đơn) | `custom` |
+| `tailoring_request_id` | ObjectId của yêu cầu (đã có trong validator, nullable) |
+| `measurement_profile` | snapshot `body` + bảy `_cm` của yêu cầu tại lúc tạo; chỉ key đang có |
+| `items[0]` | `fulfillment_mode=custom`, `product_id`, `product_name` (tên sản phẩm lúc tạo), `sku="CUSTOM"` (validator bắt buộc chuỗi, dòng custom không phải biến thể kho), `quantity`, `unit_price` (admin chốt), `measurements` (cùng snapshot); **không** `size/color/variant_id` |
+| `customer_id` | lấy từ yêu cầu; yêu cầu guest ⇒ **bỏ field** (validator cho phép; không tạo khách giả) |
+| `status` / `payment_status` | `pending` / `unpaid` |
+| `shipping_address` | COD: đủ `recipient/phone/line1/city`; tại quầy: chỉ `recipient/phone`, phí 0 (validator `$or`). `recipient`/`phone` mặc định lấy `full_name`/`phone` của yêu cầu; **địa chỉ giao không bao giờ tự bịa** |
+| `subtotal/shipping_fee/total` | `unit_price × quantity` và phí, decimal exact (`Money`, lưu int64 hoặc Decimal128) |
+| `order_number` | cùng bộ sinh với checkout; trùng ⇒ sinh lại tối đa 3 lần (unique `uq_orders_order_number`) |
+
+Không đụng `products.stock` hay `variants[].stock` (kiểm chứng bằng test integration).
+
+### 8.2. Có cần `checkout` marker không?
+
+**Không.** Validator chỉ ràng buộc marker khi nó *tồn tại*: khi có marker thì bắt buộc `payment_method ∈ {cod, cash_at_counter}`, và `scope` phải khớp `customer:<customer_id>` hoặc `guest:<guest_access_hash>`. Thiếu marker thì enum cũ vẫn gồm `cod` và `cash_at_counter` và các ràng buộc phí/địa chỉ vẫn áp dụng. Vì vậy đơn custom **không có** `checkout`/`guest_access_hash`. Hệ quả đã kiểm tra trong code:
+- Hủy đơn custom: `restockItems` trả rỗng (không marker, và dòng custom luôn bị loại) ⇒ `inventory_restock=not_applicable`, tồn không đổi.
+- Chuyển trạng thái/thu tiền dùng nguyên `AdminService` của #20 (`cod`: pending→confirmed→shipping→delivered; `cash_at_counter`: pending→confirmed→delivered).
+- `decodeOrder` nay đọc thêm `fulfillment_mode`, `tailoring_request_id`, `measurement_profile`, `items[].measurements` và DTO admin trả `fulfillment_mode`, `tailoring_request_id`, `measurement_profile`, `items[].measurements`. Đơn checkout cũ không có field này nên không đổi hình dạng.
+
+Phương án thay thế đã loại: dùng marker giả `(scope, request_id)` tất định để mượn unique index `uq_orders_checkout_scope_request`. Nhược điểm: lạm dụng ngữ nghĩa marker (scope = danh tính người đặt), với yêu cầu có tài khoản scope bắt buộc là `customer:<id>` nên chính khách đó có thể chiếm trước request_id bằng một checkout, và guest phải bịa `guest_access_hash`.
+
+### 8.3. Chống tạo trùng (không dùng Idempotency-Key)
+
+Khóa tự nhiên là chính yêu cầu: một yêu cầu có tối đa **một** đơn custom. Cơ chế (`tailoring_order_repository.go`), trong **một** MongoDB transaction snapshot/majority:
+1. đọc lại yêu cầu; 2. tìm đơn có `tailoring_request_id` đó, có thì trả về (`created=false`); 3. kiểm tra lại status (`measurement_confirmed`/`in_progress`) và đủ bảy `_cm`; 4. chèn đơn; 5. `UpdateOne` yêu cầu với filter `{_id, status, updated_at}` vừa đọc, đặt `updated_at` mới.
+
+Hai request đồng thời cùng ghi **cùng một document yêu cầu** ⇒ MongoDB abort một transaction bằng `WriteConflict`; driver chạy lại callback, lần sau thấy đơn đã commit và trả đơn đó. Cũng chống tạo đơn khi admin khác vừa sửa/hủy yêu cầu. Retry khi chưa rõ kết quả cũng an toàn.
+
+Quy ước retry:
+- Gọi lại **cùng nội dung chính** (`product_id`, `unit_price`, `quantity`, `payment_method`) ⇒ `200` trả đơn đã có (kể cả khi yêu cầu đã sang `in_progress`/`completed`). Ghi chú/địa chỉ gửi lại không sửa đơn.
+- Nội dung khác ⇒ `409 CUSTOM_ORDER_EXISTS`, không tạo đơn thứ hai.
+- Đơn đã bị hủy **không** mở cho phép tạo đơn mới (một yêu cầu = một đơn); cần đơn khác phải xử lý thủ công, đây là giới hạn đã chấp nhận.
+
+Giới hạn: chỉ code path này được bảo vệ; DB không có unique index theo `tailoring_request_id`. Hardening tùy chọn (cần **migration mới**, chưa làm, chờ reviewer): unique partial index `{tailoring_request_id:1}` với `partialFilterExpression: {tailoring_request_id: {$type: "objectId"}}`; đồng thời index này cũng thay phép tìm đơn theo `tailoring_request_id` (hiện là quét `orders`, chấp nhận ở quy mô cửa hàng).
+
+### 8.4. Khách guest không có credential đọc đơn
+
+Đơn của yêu cầu guest không có `customer_id` lẫn `guest_access_hash` ⇒ **chỉ admin đọc được** qua API admin; `GET /api/v1/orders/{id}` trả 404 cho mọi người khác (kể cả tài khoản bất kỳ và không đăng nhập), và đơn không xuất hiện trong `GET /api/v1/orders`. Khách guest theo dõi qua liên hệ trực tiếp với cửa hàng; không phát token ở bước này. Yêu cầu có tài khoản: đơn mang `customer_id` nên chủ tài khoản thấy trong `GET /api/v1/orders` và đọc được `GET /api/v1/orders/{id}`; tài khoản khác nhận 404.
+
+## 9. `POST /api/v1/admin/tailoring-requests/{id}/order`
+
+Guard admin như Bước 2 (guest/khách thường ⇒ 403 `ADMIN_REQUIRED`, Origin sai ⇒ 403 `ORIGIN_FORBIDDEN`, `no-store`). Body JSON ≤ 16 KiB, từ chối field lạ (`customer_id`, `status`, `total`, `shipping_fee`... đều ⇒ 400 `INVALID_BODY`).
+
+| Field | Bắt buộc | Quy tắc |
+| --- | --- | --- |
+| `unit_price` | Có | số thập phân dương (number hoặc chuỗi), giữ nguyên chữ số, không float; 0/âm/chữ/số mũ ⇒ 400. **Không lấy giá từ sản phẩm** |
+| `payment_method` | Có | `cod` hoặc `cash_at_counter` |
+| `product_id` | Chỉ khi yêu cầu chưa có mẫu | yêu cầu đã có mẫu mà gửi khác ⇒ 400 `product_id`; sản phẩm không tồn tại/`is_active=false` ⇒ 400 |
+| `quantity` | Không | integer 1..1.000.000, mặc định 1 |
+| `shipping_address` | COD: `line1`, `city` bắt buộc | `recipient`/`phone` mặc định từ yêu cầu; `ward`, `district` tùy chọn |
+| `note` | Không | ≤ 1000 ký tự |
+
+Phí: tại quầy = 0; COD = `ORDER_COD_SHIPPING_FEE` (chưa cấu hình ⇒ `503 SHIPPING_UNAVAILABLE`). Không có phí mặc định (Q-04).
+
+Điều kiện yêu cầu (kiểm tra lại trong transaction):
+
+| Điều kiện | Kết quả nếu sai |
+| --- | --- |
+| id hợp lệ và tồn tại | 404 `NOT_FOUND` |
+| status `measurement_confirmed` hoặc `in_progress` | 409 `TAILORING_STATE_CONFLICT` |
+| đủ bảy `_cm` (`body` không bắt buộc, có thì được snapshot) | 409 `MEASUREMENT_INCOMPLETE` |
+| chưa có đơn khác nội dung | 409 `CUSTOM_ORDER_EXISTS` |
+
+Response: `201` đơn mới hoặc `200` replay, dạng `{"data": <DTO đơn admin>, "created": true|false}`; DTO như `DW03_ADMIN_ORDER_API.md` cộng `fulfillment_mode`, `tailoring_request_id`, `measurement_profile`, `items[].measurements`. Lỗi hạ tầng ⇒ 503 `TAILORING_UNAVAILABLE`.
+
+Tạo đơn chỉ cập nhật `updated_at` của yêu cầu (không đổi status, ghi chú, số đo). Sửa yêu cầu sau đó không đổi đơn vì snapshot được sao chép theo giá trị.

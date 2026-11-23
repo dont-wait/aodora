@@ -88,6 +88,8 @@ func main() {
 	tailoringRepo := catalogMongo.NewTailoringRepository(db.DB)
 	tailoringService := tailoringapp.NewService(tailoringRepo)
 	tailoringAdminService := tailoringapp.NewAdminService(tailoringRepo)
+	tailoringOrderService := tailoringapp.NewCustomOrderService(tailoringRepo, tailoringRepo,
+		catalogMongo.NewTailoringOrderRepository(db.Client, db.DB), cfg.Order.CODShippingFee, orderapp.DefaultOrderNumber)
 
 	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
 		Name: cfg.Auth.CookieName, Secure: cfg.Auth.CookieSecure, TTL: cfg.Auth.SessionTTL, AllowedOrigin: cfg.Auth.AllowedOrigin,
@@ -103,7 +105,8 @@ func main() {
 			httpapi.WithOrders(orderService, authGuard, *log),
 			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithTailoring(tailoringService, authGuard, *log),
-			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
+			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithAdminTailoringOrders(tailoringOrderService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
