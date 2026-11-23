@@ -362,3 +362,154 @@ Phí: tại quầy = 0; COD = `ORDER_COD_SHIPPING_FEE` (chưa cấu hình ⇒ `5
 Response: `201` đơn mới hoặc `200` replay, dạng `{"data": <DTO đơn admin>, "created": true|false}`; DTO như `DW03_ADMIN_ORDER_API.md` cộng `fulfillment_mode`, `tailoring_request_id`, `measurement_profile`, `items[].measurements`. Lỗi hạ tầng ⇒ 503 `TAILORING_UNAVAILABLE`.
 
 Tạo đơn chỉ cập nhật `updated_at` của yêu cầu (không đổi status, ghi chú, số đo). Sửa yêu cầu sau đó không đổi đơn vì snapshot được sao chép theo giá trị.
+
+---
+
+# Bước 6 — Bằng chứng chạy thật và kịch bản kiểm tra trình duyệt
+
+## 10. Bằng chứng chạy thật
+
+### 10.1. Môi trường
+
+| Mục | Giá trị |
+| --- | --- |
+| MongoDB | stack `aodora-transactions`, replica set `127.0.0.1:27018`, `directConnection=true`; **không** dùng cổng 27017 |
+| Database | tên ngẫu nhiên dạng `aodora_dw04_<timestamp>_<hex>` (một DB riêng cho lần chạy này), áp migration + seed demo bằng `cmd/migrate`; helper từ chối mọi host khác `127.0.0.1:27018` và tên DB không đúng mẫu |
+| API | binary build từ branch `feature/dw-04-tailoring`, `http://127.0.0.1:18080` |
+| Client | `npm run dev` (Vite) `http://127.0.0.1:15173`, proxy `/api` tới API; cookie phiên và `AUTH_ALLOWED_ORIGIN`/`ADMIN_ALLOWED_ORIGIN` đặt đúng origin Vite |
+| Phí COD | `ORDER_COD_SHIPPING_FEE=17000` — **giá trị thử, không phải phí vận hành** (Q-04 chưa chốt) |
+| Danh tính | admin (nâng quyền trực tiếp trong DB test, không có API nào nhận role), khách có tài khoản, một khách có tài khoản khác, khách vãng lai (cookie jar riêng từng danh tính); mật khẩu ngẫu nhiên chỉ nằm ở file `/tmp` quyền 600, không ghi vào repo |
+| Fixture | danh mục thử; sản phẩm A `dw04-mau-a` (tồn 100, một biến thể `DW04-A-M` tồn 100, `bespoke=true`); sản phẩm ẩn `dw04-mau-an` (`is_active=false`) |
+
+Toàn bộ request đi qua origin Vite (không gọi thẳng API) bằng runner HTTP ngoài repo; log đã che token/cookie/hash/mật khẩu/SĐT/tên người nhận. Kết quả: **111 bản ghi, 0 assertion thất bại**.
+
+### 10.2. Request/response mẫu (rút gọn)
+
+| # | Tình huống | Request | Kết quả |
+| --- | --- | --- | --- |
+| 1 | Guest chỉ tên + SĐT | `POST /api/v1/tailoring-requests` `{full_name, phone}` | `201 {"data":{"id":…,"status":"submitted"}}` (đúng hai khóa), DB +1 document |
+| 2 | Thiếu/trắng tên hoặc SĐT | cùng route | `400 INVALID_FIELD` field `full_name`/`phone`, DB không đổi |
+| 3 | Guest chọn mẫu A (id + slug đúng) | thêm `product_id`, `product_slug` | `201`; admin detail thấy `product_id`=A, `product_slug=dw04-mau-a`, `is_guest=true` |
+| 4 | Slug mâu thuẫn / sản phẩm ẩn (id, slug) / slug không có / số đo âm / số đo 0 | cùng route | `400 INVALID_FIELD` (`product_slug`, `product_id`, `product_slug`, `product_slug`, `waist_cm`, `waist_cm`), DB không đổi |
+| 5 | Khách đăng nhập | cookie hợp lệ | `201`; admin detail `customer_id` có giá trị, `is_guest=false`, `preferred_contact=zalo` |
+| 6 | Cookie sai | `Cookie` giả | `401 AUTH_REQUIRED`, DB không đổi (không hạ xuống guest) |
+| 7 | Khách thường / không cookie gọi 6 route admin tailoring | list, detail, PATCH, status, confirm, order | cả 12 lời gọi `403 ADMIN_REQUIRED` (không phải 401) |
+| 8 | Admin list | `GET …?page_size=100`, `?status=submitted`, `?page=1/2&page_size=2`, `?status=bogus` | `200` (tổng ≥ số vừa tạo + seed demo), chỉ `submitted`, hai trang không trùng, `400` cho status lạ |
+| 9 | Sửa + tải lại | `PATCH` `{notes, appointment_at, assigned_staff, measurements{body,neck_cm,bust_cm}}` rồi `GET` | `200`; GET thấy đủ ghi chú, lịch hẹn (đổi sang UTC), phụ trách, số đo |
+| 10 | Xóa lịch hẹn | `PATCH {"appointment_at": null}` rồi `GET` | `appointment_at=null`, giữ sau tải lại |
+| 11 | `PATCH {"status":…}` thường | `PATCH` yêu cầu | `400` (field lạ) |
+| 12 | Luồng trạng thái | `submitted→contacted→consultation_scheduled`; nhảy `in_progress` | `200`, `200`, nhảy cóc `409` |
+| 13 | Chốt số đo thiếu | `POST …/confirm-measurements {"confirmed":true}` | `409 MEASUREMENT_INCOMPLETE` |
+| 14 | `measurement_confirmed` qua `/status` | `PATCH …/status` | `400 INVALID_FIELD` `status`; GET vẫn `consultation_scheduled` |
+| 15 | Chốt không có cờ | `{"confirmed":false}` | `400` |
+| 16 | Đủ bảy `_cm` rồi chốt | PATCH rồi POST confirm | `200 measurement_confirmed`, `allowed_actions` không còn `confirm_measurements`/`update_measurements` |
+| 17 | Sửa số đo sau chốt | `PATCH {"measurements":{"waist_cm":70}}` | `409 MEASUREMENT_LOCKED`; sửa ghi chú vẫn `200` |
+
+Đơn custom (admin tạo, mẫu A, cùng một tồn 100/100):
+
+| # | Tình huống | Kết quả |
+| --- | --- | --- |
+| 18 | Điều kiện sai: giá 0, COD không địa chỉ, field lạ `total`, yêu cầu chưa chốt | `400`, `400` (`shipping_address.line1`), `400`, `409` |
+| 19 | Tại quầy, khách có tài khoản: `{"unit_price":"1500000.50","payment_method":"cash_at_counter","quantity":2}` | `201 created=true`; `fulfillment_mode=custom`, `tailoring_request_id` đúng, `status=pending`, `payment_status=unpaid`, `shipping_fee=0`, `total=3000001`, `customer_id` có, snapshot `measurement_profile` đủ bảy `_cm` + `body` |
+| 20 | COD, yêu cầu của guest: `{"unit_price":2000000,"payment_method":"cod","shipping_address":{line1,city}}` | `201`; `shipping_fee=17000` (giá trị thử), `total=2017000`, `is_guest=true`, **không có** `customer_id` |
+| 21 | Đơn có `product_id` trong body (yêu cầu guest chưa có mẫu), tại quầy | `201` |
+| 22 | DB (không có marker checkout) | đơn custom không có `checkout`; đơn guest không có `customer_id` và không có `guest_access_hash` |
+| 23 | Hiển thị | `GET /admin/orders` có cả ba đơn với `fulfillment_mode=custom`, `tailoring_request_id`, `measurement_profile` |
+| 24 | Quyền đọc | khách chủ đơn: có trong `GET /orders` và `GET /orders/{id}` `200`; khách khác, không cookie: `404`; **đơn guest**: không cookie, khách thường, khách khác đều `404`, admin `200` |
+| 25 | Tạo lại | cùng nội dung: `200 created=false` cùng id; khác `unit_price`: `409 CUSTOM_ORDER_EXISTS`; DB: đúng **1** document `orders` cho yêu cầu |
+
+Sửa yêu cầu sau khi tạo đơn:
+
+| # | Thao tác | Kết quả |
+| --- | --- | --- |
+| 26 | `PATCH` ghi chú, lịch hẹn, phụ trách của yêu cầu; **sửa trực tiếp `measurements.waist_cm`=99.5 trong DB test** (mô phỏng luồng mở lại số đo chưa tồn tại) | `GET` yêu cầu thấy `99.5`; đơn vẫn `waist_cm=65.25`, `updated_at` và `measurement_profile` của đơn trong DB không đổi; tạo lại vẫn trả đúng đơn cũ |
+
+Luồng đơn qua API admin đơn (#20):
+
+| # | Thao tác | Kết quả |
+| --- | --- | --- |
+| 27 | COD: `confirmed → shipping → delivered` | `delivered`, `payment_status` vẫn `unpaid`; `mark_paid` ⇒ `paid` |
+| 28 | Tại quầy: `confirmed`, thử `shipping`, `delivered` | `200`, `409`, `200` |
+| 29 | Hủy đơn custom đang `pending` | `cancelled`, `inventory_restock=not_applicable`; tạo lại cho yêu cầu đó vẫn trả đơn cũ (đúng 1 document) |
+
+### 10.3. Tồn kho trước và sau
+
+| Thời điểm | `products.stock` | biến thể `DW04-A-M` |
+| --- | --- | --- |
+| Sau khi dựng fixture | 100 | 100 |
+| Trước khi tạo đơn custom | 100 | 100 |
+| Sau khi tạo 3 đơn custom | 100 | 100 |
+| Sau giao/thu tiền/hủy | 100 | 100 |
+
+### 10.4. Đối chiếu tiêu chí của issue
+
+| Tiêu chí | Bằng chứng | Loại |
+| --- | --- | --- |
+| Guest chỉ tên/SĐT vẫn gửi được; thiếu thì chưa lưu | #1, #2 (đếm document trong DB) | HTTP thật |
+| Chọn tư vấn từ mẫu A tạo yêu cầu đúng A; không còn slug mặc định | #3, #4 (HTTP); không còn slug cứng trong `client/src` (grep); form đọc `product_id/product_slug` từ query, `tests/tailoring.test.mjs` | HTTP + unit; **luồng nút tư vấn → form chưa chạy trình duyệt** |
+| Admin tải lại vẫn thấy yêu cầu, lịch hẹn, số đo đã sửa | #9, #10 (GET sau PATCH) | HTTP thật; **UI chưa chạy trình duyệt** |
+| Lỗi lưu không xóa dữ liệu nhập, không báo đã lưu | `tests/tailoring.test.mjs` (chỉ 201 hợp lệ là thành công, lỗi 400/401/503/mạng ném lỗi), `tests/admin-tailoring.test.mjs`; mã form giữ state khi lỗi | unit; **hành vi UI chưa chạy trình duyệt** |
+| Đơn `custom`, liên kết yêu cầu và số đo; sửa yêu cầu sau không sửa ngầm đơn | #19–#26 (kể cả sửa DB trực tiếp) | HTTP + DB thật |
+| `measurement_confirmed` chỉ qua thao tác chủ động | #13–#16 (không qua `/status`, cần `confirmed:true` và đủ bảy số đo); UI cần tick "Tôi đã kiểm tra lại số đo với khách" | HTTP thật; **ô tick UI chưa chạy trình duyệt** |
+| Không trừ tồn | 10.3 và #29 | HTTP + DB thật |
+| `make test`, integration Mongo thật, build, lint | 10.6 | đã chạy |
+| Kiểm tra trình duyệt | kịch bản 11, **chưa thực hiện** | chờ người kiểm tra |
+
+### 10.5. Giới hạn đã chấp nhận
+
+- `MEASUREMENT_LOCKED`: sau khi chốt số đo chưa có luồng mở lại để sửa số đo (ghi chú, lịch hẹn, phụ trách vẫn sửa được).
+- Đơn của khách vãng lai chỉ admin đọc được (không phát token); khách theo dõi qua liên hệ với cửa hàng.
+- Đơn đã hủy vẫn chiếm chỗ yêu cầu: một yêu cầu chỉ có một đơn, tạo lại trả đơn cũ hoặc `CUSTOM_ORDER_EXISTS`.
+- Danh sách admin không lọc `status` sắp theo `created_at, _id` nên quét toàn collection rồi sắp trong bộ nhớ (lọc theo status dùng index `status+created_at`); chấp nhận ở quy mô cửa hàng, cần index mới thì phải có migration mới.
+- DB không có unique theo `tailoring_request_id`; chống tạo trùng nằm ở transaction (mục 8.3) và đã chứng minh bằng test đồng thời, nhưng ghi trực tiếp bằng công cụ khác không bị DB chặn. Hardening tùy chọn cần migration mới.
+- Phí COD là cấu hình `ORDER_COD_SHIPPING_FEE` (Q-04 chưa chốt, không có phí mặc định); chưa cấu hình thì COD trả `SHIPPING_UNAVAILABLE`. Giá `17000` ở 10.1 chỉ là giá thử.
+- Client chưa có test component React: hành vi UI được bảo đảm bằng test hàm thuần + HTTP thật, và cần kịch bản trình duyệt dưới đây.
+
+### 10.6. Lệnh kiểm tra
+
+Chạy trong `server/` (cần `MONGO_TEST_URI` trỏ replica set test, không commit URI có credential) và `client/`; các lệnh Node dùng `nix develop ../server -c bash -c '…'`:
+
+```
+# server
+make test                       # go test -race ./...
+make test-integration           # migration + Mongo thật (replica set 27018)
+gofmt -l . && go vet ./... && go vet -tags=integration ./...
+# client
+npm run test:tailoring
+npm run test:admin-tailoring
+for f in tests/*.test.mjs; do node --experimental-strip-types --test $f; done
+npm run build && npm run lint && git diff --check
+```
+
+Kết quả lần chạy này: `make test` pass; `make test-integration` pass (gồm `TestTailoringIntegration_RealMongoDB`, `TestAdminTailoring*`, `TestAdminTailoringCustomOrderIntegration`); toàn bộ test client pass (admin-catalog-routes 1, admin-catalog 4, admin-orders 13, admin-tailoring 15, auth 1, catalog 7, orders 36, pd04-content 5, tailoring 13); `npm run build`, `npm run lint`, `git diff --check` sạch.
+
+## 11. Kịch bản kiểm tra trình duyệt (chưa thực hiện)
+
+Chuẩn bị: mở `http://127.0.0.1:15173`. Tài khoản admin/khách đọc từ file creds quyền 600 trong `/tmp` (đường dẫn do người dựng môi trường cung cấp; không dán mật khẩu vào ticket/PR). Sản phẩm thử: `/san-pham/dw04-mau-a` (có `bespoke`). Lặp mọi bước ở **desktop** và **mobile 390px** (devtools); kiểm tra không có cuộn ngang.
+
+**A. Khách vãng lai (không đăng nhập)**
+1. Mở `/dich-vu-may-do#bang-so-do`. Form có nhãn "Gửi Yêu Cầu Tư Vấn", không bị đẩy sang đăng nhập, không có khối "Đang tư vấn cho mẫu".
+2. Bấm gửi khi để trống: thấy lỗi ở họ tên và số điện thoại, **chưa** có yêu cầu mới.
+3. Chỉ nhập họ tên + SĐT, gửi: thông báo "Đã gửi yêu cầu tư vấn may đo — đây chưa phải đặt đơn thành công…" + mã tham chiếu; form được đặt lại; không chuyển sang giỏ/thanh toán.
+4. Nhập số đo `abc`, `-3`, `0`, `65,5`: ba giá trị đầu báo lỗi và không gửi; `65,5` được chấp nhận.
+5. Mở `/san-pham/dw04-mau-a`, bấm "Gửi yêu cầu tư vấn may đo (chưa phải đặt mua)": form hiện "Đang tư vấn cho mẫu: Áo dài thử may đo DW04 (mẫu A)". Gửi ⇒ admin thấy yêu cầu gắn mẫu A.
+6. Mở `/dich-vu-may-do?product_slug=khong-ton-tai`, nhập đủ và gửi: lỗi hiện ở khối mẫu, **dữ liệu đã nhập còn nguyên**, không có thông báo đã gửi.
+7. Mô phỏng lỗi: dừng API (xem lệnh dừng trong result của lần dựng) rồi gửi: thông báo "chưa được gửi", dữ liệu giữ nguyên; bật lại API, gửi lại thành công.
+
+**B. Khách có tài khoản**
+1. Đăng nhập khách ở `/dang-nhap`, mở `/dich-vu-may-do`: họ tên/SĐT/số đo được điền sẵn nếu hồ sơ có. Gửi yêu cầu: thành công, hồ sơ **không** bị ghi đè.
+2. Nút "Lưu vào hồ sơ số đo": nhập `abc` ⇒ báo lỗi, không gọi lưu; nhập hợp lệ ⇒ "Đã lưu thành công hồ sơ số đo".
+3. Xóa cookie phiên (devtools) ở tab khác rồi gửi: thông báo phiên hết hạn + link đăng nhập lại, form giữ nguyên.
+
+**C. Admin** (`/admin/tailoring`)
+1. Danh sách: lọc từng trạng thái, đổi số mục/trang, URL phản ánh bộ lọc; giá trị lạ trên URL (`?status=abc`) bị bỏ qua. Mở một yêu cầu.
+2. Chi tiết: thấy liên hệ, mẫu, ghi chú, số đo ("chưa có" khi thiếu, không hiện 0). Sửa ghi chú, lịch hẹn (`datetime-local`), phụ trách, kênh liên hệ, vài số đo ⇒ "Đã lưu thay đổi"; **tải lại trang (F5)** vẫn thấy đủ. Xóa lịch hẹn bằng cách để trống ⇒ lưu ⇒ tải lại thấy "Chưa hẹn". Bấm "Xóa số đo" ở một ô ⇒ lưu ⇒ ô đó "chưa có".
+3. Nhập số đo `-1`/`abc`: báo lỗi tại ô, không gửi. Ngắt API rồi lưu: báo chưa lưu và **giữ nội dung đang sửa**.
+4. Nút trạng thái chỉ xuất hiện theo trạng thái (Đã liên hệ → Đã hẹn tư vấn…); mỗi nút mở hộp xác nhận nêu hệ quả; hủy ghi rõ không hoàn tác.
+5. Khi chưa đủ bảy số đo: không có nút "Xác nhận số đo" (có ghi chú cần đủ bảy). Nhập đủ ⇒ nút xuất hiện ⇒ hộp xác nhận có ô tick "Tôi đã kiểm tra lại số đo với khách"; nút "Xác nhận thao tác" bị khóa tới khi tick ⇒ xác nhận ⇒ trạng thái "Đã xác nhận số đo", khối sửa hiện "Đã chốt số đo, không sửa trực tiếp", ô số đo biến mất.
+6. Tạo đơn: panel "Tạo đơn may đo" chỉ hiện ở "Đã xác nhận số đo"/"Đang thực hiện". Thử giá `0`, `abc`, số lượng `0`, chưa chọn hình thức: lỗi tại ô, không gửi. Chọn tại quầy, giá `1500000.50`, số lượng 2 ⇒ tạo ⇒ link "Mở đơn…" ⇒ trang đơn hiển thị tổng `3.000.001 ₫`, phí 0, dòng may đo. Trên yêu cầu khác chọn COD: ô địa chỉ xuất hiện, thiếu số nhà/thành phố báo lỗi, đủ ⇒ phí = 17.000 ₫ (giá thử). Bấm lại tạo đơn lần hai ngay sau khi xong: panel đã khóa; tải lại trang rồi tạo cùng nội dung ⇒ "đã có đơn" kèm link, **không** có đơn thứ hai (kiểm tra ở `/admin/orders`).
+7. Yêu cầu của khách vãng lai: panel nhắc "chỉ quản trị đọc được đơn này".
+8. Khách thường truy cập `/admin/tailoring` ⇒ chuyển `/403`; không đăng nhập ⇒ chuyển đăng nhập kèm `next`.
+9. Ở `/admin/orders`, các đơn vừa tạo có thể xác nhận/giao/thu tiền/hủy; hủy đơn custom ⇒ "Không áp dụng" cho hoàn tồn; tồn sản phẩm không đổi.
+
+**D. Ghi nhận**: chụp màn hình các bước A3, A6, C2, C5, C6 ở desktop và 390px; ghi mọi lệch so với kịch bản vào ticket.
