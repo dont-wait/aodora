@@ -11,7 +11,9 @@
     "test:catalog": "node --experimental-strip-types --test tests/catalog.test.mjs",
     "test:admin": "node --experimental-strip-types --test tests/admin-catalog.test.mjs",
     "test:content": "node --experimental-strip-types --test tests/pd04-content.test.mjs",
-    "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs"
+    "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs",
+    "test:orders": "node --experimental-strip-types --test tests/orders.test.mjs",
+    "test:admin-orders": "node --experimental-strip-types --test tests/admin-orders.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

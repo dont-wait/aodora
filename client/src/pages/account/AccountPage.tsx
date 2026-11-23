@@ -114,6 +114,7 @@ export default function AccountPage() {
     <div className="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-10 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       <aside className="lg:col-span-3 bg-surface-container-low p-3">
         {([['profile', 'Thông tin cá nhân', 'person'], ['addresses', 'Địa chỉ nhận hàng', 'location_on'], ['measurements', 'Hồ sơ số đo', 'straighten']] as const).map(([key, label, icon]) => <button key={key} type="button" onClick={() => { setSection(key); setError(''); setSuccess('') }} className={`w-full flex items-center gap-3 text-left px-4 py-3 ${section === key ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}><Icon name={icon} size={19} />{label}</button>)}
+        <Link to="/tai-khoan/don-hang" className="w-full flex items-center gap-3 text-left px-4 py-3 text-on-surface-variant hover:bg-surface-container"><Icon name="receipt_long" size={19} />Đơn hàng của tôi</Link>
         <Link to={ROUTES.wishlist} className="w-full flex items-center gap-3 text-left px-4 py-3 text-on-surface-variant hover:bg-surface-container"><Icon name="favorite" size={19} />Danh sách yêu thích</Link>
       </aside>
       <section className="lg:col-span-9 bg-surface-container-lowest p-6 sm:p-8">

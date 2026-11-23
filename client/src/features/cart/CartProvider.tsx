@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { addSelectedProduct, registerCartAddHandler, type CartSelection } from '@/features/catalog/selection'
 import { useAuth } from '@/features/auth/useAuth'
 import { cartApi, type CartData } from './api'
 import { CartContext } from './context'
+import { subtractPurchased, verifyCheckoutIdentity } from '@/features/orders/checkout'
+import { consumeAccountPurchase } from '@/features/orders/cartCleanup'
+import type { PurchaseLine } from '@/features/orders/types'
 
 const STORAGE_KEY = 'aodora.cart.v1'
 const emptyCart: CartData = { items: [], issues: [], item_count: 0, subtotal: 0 }
@@ -37,6 +40,8 @@ function removeLocal(items: CartSelection[], productId: string, sku: string) {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const identityRef = useRef(user?.id ?? null)
+  useEffect(() => { identityRef.current = user?.id ?? null }, [user])
   const [guestSelections, setGuestSelections] = useState<CartSelection[]>(readGuestSelections)
   const [guestCart, setGuestCart] = useState<CartData>(emptyCart)
   const [accountCart, setAccountCart] = useState<CartData>(emptyCart)
@@ -134,8 +139,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch (err) { setError(err instanceof Error ? err.message : 'Không thể xóa sản phẩm khỏi giỏ') }
   }, [user, guestSelections])
 
+  const consumePurchased = useCallback(async (snapshot: PurchaseLine[], ownerId: string | null) => {
+    const checkIdentity = () => {
+      if (identityRef.current !== ownerId) throw new Error('Đơn đã lưu nhưng phiên giỏ hàng đã thay đổi. Vui lòng kiểm tra giỏ của bạn.')
+    }
+    checkIdentity()
+    if (ownerId) await verifyCheckoutIdentity({ kind: 'account', customerId: ownerId }, identityRef.current)
+    if (!ownerId) {
+      const next = subtractPurchased(readGuestSelections(), snapshot)
+      writeGuestSelections(next)
+      setGuestSelections(next)
+      if (!next.length) setGuestCart(emptyCart)
+      else await refreshGuest(next)
+      return
+    }
+    await consumeAccountPurchase(snapshot, cartApi, next => setAccountCart(normalizeCart(next)), checkIdentity)
+  }, [refreshGuest])
+
   const cart = user ? accountCart : guestCart
   const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0)
-  const value = useMemo(() => ({ cart, loading, error, itemCount, add, update, remove, refresh: user ? refreshAccount : () => refreshGuest() }), [cart, loading, error, itemCount, add, update, remove, user, refreshAccount, refreshGuest])
+  const value = useMemo(() => ({ cart, loading, error, itemCount, add, update, remove, consumePurchased, refresh: user ? refreshAccount : () => refreshGuest() }), [cart, loading, error, itemCount, add, update, remove, consumePurchased, user, refreshAccount, refreshGuest])
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }
