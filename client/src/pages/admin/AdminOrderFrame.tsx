@@ -13,6 +13,7 @@ export default function AdminOrderFrame({ title, children }: { title: string; ch
           <nav aria-label="Điều hướng quản trị" className="flex flex-wrap gap-5 text-primary underline">
             <Link to="/admin/catalog">Danh mục & sản phẩm</Link>
             <Link to="/admin/orders">Quản trị đơn hàng</Link>
+            <Link to="/admin/tailoring">Yêu cầu may đo</Link>
             <Link to="/">Trang khách</Link>
           </nav>
         </header>

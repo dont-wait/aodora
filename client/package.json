@@ -14,7 +14,8 @@
     "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs",
     "test:orders": "node --experimental-strip-types --test tests/orders.test.mjs",
     "test:admin-orders": "node --experimental-strip-types --test tests/admin-orders.test.mjs",
-    "test:tailoring": "node --experimental-strip-types --test tests/tailoring.test.mjs"
+    "test:tailoring": "node --experimental-strip-types --test tests/tailoring.test.mjs",
+    "test:admin-tailoring": "node --experimental-strip-types --test tests/admin-tailoring.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
