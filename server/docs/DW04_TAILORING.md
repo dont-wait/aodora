@@ -7,8 +7,8 @@ Tài liệu kỹ thuật và hợp đồng API cho chức năng may đo theo Iss
 ## 1. Mục đích và phạm vi
 
 Issue #22 (DW-04) gồm 5 bước triển khai tuần tự:
-1. **Bước 1 (Hiện tại)**: API gửi yêu cầu may đo công khai (`POST /api/v1/tailoring-requests`), hỗ trợ khách vãng lai và khách có tài khoản; hợp đồng API và mapping schema.
-2. **Bước 2**: API quản trị may đo (admin list, filter status, paging, detail, update appointment/notes/measurements/status; xác nhận số đo chủ động `measurement_confirmed`).
+1. **Bước 1 (Xong)**: API gửi yêu cầu may đo công khai (`POST /api/v1/tailoring-requests`), hỗ trợ khách vãng lai và khách có tài khoản; hợp đồng API và mapping schema.
+2. **Bước 2 (Hiện tại)**: API quản trị may đo (admin list, filter status, paging, detail, update appointment/notes/measurements/status; xác nhận số đo chủ động `measurement_confirmed`).
 3. **Bước 3**: Admin tạo đơn custom (`orders.fulfillment_mode = custom`, liên kết `tailoring_request_id`, snapshot số đo, chốt giá, không trừ tồn kho sẵn, chống tạo trùng khi retry).
 4. **Bước 4**: Tích hợp client (form GuidePage, nút tư vấn ở chi tiết áo, trang admin quản trị yêu cầu may đo).
 5. **Bước 5**: Nghiệm thu xuyên suốt, bằng chứng DB test, kiểm tra trình duyệt.
@@ -181,3 +181,105 @@ Phản hồi luôn kèm header `Cache-Control: no-store`.
 3. **Cơ chế chống gửi lặp (Retry)**:
    - Ở Bước 1 (tiếp nhận yêu cầu tư vấn may đo công khai), mỗi lần gửi sẽ tạo một document yêu cầu mới với ID riêng. Không bắt buộc `Idempotency-Key` hay token guest ở bước này để giữ luồng tư vấn đơn giản và thân thiện với khách hàng.
    - Cơ chế idempotency và chống tạo trùng đơn sẽ được áp dụng chặt chẽ ở Bước 3 khi admin tạo đơn custom từ yêu cầu may đo.
+
+---
+
+# Bước 2 — API Quản Trị Yêu Cầu May Đo
+
+## 7. Route, Quyền Truy Cập, Phản Hồi Chung
+
+Dùng lại guard của admin catalog/order (#20): cookie phiên hợp lệ + vai trò `admin`. Preflight do `OPTIONS /api/v1/admin/{path...}` đã có, không đăng ký trùng.
+
+| Method | Path | Mục đích |
+| --- | --- | --- |
+| GET | `/api/v1/admin/tailoring-requests` | Danh sách, lọc `status`, phân trang |
+| GET | `/api/v1/admin/tailoring-requests/{id}` | Chi tiết |
+| PATCH | `/api/v1/admin/tailoring-requests/{id}` | Sửa một phần ghi chú/lịch hẹn/phụ trách/kênh liên hệ/số đo |
+| PATCH | `/api/v1/admin/tailoring-requests/{id}/status` | Chuyển trạng thái (bảng 7.4) |
+| POST | `/api/v1/admin/tailoring-requests/{id}/confirm-measurements` | Chốt số đo (thao tác chủ động) |
+
+- Guest hoặc khách thường ⇒ `403 ADMIN_REQUIRED`; Origin không hợp lệ ⇒ `403 ORIGIN_FORBIDDEN`. Mọi phản hồi có `Cache-Control: no-store`.
+- Thành công trả `{"data": <DTO>}` (list: `{"data":[...], "total", "page", "page_size"}`).
+- Body JSON object, tối đa 16 KiB, `Content-Type: application/json`, **từ chối field lạ** (`DisallowUnknownFields`, kể cả trong `measurements`) và dữ liệu thừa.
+
+### 7.1. DTO admin
+
+`id`, `customer_id` (null nếu khách vãng lai), `is_guest`, `full_name`, `phone`, `preferred_contact`, `category_id`, `product_id`, `product_slug`, `measurements` (`body` + bảy `_cm`, chỉ có key đã nhập), `notes`, `status`, `appointment_at`, `assigned_staff`, `created_at`, `updated_at`, `allowed_actions`.
+
+`allowed_actions` do server tính **chỉ để UI hiển thị**; mọi thao tác vẫn được kiểm tra lại khi thực thi:
+
+| Action | Điều kiện hiển thị |
+| --- | --- |
+| `update` | luôn có |
+| `update_measurements` | status chưa khóa số đo (`submitted`, `contacted`, `consultation_scheduled`) |
+| `contact` | `submitted` (→ `contacted`) |
+| `schedule` | `contacted` (→ `consultation_scheduled`) |
+| `confirm_measurements` | `contacted`/`consultation_scheduled` **và** đủ bảy `_cm` |
+| `start` | `measurement_confirmed` (→ `in_progress`) |
+| `complete` | `in_progress` (→ `completed`) |
+| `cancel` | mọi status trừ `completed`/`cancelled` |
+
+## 7.2. `GET /api/v1/admin/tailoring-requests`
+
+Query: `status` (đúng 7 enum, rỗng/lạ ⇒ 400 `INVALID_FIELD`), `page` (≥1, tối đa 100000, mặc định 1), `page_size` (≥1, tối đa 100, mặc định 20). Tham số lặp hoặc không hỗ trợ ⇒ 400. Sắp xếp `created_at` giảm dần rồi `_id` giảm dần để trang ổn định khi trùng `created_at`.
+
+## 7.3. `PATCH /api/v1/admin/tailoring-requests/{id}`
+
+Chỉ gửi các key cần đổi; key vắng = giữ nguyên; `null` = xóa. Body rỗng `{}` ⇒ 400. **Không nhận** `status`, `customer_id`, `created_at`, `updated_at` (field lạ ⇒ 400).
+
+| Field | Kiểu | Quy tắc |
+| --- | --- | --- |
+| `notes` | string/null | trim, tối đa 2000; chuỗi trắng = xóa |
+| `appointment_at` | string RFC3339/null | lưu UTC; `null` xóa lịch hẹn |
+| `assigned_staff` | string/null | trim, tối đa 200; chuỗi trắng = xóa |
+| `preferred_contact` | `phone`/`zalo`/null | null xóa (schema không cho null nên server `$unset`) |
+| `measurements` | object | gộp từng key vào số đo hiện có: `body` (string/null, ≤500) và bảy `_cm` (số > 0, ≤ 500, giữ nguyên số thập phân, `null` xóa riêng số đó). Thiếu không bao giờ thành 0; còn lại rỗng ⇒ xóa cả `measurements` |
+
+Sửa `measurements` khi status là `measurement_confirmed`, `in_progress`, `completed`, `cancelled` ⇒ **409 `MEASUREMENT_LOCKED`**. Đây là giới hạn đã chấp nhận: chưa có luồng mở lại số đo. Các field khác (ghi chú, lịch hẹn...) vẫn sửa được ở mọi status.
+
+## 7.4. `PATCH .../{id}/status` — bảng chuyển trạng thái
+
+Body `{"status": "<enum>"}`.
+
+| Từ \ Đến | `contacted` | `consultation_scheduled` | `in_progress` | `completed` | `cancelled` |
+| --- | --- | --- | --- | --- | --- |
+| `submitted` | ✔ | ✘ | ✘ | ✘ | ✔ |
+| `contacted` | = | ✔ | ✘ | ✘ | ✔ |
+| `consultation_scheduled` | ✘ | = | ✘ | ✘ | ✔ |
+| `measurement_confirmed` | ✘ | ✘ | ✔ | ✘ | ✔ |
+| `in_progress` | ✘ | ✘ | = | ✔ | ✔ |
+| `completed` | ✘ | ✘ | ✘ | = | ✘ |
+| `cancelled` | ✘ | ✘ | ✘ | ✘ | = |
+
+- `=`: đích trùng hiện tại ⇒ no-op, `200`, không ghi.
+- ✘ (lùi, nhảy cóc, rời trạng thái cuối) ⇒ `409 TAILORING_STATE_CONFLICT`.
+- `measurement_confirmed` làm đích ⇒ `400 INVALID_FIELD` (`status`), chỉ đặt được qua `confirm-measurements`.
+- `in_progress` **chỉ** từ `measurement_confirmed` (quyết định: chỉ thực hiện may sau khi chốt số đo).
+- Giá trị ngoài 7 enum ⇒ 400.
+
+## 7.5. `POST .../{id}/confirm-measurements`
+
+Body bắt buộc `{"confirmed": true}` (thiếu/false/không phải boolean ⇒ 400). Không bao giờ tự chạy khi form đủ số.
+- Status phải là `contacted` hoặc `consultation_scheduled`, ngược lại `409 TAILORING_STATE_CONFLICT`.
+- Phải đủ bảy `_cm` dương, thiếu ⇒ `409 MEASUREMENT_INCOMPLETE` (không ghi gì). `body` không bắt buộc.
+- Thành công ghi `measurement_confirmed`. Gọi lại khi đã `measurement_confirmed` ⇒ no-op `200` (retry an toàn).
+
+## 7.6. Lỗi
+
+| HTTP | Code | Khi nào |
+| --- | --- | --- |
+| 400 | `INVALID_FIELD` / `INVALID_BODY` | query/body/enum/số đo/RFC3339 không hợp lệ, field lạ |
+| 403 | `ADMIN_REQUIRED` / `ORIGIN_FORBIDDEN` | không phải admin / Origin sai |
+| 404 | `NOT_FOUND` | id sai định dạng hoặc không tồn tại |
+| 409 | `TAILORING_STATE_CONFLICT` | chuyển trạng thái không hợp lệ, hoặc tranh chấp ghi kéo dài |
+| 409 | `MEASUREMENT_LOCKED` | sửa số đo khi đã khóa |
+| 409 | `MEASUREMENT_INCOMPLETE` | chốt số đo khi chưa đủ bảy `_cm` |
+| 503 | `TAILORING_UNAVAILABLE` | lỗi hạ tầng (không rò chi tiết; log chỉ ghi kiểu lỗi) |
+
+## 7.7. Ghi đồng thời
+
+Mọi ghi dùng điều kiện trên `status` và `updated_at` đã đọc (`UpdateOne` với filter `{_id, status, updated_at}`). Nếu không khớp (admin khác vừa sửa), service đọc lại, tính lại trên dữ liệu mới và thử lại tối đa 3 lần; hết lượt ⇒ 409 `TAILORING_STATE_CONFLICT`. Nhờ đó hai admin sửa hai field khác nhau cùng lúc đều được giữ, còn hai chuyển trạng thái xung đột thì chỉ một thắng. `updated_at` luôn tăng (làm tròn mili-giây, tối thiểu +1 ms).
+
+## 7.8. Index
+
+`tailoring_requests` có `ix_tailoring_requests_status_created {status:1, created_at:-1}` phục vụ lọc theo status. Danh sách **không lọc** sắp theo `created_at, _id` không có index riêng (quét + sắp xếp trong bộ nhớ); với quy mô cửa hàng hiện tại chấp nhận được, nếu cần index `{created_at:-1,_id:-1}` thì phải thêm migration mới (chưa làm, xem result.md "Chưa chắc").
