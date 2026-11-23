@@ -16,6 +16,7 @@ import (
 	customerapp "github.com/your-org/aodora/server/internal/application/customer"
 	"github.com/your-org/aodora/server/internal/application/health"
 	orderapp "github.com/your-org/aodora/server/internal/application/order"
+	tailoringapp "github.com/your-org/aodora/server/internal/application/tailoring"
 	"github.com/your-org/aodora/server/internal/config"
 	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
@@ -84,6 +85,12 @@ func main() {
 	orderAdminService := orderapp.NewAdminService(orderRepo)
 	orderService := orderapp.NewService(orderRepo, orderRepo, quoteSigner, cfg.Order.QuoteTTL, cfg.Order.CODShippingFee, nil, nil)
 
+	tailoringRepo := catalogMongo.NewTailoringRepository(db.DB)
+	tailoringService := tailoringapp.NewService(tailoringRepo)
+	tailoringAdminService := tailoringapp.NewAdminService(tailoringRepo)
+	tailoringOrderService := tailoringapp.NewCustomOrderService(tailoringRepo, tailoringRepo,
+		catalogMongo.NewTailoringOrderRepository(db.Client, db.DB), cfg.Order.CODShippingFee, orderapp.DefaultOrderNumber)
+
 	authGuard := httpapi.NewAuthGuard(authService, httpapi.AuthCookieConfig{
 		Name: cfg.Auth.CookieName, Secure: cfg.Auth.CookieSecure, TTL: cfg.Auth.SessionTTL, AllowedOrigin: cfg.Auth.AllowedOrigin,
 	})
@@ -96,7 +103,10 @@ func main() {
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithOrders(orderService, authGuard, *log),
-			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
+			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithTailoring(tailoringService, authGuard, *log),
+			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithAdminTailoringOrders(tailoringOrderService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN"))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

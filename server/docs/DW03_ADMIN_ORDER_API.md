@@ -2,6 +2,8 @@
 
 UI checkout/đơn/admin và bằng chứng chạy thử issue #21: [DW03_CHECKOUT_UI.md](DW03_CHECKOUT_UI.md).
 
+Đơn may đo (custom) tạo từ yêu cầu may đo và bằng chứng chạy thử issue #22: [DW04_TAILORING.md](DW04_TAILORING.md).
+
 Phạm vi: backend quản trị đơn, giao nhận, hủy/hoàn tồn và ghi nhận thu/hoàn đủ tiền. Chưa có UI admin (issue #21). API khách và DTO của [DW02_ORDER_API.md](DW02_ORDER_API.md) giữ nguyên.
 
 Nguồn: `internal/interfaces/http/admin_order_handler.go`, `internal/application/order/admin.go`, `internal/domain/order/admin.go`, `internal/infrastructure/mongo/order_repository.go`; wiring tại `cmd/api/main.go`.

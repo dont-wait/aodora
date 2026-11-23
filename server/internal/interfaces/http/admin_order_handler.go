@@ -58,28 +58,32 @@ func WithAdminOrders(service AdminOrderService, authorize AdminAuthorizer, log z
 
 type adminOrderItemDTO struct {
 	orderItemResponseDTO
-	FulfillmentMode string `json:"fulfillment_mode"`
+	FulfillmentMode string                `json:"fulfillment_mode"`
+	Measurements    *adminMeasurementsDTO `json:"measurements,omitempty"`
 }
 
 type adminOrderDTO struct {
 	orderDTO
-	Items                []adminOrderItemDTO `json:"items"`
-	UpdatedAt            time.Time           `json:"updated_at"`
-	CustomerID           string              `json:"customer_id,omitempty"`
-	IsGuest              bool                `json:"is_guest"`
-	CancelledAt          *time.Time          `json:"cancelled_at,omitempty"`
-	InventoryRestock     string              `json:"inventory_restock,omitempty"`
-	InventoryRestockedAt *time.Time          `json:"inventory_restocked_at,omitempty"`
-	PaidAt               *time.Time          `json:"paid_at,omitempty"`
-	RefundedAt           *time.Time          `json:"refunded_at,omitempty"`
-	AllowedActions       []string            `json:"allowed_actions"`
+	Items                []adminOrderItemDTO   `json:"items"`
+	UpdatedAt            time.Time             `json:"updated_at"`
+	FulfillmentMode      string                `json:"fulfillment_mode,omitempty"`
+	TailoringRequestID   string                `json:"tailoring_request_id,omitempty"`
+	MeasurementProfile   *adminMeasurementsDTO `json:"measurement_profile,omitempty"`
+	CustomerID           string                `json:"customer_id,omitempty"`
+	IsGuest              bool                  `json:"is_guest"`
+	CancelledAt          *time.Time            `json:"cancelled_at,omitempty"`
+	InventoryRestock     string                `json:"inventory_restock,omitempty"`
+	InventoryRestockedAt *time.Time            `json:"inventory_restocked_at,omitempty"`
+	PaidAt               *time.Time            `json:"paid_at,omitempty"`
+	RefundedAt           *time.Time            `json:"refunded_at,omitempty"`
+	AllowedActions       []string              `json:"allowed_actions"`
 }
 
 func toAdminOrderDTO(o domain.Order) adminOrderDTO {
 	base := toOrderDTO(o)
 	items := make([]adminOrderItemDTO, len(o.Items))
 	for i, it := range o.Items {
-		items[i] = adminOrderItemDTO{orderItemResponseDTO: base.Items[i], FulfillmentMode: it.FulfillmentMode}
+		items[i] = adminOrderItemDTO{orderItemResponseDTO: base.Items[i], FulfillmentMode: it.FulfillmentMode, Measurements: toMeasurementsDTO(it.Measurements)}
 	}
 	actions := make([]string, 0, 5)
 	for _, next := range []struct{ target, action string }{{domain.StatusConfirmed, "confirm"}, {domain.StatusShipping, "ship"}, {domain.StatusDelivered, "deliver"}} {
@@ -101,7 +105,7 @@ func toAdminOrderDTO(o domain.Order) adminOrderDTO {
 	if domain.NextPaymentAllowed(o.PaymentStatus, domain.PaymentRefunded) && o.PaymentStatus != domain.PaymentRefunded {
 		actions = append(actions, "mark_refunded")
 	}
-	return adminOrderDTO{orderDTO: base, Items: items, UpdatedAt: o.UpdatedAt, CustomerID: o.CustomerID, IsGuest: o.CustomerID == "", CancelledAt: o.CancelledAt, InventoryRestock: o.InventoryRestock, InventoryRestockedAt: o.InventoryRestockedAt, PaidAt: o.PaidAt, RefundedAt: o.RefundedAt, AllowedActions: actions}
+	return adminOrderDTO{orderDTO: base, Items: items, FulfillmentMode: o.FulfillmentMode, TailoringRequestID: o.TailoringRequestID, MeasurementProfile: toMeasurementsDTO(o.MeasurementProfile), UpdatedAt: o.UpdatedAt, CustomerID: o.CustomerID, IsGuest: o.CustomerID == "", CancelledAt: o.CancelledAt, InventoryRestock: o.InventoryRestock, InventoryRestockedAt: o.InventoryRestockedAt, PaidAt: o.PaidAt, RefundedAt: o.RefundedAt, AllowedActions: actions}
 }
 
 func decodeAdminOrderBody(w http.ResponseWriter, r *http.Request, dst any, optional bool) bool {
@@ -263,4 +267,12 @@ func (h adminOrderHandler) respondError(w http.ResponseWriter, err error) {
 		h.log.Error().Str("error_type", fmt.Sprintf("%T", err)).Msg("admin order request failed")
 		respondError(w, 503, "ORDER_UNAVAILABLE", "", "Dịch vụ đơn hàng tạm thời không khả dụng")
 	}
+}
+
+func toMeasurementsDTO(m *domain.MeasurementProfile) *adminMeasurementsDTO {
+	if m == nil {
+		return nil
+	}
+	return &adminMeasurementsDTO{Body: m.Body, NeckCM: m.NeckCM, BustCM: m.BustCM, WaistCM: m.WaistCM, HipsCM: m.HipsCM,
+		ShoulderCM: m.ShoulderCM, SleeveCM: m.SleeveCM, GarmentLengthCM: m.GarmentLengthCM}
 }

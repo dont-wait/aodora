@@ -474,6 +474,7 @@ func decodeOrder(doc bson.M) (domainorder.Order, error) {
 			return domainorder.Order{}, fmt.Errorf("decode item unit_price: %w", err)
 		}
 		items = append(items, domainorder.OrderItem{
+			Measurements:    decodeMeasurementProfile(itDoc["measurements"]),
 			FulfillmentMode: asString(itDoc["fulfillment_mode"]),
 			ProductID:       asID(itDoc["product_id"]),
 			ProductName:     asString(itDoc["product_name"]),
@@ -500,7 +501,15 @@ func decodeOrder(doc bson.M) (domainorder.Order, error) {
 	createdAt := asTime(doc["created_at"])
 	updatedAt := asTime(doc["updated_at"])
 
+	tailoringID := ""
+	if doc["tailoring_request_id"] != nil {
+		tailoringID = asID(doc["tailoring_request_id"])
+	}
+
 	return domainorder.Order{
+		FulfillmentMode:      asString(doc["fulfillment_mode"]),
+		TailoringRequestID:   tailoringID,
+		MeasurementProfile:   decodeMeasurementProfile(doc["measurement_profile"]),
 		CancelledAt:          optionalOrderTime(doc, "cancelled_at"),
 		InventoryRestock:     asString(doc["inventory_restock"]),
 		InventoryRestockedAt: optionalOrderTime(doc, "inventory_restocked_at"),
@@ -844,4 +853,29 @@ func optionalOrderTime(doc bson.M, key string) *time.Time {
 	}
 	t := asTime(doc[key])
 	return &t
+}
+
+func optionalFloat(value any) *float64 {
+	switch value.(type) {
+	case int32, int64, float64, bson.Decimal128:
+		f := asFloat64(value)
+		return &f
+	}
+	return nil
+}
+
+func decodeMeasurementProfile(value any) *domainorder.MeasurementProfile {
+	m := asMap(value)
+	if len(m) == 0 {
+		return nil
+	}
+	p := &domainorder.MeasurementProfile{
+		NeckCM: optionalFloat(m["neck_cm"]), BustCM: optionalFloat(m["bust_cm"]), WaistCM: optionalFloat(m["waist_cm"]),
+		HipsCM: optionalFloat(m["hips_cm"]), ShoulderCM: optionalFloat(m["shoulder_cm"]),
+		SleeveCM: optionalFloat(m["sleeve_cm"]), GarmentLengthCM: optionalFloat(m["garment_length_cm"]),
+	}
+	if s, ok := m["body"].(string); ok {
+		p.Body = &s
+	}
+	return p
 }
