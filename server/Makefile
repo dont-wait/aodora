@@ -89,6 +89,7 @@ sumire-env:
 	@test -f .env || { cp .env.example .env && echo "Created .env from .env.example (local defaults)"; }
 
 sumire-import: sumire-env
+	go run ./cmd/importsumire -verify-target
 	$(MAKE) sumire-check
 	$(MAKE) infra-up
 	$(MAKE) migrate-up

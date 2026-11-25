@@ -58,11 +58,12 @@ func TestHTMLToTextDropsBoilerplate(t *testing.T) {
 
 func TestHTMLToTextTruncates(t *testing.T) {
 	long := strings.Repeat("<p>"+strings.Repeat("a", 400)+"</p>", 5)
-	if n := len([]rune(htmlToText(long))); n > maxDescription {
-		t.Fatalf("description too long: %d", n)
+	got := htmlToText(long)
+	if n := len([]rune(got)); n > maxDescription || n < 400 || !strings.HasPrefix(got, strings.Repeat("a", 400)) {
+		t.Fatalf("multiline description must keep leading lines within the limit, got %d runes", n)
 	}
-	if got := htmlToText("<p>" + strings.Repeat("b", 5000) + "</p>"); len([]rune(got)) != maxDescription {
-		t.Fatalf("single long line must be cut to %d runes, got %d", maxDescription, len([]rune(got)))
+	if single := htmlToText("<p>" + strings.Repeat("b", 5000) + "</p>"); len([]rune(single)) != maxDescription {
+		t.Fatalf("single long line must be cut to %d runes, got %d", maxDescription, len([]rune(single)))
 	}
 }
 
@@ -183,9 +184,27 @@ func TestDuplicateSKUIsRenamedStably(t *testing.T) {
 	if first != "AD000041AA" || second == first || !strings.HasPrefix(second, "AD000041AA-") || len(p.Warnings) == 0 {
 		t.Fatalf("sku collision not handled: %v %v %v", first, second, p.Warnings)
 	}
+	seen := map[string]bool{}
+	for _, doc := range p.Products {
+		for _, v := range doc["variants"].([]bson.M) {
+			sku := v["sku"].(string)
+			if seen[sku] {
+				t.Fatalf("duplicate variant SKU left in plan: %s", sku)
+			}
+			seen[sku] = true
+		}
+	}
+	if p.Products[0]["sku"] == p.Products[1]["sku"] {
+		t.Fatalf("product-level SKU still duplicated: %v", p.Products[1]["sku"])
+	}
 	again, _ := buildPlan([]srcProduct{a, b}, "http://x/b", 5, time.Now())
-	if again.Products[1]["variants"].([]bson.M)[0]["sku"] != second {
-		t.Fatal("renamed SKU is not stable across runs")
+	for i := range p.Products {
+		got, want := again.Products[i]["variants"].([]bson.M), p.Products[i]["variants"].([]bson.M)
+		for j := range want {
+			if got[j]["sku"] != want[j]["sku"] {
+				t.Fatalf("renamed SKU %v is not stable across runs (%v)", want[j]["sku"], got[j]["sku"])
+			}
+		}
 	}
 }
 
@@ -248,16 +267,83 @@ func TestValidateImagesChecksMagicBytes(t *testing.T) {
 
 func TestIsLocalMongo(t *testing.T) {
 	for uri, want := range map[string]bool{
-		"mongodb://aodora:aodora@localhost:27017/?authSource=admin": true,
-		"mongodb://127.0.0.1:27017":                                 true,
-		"mongodb://[::1]:27017/db":                                  true,
-		"mongodb://u:p@db.prod.example.com:27017/":                  false,
-		"mongodb://localhost:27017,remote.example.com:27017/":       false,
-		"mongodb+srv://u:p@cluster0.abc.mongodb.net/":               false,
+		"mongodb://localhost:27017/?authSource=admin":         true,
+		"mongodb://devuser@localhost:27017/?authSource=admin": true,
+		"mongodb://127.0.0.1:27017":                           true,
+		"mongodb://[::1]:27017/db":                            true,
+		"mongodb://devuser@db.prod.example.com:27017/":        false,
+		"mongodb://localhost:27017,remote.example.com:27017/": false,
+		"mongodb+srv://cluster0.abc.mongodb.net/":             false,
 		"": false,
 	} {
 		if got := isLocalMongo(uri); got != want {
 			t.Errorf("isLocalMongo(%q) = %v, want %v", uri, got, want)
 		}
+	}
+}
+
+func TestImagesSortedByOrderAndNoStory(t *testing.T) {
+	s := sample()
+	s.Images = []srcImage{{Order: 2, File: "02.jpg"}, {Order: 1, File: "01.png"}}
+	p, err := buildPlan([]srcProduct{s}, "http://x/b", 5, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := p.Products[0]
+	if got := doc["image"].(bson.M)["src"]; got != "http://x/b/catalog/sumire/ao-dai-van-hoa-do/01.png" {
+		t.Fatalf("cover image must be order 1, got %v", got)
+	}
+	if _, has := doc["story"]; has {
+		t.Fatal("description must not be duplicated into the story tab")
+	}
+}
+
+func TestOptionsUsePositionNotArrayIndex(t *testing.T) {
+	s := sample()
+	// Listed in reverse array order; Position says size is option1.
+	s.Options = []srcOption{{Name: "Màu sắc", Position: 2}, {Name: "Kích thước", Position: 1}}
+	s.Variants = []srcVariant{{SKU: "X1A", Option1: ptr("Size A"), Option2: ptr("Đỏ"), Price: "100000", Available: true}}
+	p, err := buildPlan([]srcProduct{s}, "http://x/b", 5, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := p.Products[0]["variants"].([]bson.M)[0]
+	if v["size"] != "A" || v["color"] != "Đỏ" {
+		t.Fatalf("options resolved by array index instead of position: %v", v)
+	}
+}
+
+func TestVariantPricesKeptAndWarned(t *testing.T) {
+	s := sample()
+	s.Variants[0].Price, s.Variants[1].Price = "680000", "880000"
+	s.Variants[0].CompareAtPrice = nil
+	p, err := buildPlan([]srcProduct{s}, "http://x/b", 5, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vs := p.Products[0]["variants"].([]bson.M)
+	if p.Products[0]["price"] != int64(680000) || vs[0]["price"] != int64(680000) || vs[1]["price"] != int64(880000) {
+		t.Fatalf("variant prices lost: %v", vs)
+	}
+	found := false
+	for _, w := range p.Warnings {
+		found = found || strings.Contains(w, "different prices")
+	}
+	if !found {
+		t.Fatalf("missing different-price warning: %v", p.Warnings)
+	}
+}
+
+func TestJPEGExtensionIsRejected(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "h", "01.jpeg")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, make([]byte, 12)...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateImages([]imageRef{{"h", "01.jpeg"}}, dir); err == nil {
+		t.Fatal(".jpeg is not synced by rustfs-sumire and must be rejected")
 	}
 }

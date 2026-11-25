@@ -99,7 +99,7 @@ Không dùng 1 danh mục chung. Suy từ `tags` và tên (hằng số trong `ca
 | `name` | `title` |
 | `slug`, `sku` | 5.1 |
 | `category_id` | 5.2 |
-| `collection` | `"Sumire Store"` hoặc tag bộ sưu tập (`bst-*`) nếu có |
+| `collection` | Cố định `"Sumire Store"` (tag `bst-*` là mã nội bộ, không đẹp để hiển thị) |
 | `description` | `body_html` chuyển sang text thuần (bỏ thẻ, `&nbsp;`, dòng `____`); giữ đoạn đầu mô tả, tối đa ~1000 ký tự |
 | `material` | Chỉ lấy khi có nhãn rõ: `Chất liệu: X` hoặc mục `[Chất liệu]` + dòng kế tiếp (cắt tại `: , . ;`). Không đoán từ văn xuôi; không có nhãn thì bỏ field (≈183/220 có) |
 | `price` | giá variant (VND nguyên) |
@@ -109,14 +109,14 @@ Không dùng 1 danh mục chung. Suy từ `tags` và tên (hằng số trong `ca
 | `images[]` | danh sách URL (field legacy mà seed đang ghi) |
 | `colors[]` | giá trị option "Màu sắc" → `{name, hex}`; hex = từ màu xuất hiện **sớm nhất** trong tên ("Nền trắng hoa tím" → trắng), bảng trong `catalog.go`; tên riêng như "Nguyệt Mai" dùng `#CCCCCC` và in cảnh báo |
 | `sizes[]` | giá trị option "Kích thước", chuẩn hóa về `AA/A/B/C/D` (bỏ tiền tố "Size ", bỏ tên mẫu như "Tú Trân / ") |
-| `variants[]` | `{sku, size, color, stock}` mỗi variant Shopify |
+| `variants[]` | `{sku, size, color, stock, price}` mỗi variant Shopify. Option size/màu lấy theo `position` của option, không theo thứ tự mảng. `price` theo từng variant; `price` sản phẩm = giá thấp nhất (chỉ 1 sản phẩm có giá khác nhau, có cảnh báo khi import) |
 | `stock` | tổng `variants[].stock` |
 | `is_active` | true, trừ khi theo 5.4 |
 | `badge`/`tag` | `tag` "Ngừng sản xuất" nếu có `vd-ngung-sx` (5.4); không bịa badge khác |
 | `source_url`, `seed_source` | `source_url` từ manifest; `seed_source="sumire-store"` |
 | `created_at`, `updated_at` | thời điểm import |
 
-Không điền `rating`, `review_count`, `story`, `fabric`, `craft`, `accessories`, `trust` bằng nội dung bịa. Nếu validator bắt buộc, dùng giá trị rỗng/mặc định trung tính (kiểm tra ở 6).
+Không điền `story`: mô tả sản phẩm nằm ở `description`, không nhân đôi thành tab "Câu chuyện tác phẩm". Ảnh được sắp theo `order`. Chỉ nhận đuôi `png/jpg/webp` (`.jpeg` bị từ chối vì `rustfs-sumire` không sync). Không điền `rating`, `review_count`, `story`, `fabric`, `craft`, `accessories`, `trust` bằng nội dung bịa. Nếu validator bắt buộc, dùng giá trị rỗng/mặc định trung tính (kiểm tra ở 6).
 
 ### 5.4 Tồn kho và trạng thái
 
@@ -138,7 +138,8 @@ Nếu sau này validator bị siết, thêm migration **mới** theo quy trình 
 
 - Kết thúc in bảng: sản phẩm thêm / bỏ qua (đã có) / bị loại (+lý do), ảnh upload / bỏ qua / lỗi, cảnh báo màu thiếu hex, sản phẩm chưa suy ra được size.
 - Lỗi dữ liệu (handle sai/trùng, thiếu ảnh/file, giá sai, slug bị bản ghi khác chiếm) làm lệnh dừng với exit 1 **trước khi ghi gì**; chạy lại an toàn.
-- `MONGO_URI` không phải localhost (mọi host) bị từ chối khi không có `-allow-remote`, kể cả `-purge`.
+- `MONGO_URI` không phải localhost (mọi host) bị từ chối khi không có `-allow-remote`, kể cả `-purge`. `make sumire-import` kiểm tra điều này **trước** `migrate-up` (`importsumire -verify-target`). `-purge` không dùng chung được với `-dry-run`; `-default-stock` tối đa 100000.
+- Giới hạn đã biết (dev tool, chạy tuần tự một người): ghi theo từng document, không transaction (chạy lại để hoàn tất nếu bị ngắt); `-update` không tăng `version` và không chống ghi chồng giữa hai snapshot catalog khác nhau.
 - Không log credential. Không commit `seeds/sumire/`, `.env`.
 - Các bước ảnh/DB không nằm trong một transaction; thứ tự: ảnh trước, DB sau để DB không bao giờ trỏ tới ảnh chưa có.
 

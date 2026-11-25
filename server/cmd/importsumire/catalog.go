@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -242,10 +243,15 @@ func colorHex(name string) (string, bool) {
 	return best, true
 }
 
+// optionIndex returns the 0-based variant option slot (option1..3) for the named option,
+// using its Shopify Position rather than its place in the array.
 func optionIndex(options []srcOption, names ...string) int {
 	for i, o := range options {
 		for _, n := range names {
 			if strings.EqualFold(strings.TrimSpace(o.Name), n) {
+				if o.Position > 0 {
+					return o.Position - 1
+				}
 				return i
 			}
 		}
@@ -306,6 +312,7 @@ func buildPlan(items []srcProduct, baseURL string, defaultStock int64, now time.
 				unique := sku + "-" + stableID("sku", p.Handle).Hex()[:6]
 				warnings = append(warnings, fmt.Sprintf("%s: SKU %q already used by %s, renamed %q", p.Handle, sku, owner, unique))
 				v["sku"], sku = unique, unique
+				doc["sku"] = productSKU(doc["variants"].([]bson.M))
 				if skus[sku] != "" {
 					return out, fmt.Errorf("%s: SKU %q still duplicated", p.Handle, sku)
 				}
@@ -346,8 +353,10 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 	sizeIdx := optionIndex(p.Options, "Kích thước", "Size")
 	colorIdx := optionIndex(p.Options, "Màu sắc", "Color")
 
+	srcImages := slices.Clone(p.Images)
+	slices.SortStableFunc(srcImages, func(a, b srcImage) int { return a.Order - b.Order })
 	images, urls := []bson.M{}, []string{}
-	for i, im := range p.Images {
+	for i, im := range srcImages {
 		if im.File == "" {
 			return nil, nil, fmt.Errorf("image %d has no file", im.Order)
 		}
@@ -394,7 +403,7 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 			sku = fmt.Sprintf("SUMIRE-%s-%d", strings.ToUpper(p.Handle), i+1)
 		}
 		stock += n
-		variants = append(variants, bson.M{"sku": sku, "size": size, "color": color, "stock": n})
+		variants = append(variants, bson.M{"sku": sku, "size": size, "color": color, "stock": n, "price": vp})
 		if size != "" && !seenSize[size] {
 			seenSize[size] = true
 			sizes = append(sizes, size)
@@ -403,6 +412,9 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 			seenColor[color] = true
 			colorNames = append(colorNames, color)
 		}
+	}
+	if price != maxVariantPrice(variants) {
+		warnings = append(warnings, fmt.Sprintf("%s: variants have different prices; product price is the lowest (%d), each variant keeps its own `price`", p.Handle, price))
 	}
 	colors := []bson.M{}
 	for _, name := range colorNames {
@@ -431,9 +443,6 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 	if m := extractMaterial(description); m != "" {
 		doc["material"] = m
 	}
-	if description != "" {
-		doc["story"] = bson.M{"title": strings.TrimSpace(p.Title), "paragraphs": strings.Split(description, "\n"), "image": images[0]}
-	}
 	for _, t := range p.Tags {
 		if strings.EqualFold(strings.TrimSpace(t), discontinuedTag) {
 			doc["is_active"] = false
@@ -442,6 +451,16 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 		}
 	}
 	return doc, warnings, nil
+}
+
+func maxVariantPrice(variants []bson.M) int64 {
+	var max int64
+	for _, v := range variants {
+		if p := v["price"].(int64); p > max {
+			max = p
+		}
+	}
+	return max
 }
 
 // productSKU strips the size suffix from the first variant SKU, e.g. AD000041AA/AA -> AD000041.

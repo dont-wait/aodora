@@ -23,10 +23,10 @@ import (
 )
 
 type importOptions struct {
-	catalogPath, assetsPath                        string
-	check, dryRun, update, allowRemote, purge, yes bool
-	limit                                          int
-	defaultStock                                   int64
+	catalogPath, assetsPath                                      string
+	check, dryRun, update, allowRemote, purge, yes, verifyTarget bool
+	limit                                                        int
+	defaultStock                                                 int64
 }
 
 func main() {
@@ -46,14 +46,29 @@ func run() error {
 	flag.BoolVar(&o.allowRemote, "allow-remote", false, "allow a MONGO_URI that is not localhost")
 	flag.BoolVar(&o.purge, "purge", false, "delete documents created by this importer (needs -yes)")
 	flag.BoolVar(&o.yes, "yes", false, "confirm -purge")
+	flag.BoolVar(&o.verifyTarget, "verify-target", false, "only verify MONGO_URI is localhost (used by make before migrating)")
 	flag.IntVar(&o.limit, "limit", 0, "import only the first N products (0 = all)")
 	flag.Int64Var(&o.defaultStock, "default-stock", 5, "stock given to each available variant (source has no quantities)")
 	flag.Parse()
-	if o.defaultStock < 0 || o.limit < 0 {
-		return fmt.Errorf("-default-stock and -limit must not be negative")
+	if o.defaultStock < 0 || o.defaultStock > maxDefaultStock || o.limit < 0 {
+		return fmt.Errorf("-default-stock must be 0..%d and -limit must not be negative", maxDefaultStock)
+	}
+	if o.purge && o.dryRun {
+		return fmt.Errorf("-purge cannot be combined with -dry-run: it would delete data")
 	}
 	if err := config.LoadEnv(); err != nil {
 		return err
+	}
+	if o.verifyTarget {
+		mongoConfig, err := config.LoadMongoConfig()
+		if err != nil {
+			return err
+		}
+		if !o.allowRemote && !isLocalMongo(mongoConfig.URI) {
+			return fmt.Errorf("MONGO_URI is not localhost: refusing to migrate or import dev data (use -allow-remote to override)")
+		}
+		fmt.Println("target database is local")
+		return nil
 	}
 	if o.purge {
 		if !o.yes {
@@ -119,7 +134,10 @@ func validateBaseURL(base string) error {
 	return nil
 }
 
-const maxImageBytes = 20 * 1024 * 1024
+const (
+	maxImageBytes   = 20 * 1024 * 1024
+	maxDefaultStock = 100000 // keeps per-product stock sums far from int64 overflow
+)
 
 // validateImages checks every referenced file exists, is non-empty, sane in size and its magic bytes match the extension.
 func validateImages(images []imageRef, assets string) error {
@@ -153,7 +171,7 @@ func magicMatches(ext string, head []byte) bool {
 	switch ext {
 	case ".png":
 		return bytes.HasPrefix(head, []byte("\x89PNG\r\n\x1a\n"))
-	case ".jpg", ".jpeg":
+	case ".jpg":
 		return bytes.HasPrefix(head, []byte{0xFF, 0xD8, 0xFF})
 	case ".webp":
 		return string(head[:4]) == "RIFF" && string(head[8:12]) == "WEBP"
@@ -219,7 +237,7 @@ func withDB(o importOptions, fn func(context.Context, *mongo.Database, importOpt
 }
 
 // updatable lists source-owned fields refreshed by -update. Stock, price and version are never in it.
-var updatable = []string{"name", "description", "material", "image", "gallery", "images", "colors", "source_url", "seed_source", "source_handle", "collection"}
+var updatable = []string{"name", "description", "material", "image", "gallery", "images", "colors", "source_url", "seed_source", "source_handle", "collection", "story"}
 
 func importPlan(ctx context.Context, db *mongo.Database, o importOptions, p plan) error {
 	categories, products := db.Collection("categories"), db.Collection("products")
