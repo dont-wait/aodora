@@ -56,3 +56,38 @@ Nếu đã upload ảnh, `go run ./cmd/seed` chỉ thêm dữ liệu catalog.
 
 Ảnh giữ nguyên nguồn Forher và dùng làm tài nguyên tham khảo cho demo.
 Trường `source_url` và `seed_source` được lưu cùng sản phẩm để đối chiếu.
+
+# Catalog áo dài Sumire Store (220 sản phẩm, ~1058 ảnh)
+
+Dữ liệu dev lớn hơn bộ Forher ở trên. **Hướng dẫn từng bước: [../docs/SUMIRE_CATALOG_SETUP.md](../docs/SUMIRE_CATALOG_SETUP.md).** Spec: [../../specs/migrate-data.md](../../specs/migrate-data.md).
+Ảnh và mô tả là của Sumire Store: chỉ dùng cho dev/demo nội bộ, không commit ảnh, không đưa lên môi trường công khai.
+
+## Lấy dữ liệu
+
+Tải thư mục Drive **aodora-ao-dai-images** (xin quyền từ chủ dự án) vào `server/seeds/sumire/` sao cho có:
+
+```
+seeds/sumire/catalog.json
+seeds/sumire/<handle>/01.png, 02.png ...
+```
+
+Hoặc cấu hình rclone remote tên `gdrive` rồi `make sumire-fetch`. `seeds/sumire/` đã được gitignore.
+
+## Nạp vào MongoDB + RustFS
+
+```bash
+make sumire-import      # check + mongo/rustfs + migrate-up + upload ảnh + import DB
+```
+
+Từng bước: `make sumire-check` (không đụng DB), `make sumire-images` (upload ảnh lên `s3://$RUSTFS_BUCKET/catalog/sumire/`), `go run ./cmd/importsumire`.
+
+Cờ của `importsumire`: `-dry-run`, `-update` (làm mới tên/mô tả/ảnh/màu, không đụng tồn kho/giá), `-limit N`, `-default-stock N` (mặc định 5), `-allow-remote`.
+`make sumire-purge` xóa dữ liệu do importer tạo (slug `sumire-*`), không xóa ảnh.
+
+## Quy ước dữ liệu
+
+- Chạy lại không tạo trùng, không ghi đè dữ liệu đã chỉnh tay.
+- Nguồn chỉ cho biết còn/hết hàng: biến thể còn hàng có tồn `5`, hết hàng `0` (giả lập).
+- 69 sản phẩm gắn `vd-ngung-sx` (ngừng sản xuất) được import với `is_active=false` nên không hiện ở catalog công khai.
+- 3 sản phẩm `product_type="Khác"` bị bỏ qua.
+- SKU trùng giữa các sản phẩm ở nguồn được thêm hậu tố để duy nhất.

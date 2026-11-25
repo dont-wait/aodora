@@ -6,7 +6,7 @@ export AODORA_MIGRATION_NAME := $(value name)
 export AODORA_LEGACY_FINGERPRINT := $(value legacy_fingerprint)
 unexport name MIGRATIONS_PATH legacy_fingerprint
 
-.PHONY: run build test test-migrations test-orders standalone-up test-orders-standalone transactions-up transactions-down test-integration fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
+.PHONY: sumire-env sumire-fetch sumire-check sumire-images sumire-import sumire-purge run build test test-migrations test-orders standalone-up test-orders-standalone transactions-up transactions-down test-integration fmt lint migrate-create migrate-adopt migrate-up migrate-down migrate-up-one infra-up infra-down storage-up storage-down seed-fetch seed-demo navicat-build navicat-up navicat-down
 
 run:
 	go run ./cmd/api
@@ -66,6 +66,37 @@ seed-demo:
 	$(MAKE) migrate-up
 	docker compose --profile seed run --rm rustfs-seed
 	go run ./cmd/seed
+
+# Sumire áo dài catalog (see ../specs/migrate-data.md). Data comes from the shared Drive folder.
+sumire-fetch:
+	@if command -v rclone >/dev/null 2>&1 && rclone listremotes | grep -q '^gdrive:$$'; then \
+		rclone copy "gdrive:aodora-ao-dai-images" seeds/sumire --progress; \
+	else \
+		echo "Download the Drive folder 'aodora-ao-dai-images' (catalog.json + one folder per product) into server/seeds/sumire/,"; \
+		echo "or configure an rclone remote named 'gdrive' and re-run. See seeds/README.md."; exit 1; \
+	fi
+
+sumire-check:
+	go run ./cmd/importsumire -check
+
+sumire-images:
+	docker compose up -d rustfs
+	docker compose run --rm rustfs-init
+	docker compose --profile sumire run --rm rustfs-sumire
+
+# MONGO_URI defaults to an unauthenticated URL, so a missing .env makes migrate/import fail with "requires authentication".
+sumire-env:
+	@test -f .env || { cp .env.example .env && echo "Created .env from .env.example (local defaults)"; }
+
+sumire-import: sumire-env
+	$(MAKE) sumire-check
+	$(MAKE) infra-up
+	$(MAKE) migrate-up
+	docker compose --profile sumire run --rm rustfs-sumire
+	go run ./cmd/importsumire
+
+sumire-purge:
+	go run ./cmd/importsumire -purge -yes
 
 navicat-build:
 	test -f "$(NAVICAT_APPIMAGE)"

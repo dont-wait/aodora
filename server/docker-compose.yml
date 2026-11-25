@@ -97,6 +97,30 @@ services:
         aws --endpoint-url http://rustfs:9000 s3 sync /seed "s3://$$RUSTFS_BUCKET/demo/forher/" \
           --exclude '*' --include '*.webp' --content-type image/webp --cache-control public,max-age=86400
 
+  # Uploads the Sumire catalog images (seeds/sumire, downloaded from Drive) to catalog/sumire/.
+  rustfs-sumire:
+    image: amazon/aws-cli:2.27.60
+    profiles: [sumire]
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-aodoraadmin}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-aodora-local-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-aodora-images}
+    volumes:
+      - ./seeds/sumire:/sumire:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for spec in png:image/png jpg:image/jpeg webp:image/webp; do
+          ext="$${spec%%:*}"; type="$${spec#*:}"
+          aws --endpoint-url http://rustfs:9000 s3 sync /sumire "s3://$$RUSTFS_BUCKET/catalog/sumire/" \
+            --exclude '*' --include "*.$$ext" --content-type "$$type" --cache-control public,max-age=86400
+        done
+
 volumes:
   mongo_data:
     # Preserve the existing Aodora MongoDB volume from the former "server" project.
