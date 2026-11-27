@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { findProvince, findWard, formatAddress, matchSavedAddress, normalizeName } from '../src/features/address/divisions.ts'
+import { searchOptions, foldName, findProvince, findWard, formatAddress, matchSavedAddress, normalizeName } from '../src/features/address/divisions.ts'
 import { orderDeliveryAddress } from '../src/features/orders/presentation.ts'
 
 const data = JSON.parse(readFileSync(new URL('../src/data/vn-divisions-2025.json', import.meta.url), 'utf8'))
@@ -78,4 +78,27 @@ test('orderDeliveryAddress uses formatAddress and only shows for COD', () => {
   const shipping_address = { recipient: 'A', phone: '1', line1: '1 A', ward: 'P1', district: 'Quận 3', city: 'HCM' }
   assert.equal(orderDeliveryAddress({ payment_method: 'cod', shipping_address }), '1 A, P1, Quận 3, HCM')
   assert.equal(orderDeliveryAddress({ payment_method: 'cash_at_counter', shipping_address }), null)
+})
+
+test('searchOptions: no diacritics, case-insensitive, substring, prefix-agnostic', () => {
+  const hcm = list.find((province) => province.name === 'Thành phố Hồ Chí Minh')
+  const options = hcm.wards.map((ward) => ({ value: ward.name, label: ward.name }))
+  for (const query of ['tan son nhat', 'Tân Sơn Nhất', 'TAN SON NHAT', 'phuong tan son nhat', 'Phường Tân Sơn']) {
+    assert.ok(searchOptions(options, query).some((option) => option.label === 'Phường Tân Sơn Nhất'), query)
+  }
+  assert.equal(searchOptions(options, 'zzzz không có').length, 0)
+})
+
+test('searchOptions: empty query returns all; prefix-start results come first', () => {
+  const options = [{ label: 'Phường Hòa Bình' }, { label: 'Xã Bình An' }, { label: 'Phường An Bình' }, { label: 'Xã Bình Tân' }]
+  assert.equal(searchOptions(options, '  ').length, 4)
+  assert.deepEqual(searchOptions(options, 'binh').map((option) => option.label), ['Xã Bình An', 'Xã Bình Tân', 'Phường Hòa Bình', 'Phường An Bình'])
+  assert.deepEqual(searchOptions(options, 'phuong an').map((option) => option.label), ['Phường An Bình'])
+})
+
+test('searchOptions finds provinces without diacritics; foldName keeps prefix', () => {
+  const options = list.map((province) => ({ label: province.name }))
+  assert.equal(searchOptions(options, 'ho chi minh')[0].label, 'Thành phố Hồ Chí Minh')
+  assert.equal(searchOptions(options, 'ha noi')[0].label, 'Thành phố Hà Nội')
+  assert.equal(foldName('Thành phố Đà Nẵng'), 'thanh pho da nang')
 })
