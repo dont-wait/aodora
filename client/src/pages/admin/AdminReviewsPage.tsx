@@ -18,8 +18,9 @@ import { orderPageCount } from '@/features/orders/read'
 import { useOrderRead } from '@/features/orders/useOrderRead'
 import AdminOrderFrame from './AdminOrderFrame'
 import AdminOrderNotice from './AdminOrderNotice'
+import { Button } from './ui'
+import { inputClass } from './uiStyles'
 
-const inputClass = 'w-full border border-outline-variant bg-surface p-3'
 const buttonClass = 'border border-primary text-primary px-5 py-3 disabled:opacity-40'
 const title = 'Quản lý đánh giá'
 
@@ -67,29 +68,29 @@ export default function AdminReviewsPage() {
         <p className="text-sm text-on-surface-variant">
           Đánh giá không phù hợp có thể được <strong>ẩn</strong> (gỡ khỏi trang sản phẩm, hiện lại được) hoặc <strong>xóa vĩnh viễn</strong>. Điểm trung bình và số lượt đánh giá chỉ tính các đánh giá đang hiện và được tính lại ngay.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-          <label className="space-y-2">
-            <span>Điểm</span>
-            <select className={inputClass} value={rating} onChange={(event) => setParams(adminReviewSearch({ ...filter, rating: Number(event.target.value), page: 1 }))}>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="space-y-1 text-sm">
+            <span className="block font-medium">Điểm</span>
+            <select className={`${inputClass} w-auto min-w-40`} value={rating} onChange={(event) => setParams(adminReviewSearch({ ...filter, rating: Number(event.target.value), page: 1 }))}>
               <option value={0}>Tất cả</option>
               {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} sao</option>)}
             </select>
           </label>
-          <label className="space-y-2">
-            <span>Hiển thị</span>
-            <select className={inputClass} value={visibility} onChange={(event) => setParams(adminReviewSearch({ ...filter, visibility: event.target.value as AdminReviewVisibility, page: 1 }))}>
+          <label className="space-y-1 text-sm">
+            <span className="block font-medium">Hiển thị</span>
+            <select className={`${inputClass} w-auto min-w-40`} value={visibility} onChange={(event) => setParams(adminReviewSearch({ ...filter, visibility: event.target.value as AdminReviewVisibility, page: 1 }))}>
               <option value="">Tất cả</option>
               <option value="visible">Đang hiện</option>
               <option value="hidden">Đang ẩn</option>
             </select>
           </label>
-          <label className="space-y-2">
-            <span>Số đánh giá mỗi trang</span>
-            <select className={inputClass} value={page_size} onChange={(event) => setParams(adminReviewSearch({ ...filter, page_size: Number(event.target.value), page: 1 }))}>
+          <label className="space-y-1 text-sm">
+            <span className="block font-medium">Đánh giá/trang</span>
+            <select className={`${inputClass} w-auto`} value={page_size} onChange={(event) => setParams(adminReviewSearch({ ...filter, page_size: Number(event.target.value), page: 1 }))}>
               {[...new Set([20, 50, 100, page_size])].sort((a, b) => a - b).map((size) => <option key={size} value={size}>{size}</option>)}
             </select>
           </label>
-          <button type="button" className="border border-primary text-primary px-5 py-3" onClick={retry}>Tải lại danh sách</button>
+          <Button variant="secondary" onClick={retry}>Tải lại</Button>
         </div>
       </section>
       {notice && <p role={notice.kind === 'error' ? 'alert' : 'status'} className={notice.kind === 'error' ? 'text-error' : 'text-secondary'}>{notice.text}</p>}
