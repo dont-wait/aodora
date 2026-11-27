@@ -30,6 +30,53 @@ function pickByName<T extends { name: string }>(items: T[], name: string): T | u
   return candidates.length === 1 ? candidates[0] : undefined
 }
 
+/** Lowercase, no diacritics, single spaces; the administrative prefix is kept. */
+export function foldName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u{300}-\u{36f}]/gu, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Filters options for a type-ahead box: diacritic/case-insensitive substring match against the
+ * name with or without its administrative prefix. Empty query returns everything; options
+ * whose name (sans prefix) starts with the query come first, then the rest in original order.
+ */
+export function searchOptions<T extends { label: string }>(options: T[], query: string): T[] {
+  const full = foldName(query)
+  if (!full) return options
+  const bare = normalizeName(query)
+  const ranked: { option: T; rank: number }[] = []
+  for (const option of options) {
+    const optFull = foldName(option.label)
+    const optBare = normalizeName(option.label)
+    let rank = -1
+    const typedPrefix = bare !== full // e.g. "phuong an": stay close to what was typed, no loose substring on the bare part
+    if ((bare && optBare.startsWith(bare)) || optFull.startsWith(full)) rank = 0
+    else if (optFull.includes(full) || (!typedPrefix && bare && optBare.includes(bare))) rank = 1
+    if (rank >= 0) ranked.push({ option, rank })
+  }
+  return ranked.filter((item) => item.rank === 0).concat(ranked.filter((item) => item.rank === 1)).map((item) => item.option)
+}
+
+/**
+ * What a typed-but-not-chosen query resolves to: an exact label (case-insensitive) first, otherwise a
+ * diacritic-folded label match only when it is the single one. Ambiguous or unknown text resolves to nothing.
+ */
+export function resolveTypedOption<T extends { label: string }>(options: T[], query: string): T | undefined {
+  const plain = query.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!plain) return undefined
+  const exact = options.find((option) => option.label.toLowerCase() === plain)
+  if (exact) return exact
+  const folded = foldName(query)
+  const matches = options.filter((option) => foldName(option.label) === folded)
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 export function findProvince(list: Province[], name: string): Province | undefined {
   return pickByName(list, name)
 }
