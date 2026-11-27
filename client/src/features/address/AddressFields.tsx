@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import SearchSelect from '@/components/ui/SearchSelect'
 import { matchSavedAddress } from './divisions'
 import { useDivisions } from './useDivisions'
 
@@ -41,6 +42,8 @@ export default function AddressFields({
   }, [needsCanonical, canonicalCity, canonicalWard, onChange])
 
   const province = provinces?.find((item) => item.name === value.city)
+  const provinceOptions = useMemo(() => (provinces ?? []).map((item) => ({ value: item.name, label: item.name })), [provinces])
+  const wardOptions = useMemo(() => (province?.wards ?? []).map((item) => ({ value: item.name, label: item.name })), [province])
   const idCity = `${idPrefix}-city`
   const idWard = `${idPrefix}-ward`
 
@@ -53,42 +56,41 @@ export default function AddressFields({
         </p>
       )}
       <div className={className}>
-        <label htmlFor={idCity} className={labelClassName}>
-          <span>Tỉnh / thành phố{required ? ' *' : ''}</span>
-          <select
+        <div className={labelClassName}>
+          <label htmlFor={idCity}>Tỉnh / thành phố{required ? ' *' : ''}</label>
+          <SearchSelect
             id={idCity}
             name={`${idPrefix}-city`}
-            autoComplete="address-level1"
+            autoComplete="off"
             className={selectClassName}
             required={required}
             disabled={disabled || loading || error}
+            options={provinceOptions}
             value={province ? province.name : ''}
+            placeholder={loading ? 'Đang tải danh mục...' : 'Gõ để tìm tỉnh / thành phố'}
             aria-invalid={Boolean(errors.city)}
-            onChange={(event) => { setLegacy(false); onChange({ city: event.target.value, ward: '' }) }}
-          >
-            <option value="">{loading ? 'Đang tải danh mục...' : 'Chọn tỉnh / thành phố'}</option>
-            {provinces?.map((item) => <option key={item.code} value={item.name}>{item.name}</option>)}
-          </select>
+            onChange={(next) => { setLegacy(false); onChange({ city: next, ward: '' }) }}
+          />
           {errors.city && <span role="alert" className="block text-red-700 text-sm">{errors.city}</span>}
-        </label>
-        <label htmlFor={idWard} className={labelClassName}>
-          <span>Phường / xã{wardRequired ? ' *' : ''}</span>
-          <select
+        </div>
+        <div className={labelClassName}>
+          <label htmlFor={idWard}>Phường / xã{wardRequired ? ' *' : ''}</label>
+          <SearchSelect
+            key={province?.name ?? ''}
             id={idWard}
             name={`${idPrefix}-ward`}
-            autoComplete="address-level2"
+            autoComplete="off"
             className={selectClassName}
             required={wardRequired}
             disabled={disabled || !province}
+            options={wardOptions}
             value={province?.wards.some((item) => item.name === value.ward) ? value.ward : ''}
+            placeholder={province ? 'Gõ để tìm phường / xã' : 'Chọn tỉnh / thành phố trước'}
             aria-invalid={Boolean(errors.ward)}
-            onChange={(event) => { setLegacy(false); onChange({ city: value.city, ward: event.target.value }) }}
-          >
-            <option value="">{province ? 'Chọn phường / xã' : 'Chọn tỉnh / thành phố trước'}</option>
-            {province?.wards.map((item) => <option key={item.code} value={item.name}>{item.name}</option>)}
-          </select>
+            onChange={(next) => { setLegacy(false); onChange({ city: value.city, ward: next }) }}
+          />
           {errors.ward && <span role="alert" className="block text-red-700 text-sm">{errors.ward}</span>}
-        </label>
+        </div>
       </div>
       {legacy && (
         <p role="status" className="text-sm text-secondary">
