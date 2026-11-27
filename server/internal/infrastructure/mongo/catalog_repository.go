@@ -43,7 +43,7 @@ func catalogContext(ctx context.Context) (context.Context, context.CancelFunc) {
 // Public navigation applies the same active-ancestor/root rule as product
 // listing, so an inactive parent cannot leak active child categories into tabs.
 func publicCategoriesPipeline() bson.A {
-	return bson.A{
+	return append(bson.A{
 		bson.M{"$match": bson.M{"is_active": true}},
 		bson.M{"$graphLookup": bson.M{
 			"from": "categories", "startWith": "$parent_id",
@@ -65,6 +65,37 @@ func publicCategoriesPipeline() bson.A {
 			}},
 		}}}},
 		bson.M{"$sort": bson.D{{Key: "sort_order", Value: 1}, {Key: "name", Value: 1}, {Key: "_id", Value: 1}}},
+	}, categoryCoverStages()...)
+}
+
+// categoryCoverStages gives a category without its own image the main image of
+// its most recently updated active product, so the storefront never shows an
+// empty tile while the owner has not uploaded a category photo yet.
+func categoryCoverStages() bson.A {
+	hasOwnImage := bson.M{"$gt": bson.A{bson.M{"$strLenCP": bson.M{"$ifNull": bson.A{"$image.src", ""}}}, 0}}
+	return bson.A{
+		bson.M{"$lookup": bson.M{
+			"from": "products",
+			"let":  bson.M{"categoryID": "$_id"},
+			"pipeline": bson.A{
+				bson.M{"$match": bson.M{
+					"$expr":     bson.M{"$eq": bson.A{"$category_id", "$$categoryID"}},
+					"is_active": true,
+					"$or": bson.A{
+						bson.M{"image.src": bson.M{"$type": "string", "$ne": ""}},
+						bson.M{"images.0": bson.M{"$type": "string", "$ne": ""}},
+					},
+				}},
+				bson.M{"$sort": bson.D{{Key: "updated_at", Value: -1}, {Key: "_id", Value: -1}}},
+				bson.M{"$limit": 1},
+				bson.M{"$project": bson.M{"_id": 0,
+					"src": bson.M{"$ifNull": bson.A{"$image.src", bson.M{"$arrayElemAt": bson.A{"$images", 0}}}},
+					"alt": bson.M{"$ifNull": bson.A{"$image.alt", "$name"}},
+				}},
+			},
+			"as": "_cover",
+		}},
+		bson.M{"$set": bson.M{"image": bson.M{"$cond": bson.A{hasOwnImage, "$image", bson.M{"$ifNull": bson.A{bson.M{"$first": "$_cover"}, "$image"}}}}}},
 		bson.M{"$project": bson.M{"_id": 1, "id": 1, "slug": 1, "name": 1, "description": 1,
 			"parent_id": 1, "is_active": 1, "sort_order": 1, "image": 1, "badge": 1}},
 	}

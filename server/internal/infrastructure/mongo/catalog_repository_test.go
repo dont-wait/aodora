@@ -243,9 +243,20 @@ func TestPublicCategoryNavigationIsActiveAndSorted(t *testing.T) {
 	if _, ok := asMap(pipeline[1])["$graphLookup"]; !ok {
 		t.Fatal("missing ancestor visibility check")
 	}
-	sortStage := asMap(pipeline[len(pipeline)-2])
-	sortFields, ok := sortStage["$sort"].(bson.D)
-	if !ok || len(sortFields) != 3 || sortFields[0].Key != "sort_order" || sortFields[2].Key != "_id" {
-		t.Fatalf("unstable public category sort: %v", sortStage)
+	var sortFields bson.D
+	coverFallback := false
+	for _, stage := range pipeline {
+		if fields, ok := asMap(stage)["$sort"].(bson.D); ok {
+			sortFields = fields
+		}
+		if lookup, ok := asMap(stage)["$lookup"]; ok && asMap(lookup)["from"] == "products" {
+			coverFallback = true
+		}
+	}
+	if len(sortFields) != 3 || sortFields[0].Key != "sort_order" || sortFields[2].Key != "_id" {
+		t.Fatalf("unstable public category sort: %v", sortFields)
+	}
+	if !coverFallback {
+		t.Fatal("category without image must fall back to a product cover")
 	}
 }
