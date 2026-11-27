@@ -34,7 +34,8 @@ func (fakeRepository) Statuses(_ context.Context, _ string, ids []string) ([]Pro
 func (fakeRepository) AdminList(_ context.Context, f AdminFilter) (AdminPage, error) {
 	return AdminPage{Page: f.Page, Size: f.Size}, nil
 }
-func (fakeRepository) Delete(context.Context, string) error { return nil }
+func (fakeRepository) Delete(context.Context, string) error          { return nil }
+func (fakeRepository) SetHidden(context.Context, string, bool) error { return nil }
 
 // fakeOrders models one guest order owned by hash "guest-a" and one account
 // order owned by customer "cust-a"; both contain product "p1".

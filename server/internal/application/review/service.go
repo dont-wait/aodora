@@ -43,6 +43,8 @@ type PublicReview struct {
 type OwnReview struct {
 	PublicReview
 	OrderID string `json:"order_id"`
+	// Hidden is true when the shop owner hid the review from the public list.
+	Hidden bool `json:"hidden"`
 }
 
 type Page struct {
@@ -68,6 +70,7 @@ type AdminReview struct {
 	ProductSlug string `json:"product_slug"`
 	OrderNumber string `json:"order_number,omitempty"`
 	UpdatedAt   string `json:"updated_at"`
+	Hidden      bool   `json:"hidden"`
 }
 
 // ProductReviewStatus tells the order list where to send a customer to
@@ -84,8 +87,10 @@ const MaxStatusProducts = 200
 type AdminFilter struct {
 	ProductID string
 	Rating    int64
-	Page      int64
-	Size      int64
+	// Hidden nil lists every review; otherwise only hidden or only visible ones.
+	Hidden *bool
+	Page   int64
+	Size   int64
 }
 
 type AdminPage struct {
@@ -95,7 +100,7 @@ type AdminPage struct {
 	Size  int64         `json:"page_size"`
 }
 
-// Repository writes (Upsert, Delete) must recompute
+// Repository writes (Upsert, SetHidden, Delete) must recompute
 // products.rating/review_count in the same transaction as the review change.
 type Repository interface {
 	List(context.Context, string, int64, int64) (Page, error)
@@ -103,6 +108,7 @@ type Repository interface {
 	Upsert(context.Context, string, string, Input) (OwnReview, error)
 	Statuses(context.Context, string, []string) ([]ProductReviewStatus, error)
 	AdminList(context.Context, AdminFilter) (AdminPage, error)
+	SetHidden(context.Context, string, bool) error
 	Delete(context.Context, string) error
 }
 
@@ -187,8 +193,17 @@ func (s *Service) AdminList(ctx context.Context, filter AdminFilter) (AdminPage,
 	return s.repo.AdminList(ctx, filter)
 }
 
-// AdminDelete is the moderation action agreed for Q-06: the schema has no
-// hidden/approved state, so an inappropriate review is removed permanently.
+// AdminSetHidden hides or shows a review (Q-06). Hidden reviews stay in the
+// database and are excluded from the public list and product aggregates.
+func (s *Service) AdminSetHidden(ctx context.Context, id string, hidden bool) error {
+	if strings.TrimSpace(id) == "" {
+		return ErrNotFound
+	}
+	return s.repo.SetHidden(ctx, id, hidden)
+}
+
+// AdminDelete removes a review permanently (Q-06); prefer AdminSetHidden
+// when the review may need to be restored.
 func (s *Service) AdminDelete(ctx context.Context, id string) error {
 	if strings.TrimSpace(id) == "" {
 		return ErrNotFound

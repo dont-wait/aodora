@@ -234,7 +234,7 @@ func (r *CatalogRepository) ReviewSummary(ctx context.Context, productID string)
 		return model.ReviewSummary{}, fmt.Errorf("invalid product id in review summary: %w", err)
 	}
 	pipeline := bson.A{
-		bson.M{"$match": bson.M{"product_id": id}},
+		bson.M{"$match": publicReviewFilter(id)},
 		bson.M{"$group": bson.M{"_id": nil, "count": bson.M{"$sum": 1}, "average": bson.M{"$avg": "$rating"}}},
 	}
 	cursor, err := r.reviews.Aggregate(ctx, pipeline)

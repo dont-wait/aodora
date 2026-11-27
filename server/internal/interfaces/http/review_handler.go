@@ -42,6 +42,7 @@ type appService interface {
 // AdminReviewService exposes only the moderation operations.
 type AdminReviewService interface {
 	AdminList(context.Context, app.AdminFilter) (app.AdminPage, error)
+	AdminSetHidden(context.Context, string, bool) error
 	AdminDelete(context.Context, string) error
 }
 
@@ -66,6 +67,7 @@ func WithAdminReviews(service AdminReviewService, guard *AuthGuard, log zerolog.
 		h := adminReviewHandler{service: service, guard: guard, log: log}
 		admin := adminCatalogHandler{authorize: guard.RequireAdmin, log: log, allowedOrigin: strings.TrimSuffix(strings.TrimSpace(allowedOrigin), "/")}
 		mux.HandleFunc("GET /api/v1/admin/reviews", admin.guard(h.list))
+		mux.HandleFunc("PATCH /api/v1/admin/reviews/{id}", admin.guard(h.setHidden))
 		mux.HandleFunc("DELETE /api/v1/admin/reviews/{id}", admin.guard(h.delete))
 	}
 }
@@ -202,6 +204,13 @@ func (h adminReviewHandler) list(w http.ResponseWriter, r *http.Request) {
 		switch key {
 		case "product_id":
 			filter.ProductID = value
+		case "hidden":
+			if value != "true" && value != "false" {
+				respondError(w, http.StatusBadRequest, "INVALID_FIELD", "hidden", "Giá trị không hợp lệ")
+				return
+			}
+			hidden := value == "true"
+			filter.Hidden = &hidden
 		case "rating", "page", "page_size":
 			n, err := strconv.ParseInt(value, 10, 64)
 			limits := map[string][2]int64{"rating": {1, 5}, "page": {1, 100000}, "page_size": {1, 100}}[key]
@@ -228,6 +237,28 @@ func (h adminReviewHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+// setHidden: PATCH /api/v1/admin/reviews/{id} {"hidden": true|false}
+func (h adminReviewHandler) setHidden(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Hidden *bool `json:"hidden"`
+	}
+	if !decodeReviewJSON(w, r, &body) {
+		return
+	}
+	if body.Hidden == nil {
+		respondError(w, http.StatusBadRequest, "INVALID_FIELD", "hidden", "Thiếu trạng thái ẩn/hiện")
+		return
+	}
+	id := r.PathValue("id")
+	if err := h.service.AdminSetHidden(r.Context(), id, *body.Hidden); err != nil {
+		respondReview(w, h.log, nil, err)
+		return
+	}
+	admin, _ := h.guard.Identity(r)
+	h.log.Info().Str("admin_id", admin.ID).Str("review_id", id).Bool("hidden", *body.Hidden).Msg("admin changed review visibility")
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": id, "hidden": *body.Hidden}})
 }
 
 func (h adminReviewHandler) delete(w http.ResponseWriter, r *http.Request) {

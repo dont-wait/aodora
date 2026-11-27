@@ -349,6 +349,47 @@ func TestReviewHTTPAcceptanceIntegration(t *testing.T) {
 		assertSummary(4.5, 2)
 	})
 
+	t.Run("admin hides and shows a review; hidden reviews leave the public list and aggregate", func(t *testing.T) {
+		var page struct {
+			Data  []reviewapp.AdminReview `json:"data"`
+			Total int64                   `json:"total"`
+		}
+		w := call("GET", "/api/v1/admin/reviews?rating=5", "", adminCookie, nil, http.StatusOK)
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || page.Total != 1 {
+			t.Fatalf("rating filter = %+v (%v)", page, err)
+		}
+		target := page.Data[0].ID
+		call("PATCH", "/api/v1/admin/reviews/"+target, `{"hidden":true}`, cookieB, nil, http.StatusForbidden)
+		call("PATCH", "/api/v1/admin/reviews/"+target, `{}`, adminCookie, nil, http.StatusBadRequest)
+		call("PATCH", "/api/v1/admin/reviews/"+target, `{"hidden":"yes"}`, adminCookie, nil, http.StatusBadRequest)
+		call("PATCH", "/api/v1/admin/reviews/"+bson.NewObjectID().Hex(), `{"hidden":true}`, adminCookie, nil, http.StatusNotFound)
+
+		call("PATCH", "/api/v1/admin/reviews/"+target, `{"hidden":true}`, adminCookie, nil, http.StatusOK)
+		assertSummary(4, 1) // only A's 4-star review is public now
+		w = call("GET", "/api/v1/admin/reviews?hidden=true", "", adminCookie, nil, http.StatusOK)
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || page.Total != 1 || page.Data[0].ID != target || !page.Data[0].Hidden {
+			t.Fatalf("hidden filter = %+v (%v)", page, err)
+		}
+		w = call("GET", "/api/v1/admin/reviews?hidden=false", "", adminCookie, nil, http.StatusOK)
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || page.Total != 1 || page.Data[0].ID == target {
+			t.Fatalf("visible filter = %+v (%v)", page, err)
+		}
+		call("GET", "/api/v1/admin/reviews?hidden=maybe", "", adminCookie, nil, http.StatusBadRequest)
+		// The author still sees their review, flagged as hidden; editing it
+		// keeps it hidden and does not change the public aggregate.
+		own := call("GET", "/api/v1/me/reviews?product_id="+product.Hex(), "", cookieB, nil, http.StatusOK)
+		if !strings.Contains(own.Body.String(), `"hidden":true`) {
+			t.Fatalf("own hidden review = %s", own.Body.String())
+		}
+		put(cookieB, deliveredB, 3, http.StatusOK)
+		assertSummary(4, 1)
+
+		call("PATCH", "/api/v1/admin/reviews/"+target, `{"hidden":false}`, adminCookie, nil, http.StatusOK)
+		assertSummary(3.5, 2)
+		put(cookieB, deliveredB, 5, http.StatusOK)
+		assertSummary(4.5, 2)
+	})
+
 	t.Run("admin lists and deletes reviews; aggregate follows the public list", func(t *testing.T) {
 		call("GET", "/api/v1/admin/reviews", "", cookieA, nil, http.StatusForbidden)
 		call("GET", "/api/v1/admin/reviews", "", nil, nil, http.StatusForbidden)

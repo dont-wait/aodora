@@ -1,8 +1,18 @@
 import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import Modal from '@/components/ui/Modal'
 import StarRating from '@/components/ui/StarRating'
 import { useAuth } from '@/features/auth/useAuth'
-import { adminReviewSearch, deleteAdminReview, deleteReviewConfirmation, loadAdminReviews, readAdminReviewFilters } from '@/features/admin/reviews'
+import {
+  adminReviewActions,
+  adminReviewSearch,
+  loadAdminReviews,
+  performAdminReviewAction,
+  readAdminReviewFilters,
+  type AdminReview,
+  type AdminReviewAction,
+  type AdminReviewVisibility,
+} from '@/features/admin/reviews'
 import { formatOrderDate, orderLoginPath } from '@/features/orders/presentation'
 import { orderPageCount } from '@/features/orders/read'
 import { useOrderRead } from '@/features/orders/useOrderRead'
@@ -10,6 +20,7 @@ import AdminOrderFrame from './AdminOrderFrame'
 import AdminOrderNotice from './AdminOrderNotice'
 
 const inputClass = 'w-full border border-outline-variant bg-surface p-3'
+const buttonClass = 'border border-primary text-primary px-5 py-3 disabled:opacity-40'
 const title = 'Quản lý đánh giá'
 
 export default function AdminReviewsPage() {
@@ -17,13 +28,14 @@ export default function AdminReviewsPage() {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const filter = readAdminReviewFilters(params)
-  const { rating, page, page_size } = filter
+  const { rating, visibility, page, page_size } = filter
   const [revision, setRevision] = useState(0)
-  const [deleting, setDeleting] = useState('')
+  const [dialog, setDialog] = useState<{ review: AdminReview; action: AdminReviewAction } | null>(null)
+  const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [redirect, setRedirect] = useState<'unauthenticated' | 'forbidden' | null>(null)
-  const load = useCallback(() => loadAdminReviews({ rating, page, page_size }), [rating, page, page_size])
-  const scope = JSON.stringify([user?.id, rating, page, page_size, revision])
+  const load = useCallback(() => loadAdminReviews({ rating, visibility, page, page_size }), [rating, visibility, page, page_size])
+  const scope = JSON.stringify([user?.id, rating, visibility, page, page_size, revision])
   const result = useOrderRead(scope, !!user && !loading && !error, load)
   const retry = () => setRevision((value) => value + 1)
   const next = location.pathname + location.search
@@ -32,14 +44,18 @@ export default function AdminReviewsPage() {
   if (!result || result.kind !== 'ready') return <AdminOrderNotice title={title} result={result} next={next} retry={retry} />
   const data = result.page
   const pages = orderPageCount(data)
+  const picked = dialog ? adminReviewActions[dialog.action] : null
 
-  async function remove(id: string) {
-    if (!window.confirm(deleteReviewConfirmation)) return
-    setDeleting(id); setNotice(null)
-    const outcome = await deleteAdminReview(id)
-    setDeleting('')
+  async function confirm() {
+    if (!dialog || busy) return
+    setBusy(true)
+    setNotice(null)
+    const outcome = await performAdminReviewAction(dialog.review.id, dialog.action)
+    setBusy(false)
+    const action = adminReviewActions[dialog.action]
+    setDialog(null)
     if (outcome.kind === 'unauthenticated' || outcome.kind === 'forbidden') return setRedirect(outcome.kind)
-    if (outcome.kind === 'deleted') setNotice({ kind: 'ok', text: 'Đã xóa đánh giá và tính lại điểm của sản phẩm.' })
+    if (outcome.kind === 'done') setNotice({ kind: 'ok', text: action.done })
     else if (outcome.kind === 'not-found') setNotice({ kind: 'ok', text: outcome.message })
     else return setNotice({ kind: 'error', text: outcome.message })
     retry()
@@ -49,14 +65,22 @@ export default function AdminReviewsPage() {
     <AdminOrderFrame title={title}>
       <section className="bg-surface p-5 space-y-3">
         <p className="text-sm text-on-surface-variant">
-          Đánh giá không phù hợp được xử lý bằng cách xóa vĩnh viễn. Điểm trung bình và số lượt đánh giá trên sản phẩm được tính lại ngay sau khi xóa.
+          Đánh giá không phù hợp có thể được <strong>ẩn</strong> (gỡ khỏi trang sản phẩm, hiện lại được) hoặc <strong>xóa vĩnh viễn</strong>. Điểm trung bình và số lượt đánh giá chỉ tính các đánh giá đang hiện và được tính lại ngay.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <label className="space-y-2">
             <span>Điểm</span>
             <select className={inputClass} value={rating} onChange={(event) => setParams(adminReviewSearch({ ...filter, rating: Number(event.target.value), page: 1 }))}>
               <option value={0}>Tất cả</option>
               {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} sao</option>)}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span>Hiển thị</span>
+            <select className={inputClass} value={visibility} onChange={(event) => setParams(adminReviewSearch({ ...filter, visibility: event.target.value as AdminReviewVisibility, page: 1 }))}>
+              <option value="">Tất cả</option>
+              <option value="visible">Đang hiện</option>
+              <option value="hidden">Đang ẩn</option>
             </select>
           </label>
           <label className="space-y-2">
@@ -77,7 +101,7 @@ export default function AdminReviewsPage() {
       ) : (
         <ul className="grid xl:grid-cols-2 gap-5">
           {data.data.map((item) => (
-            <li key={item.id} className="bg-surface border border-outline-variant p-5 sm:p-6 space-y-4 min-w-0">
+            <li key={item.id} className={`bg-surface border p-5 sm:p-6 space-y-4 min-w-0 ${item.hidden ? 'border-dashed border-outline' : 'border-outline-variant'}`}>
               <div className="flex flex-wrap justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="font-title-editorial text-xl text-primary break-words">
@@ -85,18 +109,23 @@ export default function AdminReviewsPage() {
                   </h2>
                   <p className="text-on-surface-variant break-words">{item.display_name}</p>
                 </div>
-                <StarRating value={item.rating} />
+                <div className="flex flex-col items-end gap-2">
+                  <StarRating value={item.rating} />
+                  {item.hidden && <span className="bg-surface-container-high px-3 py-1 text-sm">Đang ẩn</span>}
+                </div>
               </div>
-              {item.content && <p className="whitespace-pre-line break-words">{item.content}</p>}
-              {item.images.length > 0 && (
-                <ul className="text-sm space-y-1">
-                  {item.images.map((image, index) => (
-                    <li key={`${image.src}-${index}`} className="break-all">
-                      <a href={image.src} target="_blank" rel="noopener noreferrer nofollow" className="underline">{image.alt || image.src}</a>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className={item.hidden ? 'opacity-60' : ''}>
+                {item.content && <p className="whitespace-pre-line break-words">{item.content}</p>}
+                {item.images.length > 0 && (
+                  <ul className="text-sm space-y-1 mt-3">
+                    {item.images.map((image, index) => (
+                      <li key={`${image.src}-${index}`} className="break-all">
+                        <a href={image.src} target="_blank" rel="noopener noreferrer nofollow" className="underline">{image.alt || image.src}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 <dt className="text-on-surface-variant">Đơn hàng</dt>
                 <dd>{item.order_number || 'Không có'}</dd>
@@ -109,9 +138,14 @@ export default function AdminReviewsPage() {
                   </>
                 )}
               </dl>
-              <button type="button" disabled={deleting === item.id} className="border border-error text-error px-5 py-2 disabled:opacity-50" onClick={() => void remove(item.id)}>
-                {deleting === item.id ? 'Đang xóa...' : 'Xóa đánh giá'}
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" className="border border-primary text-primary px-5 py-2" onClick={() => setDialog({ review: item, action: item.hidden ? 'show' : 'hide' })}>
+                  {item.hidden ? 'Hiện lại' : 'Ẩn đánh giá'}
+                </button>
+                <button type="button" className="border border-error text-error px-5 py-2" onClick={() => setDialog({ review: item, action: 'delete' })}>
+                  Xóa đánh giá
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -125,6 +159,37 @@ export default function AdminReviewsPage() {
           </div>
         </nav>
       )}
+      <Modal
+        open={!!dialog}
+        onClose={() => {
+          if (!busy) setDialog(null)
+        }}
+      >
+        {dialog && picked && (
+          <div className="space-y-5">
+            <h2 className="font-headline-md text-2xl text-primary">
+              {picked.label} · {dialog.review.display_name}
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              {dialog.review.product_name || dialog.review.product_slug} · {dialog.review.rating} sao
+            </p>
+            <p>{picked.confirmation}</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={busy}
+                className={`${dialog.action === 'delete' ? 'bg-error text-on-error' : 'bg-primary text-on-primary'} px-5 py-3 disabled:opacity-40`}
+                onClick={() => void confirm()}
+              >
+                {busy ? 'Đang gửi...' : 'Xác nhận thao tác'}
+              </button>
+              <button type="button" disabled={busy} className={buttonClass} onClick={() => setDialog(null)}>
+                Quay lại
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </AdminOrderFrame>
   )
 }

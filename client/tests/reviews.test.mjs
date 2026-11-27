@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { formatReviewImages, parseReviewImages, reviewApi, ReviewApiError, reviewErrorMessage } from '../src/features/review/api.ts'
 import { ordersApi } from '../src/features/orders/api.ts'
 import { orderReviewable, readOrderStatusFilter } from '../src/features/orders/presentation.ts'
-import { adminReviews, adminReviewSearch, deleteAdminReview, loadAdminReviews, readAdminReviewFilters } from '../src/features/admin/reviews.ts'
+import { adminReviewApiQuery, adminReviews, adminReviewSearch, loadAdminReviews, performAdminReviewAction, readAdminReviewFilters } from '../src/features/admin/reviews.ts'
 
 const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status })
 async function withFetch(fn, run) {
@@ -18,7 +18,7 @@ async function withFetch(fn, run) {
 const adminReview = (over = {}) => ({
   id: 'r1', rating: 4, content: 'Đẹp', display_name: 'Khách A', images: [], verified_purchase: true,
   created_at: '2026-11-27T00:00:00Z', updated_at: '2026-11-27T00:00:00Z', product_id: 'p1', product_name: 'Áo', product_slug: 'ao',
-  order_number: 'AD-1', ...over,
+  order_number: 'AD-1', hidden: false, ...over,
 })
 
 test('review images round-trip and reject lines without a description', () => {
@@ -38,10 +38,12 @@ test('review errors map to clear messages', async () => {
 })
 
 test('admin review filters drop unknown, repeated and out-of-range values', () => {
-  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=9&page=0&page_size=500')), { rating: 0, page: 1, page_size: 100 })
-  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=3&rating=4&page=2')), { rating: 0, page: 2, page_size: 20 })
-  assert.equal(adminReviewSearch({ rating: 5, page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&rating=5')
-  assert.equal(adminReviewSearch({ rating: 0, page: 3, page_size: 50 }).toString(), 'page=3&page_size=50')
+  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=9&page=0&page_size=500&visibility=x')), { rating: 0, visibility: '', page: 1, page_size: 100 })
+  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=3&rating=4&page=2&visibility=hidden')), { rating: 0, visibility: 'hidden', page: 2, page_size: 20 })
+  assert.equal(adminReviewSearch({ rating: 5, visibility: '', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&rating=5')
+  assert.equal(adminReviewSearch({ rating: 0, visibility: 'visible', page: 3, page_size: 50 }).toString(), 'page=3&page_size=50&visibility=visible')
+  assert.equal(adminReviewApiQuery({ rating: 0, visibility: 'hidden', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&hidden=true')
+  assert.equal(adminReviewApiQuery({ rating: 0, visibility: 'visible', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&hidden=false')
 })
 
 test('admin list validates payload and maps auth failures', async () => {
@@ -49,18 +51,30 @@ test('admin list validates payload and maps auth failures', async () => {
     assert.equal(String(url), '/api/v1/admin/reviews?page=1&page_size=20&rating=4')
     return response({ data: [adminReview()], total: 1, page: 1, page_size: 20 })
   }, async () => {
-    const result = await loadAdminReviews({ rating: 4, page: 1, page_size: 20 })
+    const result = await loadAdminReviews({ rating: 4, visibility: '', page: 1, page_size: 20 })
     assert.equal(result.kind, 'ready')
     assert.equal(result.page.data[0].order_number, 'AD-1')
   })
   await withFetch(async () => response({ data: [adminReview({ rating: 7 })], total: 1, page: 1, page_size: 20 }), async () => {
-    assert.equal((await loadAdminReviews({ rating: 0, page: 1, page_size: 20 })).kind, 'error')
+    assert.equal((await loadAdminReviews({ rating: 0, visibility: '', page: 1, page_size: 20 })).kind, 'error')
   })
   for (const [status, kind] of [[401, 'unauthenticated'], [403, 'forbidden'], [503, 'error']]) {
     await withFetch(async () => response({ error: { code: 'X', message: 'x' } }, status), async () => {
-      assert.equal((await loadAdminReviews({ rating: 0, page: 1, page_size: 20 })).kind, kind)
+      assert.equal((await loadAdminReviews({ rating: 0, visibility: '', page: 1, page_size: 20 })).kind, kind)
     })
   }
+})
+
+test('admin hide/show sends PATCH with a boolean body', async () => {
+  const calls = []
+  await withFetch(async (url, init) => {
+    calls.push([String(url), init.method, init.body])
+    return response({ data: { id: 'r1', hidden: true } })
+  }, async () => {
+    assert.equal((await performAdminReviewAction('r1', 'hide')).kind, 'done')
+    assert.equal((await performAdminReviewAction('r1', 'show')).kind, 'done')
+  })
+  assert.deepEqual(calls, [['/api/v1/admin/reviews/r1', 'PATCH', '{"hidden":true}'], ['/api/v1/admin/reviews/r1', 'PATCH', '{"hidden":false}']])
 })
 
 test('admin delete uses DELETE and reports a missing review', async () => {
@@ -73,7 +87,7 @@ test('admin delete uses DELETE and reports a missing review', async () => {
   })
   assert.deepEqual(calls, [['/api/v1/admin/reviews/r%2F1', 'DELETE']])
   await withFetch(async () => response({ error: { code: 'NOT_FOUND', message: 'x' } }, 404), async () => {
-    assert.equal((await deleteAdminReview('r1')).kind, 'not-found')
+    assert.equal((await performAdminReviewAction('r1', 'delete')).kind, 'not-found')
   })
 })
 

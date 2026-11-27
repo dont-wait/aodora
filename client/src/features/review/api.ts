@@ -11,6 +11,8 @@ export type OwnReview = {
   verified_purchase: boolean
   created_at: string
   order_id: string
+  /** Hidden by the shop: still visible to its author only. */
+  hidden: boolean
 }
 
 export type ProductReviewStatus = { product_id: string; slug: string; reviewed: boolean }

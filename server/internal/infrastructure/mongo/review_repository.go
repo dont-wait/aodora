@@ -35,7 +35,7 @@ func (r *ReviewRepository) List(ctx context.Context, productID string, page, siz
 	if err != nil || !visible {
 		return app.Page{}, app.ErrProduct
 	}
-	filter := bson.M{"product_id": productOID}
+	filter := publicReviewFilter(productOID)
 	count, average, err := reviewStats(ctx, r.reviews, productOID)
 	if err != nil {
 		return app.Page{}, err
@@ -185,6 +185,13 @@ func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter
 	if filter.Rating != 0 {
 		match["rating"] = filter.Rating
 	}
+	if filter.Hidden != nil {
+		if *filter.Hidden {
+			match["hidden"] = true
+		} else {
+			match["hidden"] = bson.M{"$ne": true}
+		}
+	}
 	total, err := r.reviews.CountDocuments(ctx, match)
 	if err != nil {
 		return app.AdminPage{}, fmt.Errorf("count admin reviews: %w", err)
@@ -210,7 +217,7 @@ func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter
 		if err := cur.Decode(&row); err != nil {
 			return app.AdminPage{}, err
 		}
-		item := app.AdminReview{PublicReview: publicReview(row), ProductID: asID(row["product_id"]), UpdatedAt: asTime(row["updated_at"]).UTC().Format(time.RFC3339)}
+		item := app.AdminReview{PublicReview: publicReview(row), ProductID: asID(row["product_id"]), UpdatedAt: asTime(row["updated_at"]).UTC().Format(time.RFC3339), Hidden: asBool(row["hidden"])}
 		if products := asSlice(row["product"]); len(products) > 0 {
 			product := asMap(products[0])
 			item.ProductName, item.ProductSlug = asString(product["name"]), asString(product["slug"])
@@ -224,6 +231,28 @@ func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter
 		return app.AdminPage{}, err
 	}
 	return app.AdminPage{Items: items, Total: total, Page: filter.Page, Size: filter.Size}, nil
+}
+
+// SetHidden toggles visibility and recomputes the product aggregate
+// atomically. updated_at is left alone: it records the customer's last edit.
+func (r *ReviewRepository) SetHidden(ctx context.Context, id string, hidden bool) error {
+	reviewOID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return app.ErrNotFound
+	}
+	return r.transaction(ctx, func(tx context.Context) error {
+		var row struct {
+			ProductID bson.ObjectID `bson:"product_id"`
+		}
+		err := r.reviews.FindOneAndUpdate(tx, bson.M{"_id": reviewOID}, bson.M{"$set": bson.M{"hidden": hidden}}, options.FindOneAndUpdate().SetProjection(bson.M{"product_id": 1})).Decode(&row)
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return app.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("set review hidden: %w", err)
+		}
+		return r.refreshSummary(tx, row.ProductID)
+	})
 }
 
 // Delete removes the review and recomputes the product aggregate atomically.
@@ -306,12 +335,18 @@ func (r *ReviewRepository) refreshSummary(ctx context.Context, productOID bson.O
 	return nil
 }
 
+// publicReviewFilter selects the reviews shown publicly: hidden ones are
+// excluded (documents without the field count as visible).
+func publicReviewFilter(productOID bson.ObjectID) bson.M {
+	return bson.M{"product_id": productOID, "hidden": bson.M{"$ne": true}}
+}
+
 // reviewStats is the single definition of the public aggregate: every
-// stored review counts, the average is rounded to two decimals, and no
-// reviews means 0/0.
+// visible review counts, the average is rounded to two decimals, and no
+// visible reviews means 0/0.
 func reviewStats(ctx context.Context, reviews *driver.Collection, productOID bson.ObjectID) (int64, float64, error) {
 	cur, err := reviews.Aggregate(ctx, bson.A{
-		bson.M{"$match": bson.M{"product_id": productOID}},
+		bson.M{"$match": publicReviewFilter(productOID)},
 		bson.M{"$group": bson.M{"_id": nil, "count": bson.M{"$sum": 1}, "average": bson.M{"$avg": "$rating"}}},
 	})
 	if err != nil {
@@ -351,7 +386,7 @@ func displayOrFallback(name string) string {
 }
 
 func ownReview(row bson.M) app.OwnReview {
-	return app.OwnReview{PublicReview: publicReview(row), OrderID: asID(row["order_id"])}
+	return app.OwnReview{PublicReview: publicReview(row), OrderID: asID(row["order_id"]), Hidden: asBool(row["hidden"])}
 }
 
 func publicReview(row bson.M) app.PublicReview {
