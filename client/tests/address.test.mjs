@@ -102,3 +102,13 @@ test('searchOptions finds provinces without diacritics; foldName keeps prefix', 
   assert.equal(searchOptions(options, 'ha noi')[0].label, 'Thành phố Hà Nội')
   assert.equal(foldName('Thành phố Đà Nẵng'), 'thanh pho da nang')
 })
+
+test('resolveTypedOption: exact label wins, folded match only when unambiguous', async () => {
+  const { resolveTypedOption } = await import('../src/features/address/divisions.ts')
+  const options = [{ label: 'Xã Văn Lang' }, { label: 'Xã Văn Lăng' }, { label: 'Phường Bến Thành' }]
+  assert.equal(resolveTypedOption(options, 'xã văn lăng')?.label, 'Xã Văn Lăng')
+  assert.equal(resolveTypedOption(options, 'xa van lang'), undefined)
+  assert.equal(resolveTypedOption(options, 'phuong ben thanh')?.label, 'Phường Bến Thành')
+  assert.equal(resolveTypedOption(options, 'ben'), undefined)
+  assert.equal(resolveTypedOption(options, '  '), undefined)
+})

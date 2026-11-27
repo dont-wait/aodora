@@ -63,6 +63,20 @@ export function searchOptions<T extends { label: string }>(options: T[], query: 
   return ranked.filter((item) => item.rank === 0).concat(ranked.filter((item) => item.rank === 1)).map((item) => item.option)
 }
 
+/**
+ * What a typed-but-not-chosen query resolves to: an exact label (case-insensitive) first, otherwise a
+ * diacritic-folded label match only when it is the single one. Ambiguous or unknown text resolves to nothing.
+ */
+export function resolveTypedOption<T extends { label: string }>(options: T[], query: string): T | undefined {
+  const plain = query.trim().replace(/\s+/g, ' ').toLowerCase()
+  if (!plain) return undefined
+  const exact = options.find((option) => option.label.toLowerCase() === plain)
+  if (exact) return exact
+  const folded = foldName(query)
+  const matches = options.filter((option) => foldName(option.label) === folded)
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 export function findProvince(list: Province[], name: string): Province | undefined {
   return pickByName(list, name)
 }

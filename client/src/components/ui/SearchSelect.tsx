@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { foldName, searchOptions } from '@/features/address/divisions'
+import { foldName, resolveTypedOption, searchOptions } from '@/features/address/divisions'
 
 export interface SearchSelectOption { value: string; label: string }
 
@@ -26,6 +26,7 @@ export default function SearchSelect({
   const listId = `${useId()}-listbox`
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const proxyRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState<string | null>(null) // null: show the selected label
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -43,9 +44,20 @@ export default function SearchSelect({
   }, [pendingText])
 
   useEffect(() => {
+    proxyRef.current?.setCustomValidity(required && !value ? 'Vui lòng chọn một mục trong danh sách.' : '')
+  }, [required, value])
+
+  useEffect(() => {
     if (!isOpen) return
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
   }, [isOpen, activeIndex, filtered])
+
+  /** Opening the list points the cursor at the committed option, so Enter never swaps it for another. */
+  function openList() {
+    if (open) return
+    if (query === null) setActive(Math.max(0, options.findIndex((option) => option.value === value)))
+    setOpen(true)
+  }
 
   function choose(next: string) {
     onChange(next)
@@ -56,20 +68,26 @@ export default function SearchSelect({
   function commitOnLeave() {
     setOpen(false)
     if (query === null) return
-    const typed = foldName(query)
-    if (!typed) {
+    if (!foldName(query)) {
       if (value) onChange('')
-    } else {
-      const exact = options.find((option) => foldName(option.label) === typed)
-      if (exact) onChange(exact.value)
+      setQuery(null)
+      return
     }
-    setQuery(null)
+    // Only an unambiguous match is committed ("Văn Lang"/"Văn Lăng" fold to the same key).
+    const match = resolveTypedOption(options, query)
+    if (match) {
+      onChange(match.value)
+      setQuery(null)
+      return
+    }
+    // Unmatched text stays visible (custom validity blocks submit) and never leaves the old choice behind.
+    if (value) onChange('')
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      if (!isOpen) { setOpen(true); return }
+      if (!isOpen) { openList(); return }
       if (!filtered.length) return
       const step = event.key === 'ArrowDown' ? 1 : -1
       setActive((activeIndex + step + filtered.length) % filtered.length)
@@ -93,7 +111,6 @@ export default function SearchSelect({
       <input
         ref={inputRef}
         id={id}
-        name={name}
         type="text"
         role="combobox"
         aria-expanded={isOpen}
@@ -104,12 +121,11 @@ export default function SearchSelect({
         autoComplete={autoComplete}
         inputMode="search"
         placeholder={placeholder}
-        required={required}
         disabled={disabled}
         value={text}
         className={`${className} ${selected && !disabled ? 'pr-16' : 'pr-10'}`}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
+        onFocus={openList}
+        onClick={openList}
         onChange={(event) => { setQuery(event.target.value); setActive(0); setOpen(true) }}
         onKeyDown={onKeyDown}
       />
@@ -125,6 +141,17 @@ export default function SearchSelect({
           ×
         </button>
       )}
+      {/* Carries the committed value for native forms and keeps `required` enforced even while the visible box is disabled (e.g. options still loading). */}
+      <input
+        ref={proxyRef}
+        tabIndex={-1}
+        aria-hidden="true"
+        name={name}
+        required={required}
+        value={value}
+        onChange={() => {}}
+        className="absolute inset-x-0 bottom-0 h-px w-full opacity-0 pointer-events-none"
+      />
       <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs">▾</span>
       {isOpen && (
         <ul
