@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import Modal from '@/components/ui/Modal'
-import { SIZE_CHART, STANDARD_SIZES, isStandardSize, suggestSize, type StandardSize } from '@/features/catalog/sizes'
+import { SIZE_CHART, STANDARD_SIZES, estimateSizeFromBody, isStandardSize, lengthFit, suggestSize, type StandardSize } from '@/features/catalog/sizes'
 
 const range = ([min, max]: [number, number]) => `${min}–${max}`
 const COLUMNS = [
@@ -17,9 +17,16 @@ export default function SizeGuideModal({ open, onClose, sizes }: { open: boolean
   const offered = new Set(sizes)
   // Show the product's sizes; if it lists none we know, show the whole chart.
   const rows = STANDARD_SIZES.filter((size) => SIZE_CHART[size] && (offered.size === 0 || offered.has(size) || !sizes.some(isStandardSize)))
-  const [body, setBody] = useState({ bust: '', waist: '', hip: '' })
-  const suggestion = body.bust && body.waist && body.hip ? suggestSize(Number(body.bust), Number(body.waist), Number(body.hip)) : undefined
+  const [body, setBody] = useState({ bust: '', waist: '', hip: '', height: '', weight: '' })
+  const hasGirths = Boolean(body.bust && body.waist && body.hip)
+  const estimated = !hasGirths && Boolean(body.height && body.weight)
+  // Girths decide whether the bodice closes; height and weight only give an estimate.
+  const suggestion = hasGirths
+    ? suggestSize(Number(body.bust), Number(body.waist), Number(body.hip))
+    : estimated ? estimateSizeFromBody(Number(body.height), Number(body.weight)) : undefined
   const available = suggestion ? offered.size === 0 || offered.has(suggestion) : false
+  const length = suggestion && body.height ? lengthFit(suggestion, Number(body.height)) : null
+  const fields = [['bust', 'Vòng ngực (cm)'], ['waist', 'Vòng eo (cm)'], ['hip', 'Vòng mông (cm)'], ['height', 'Chiều cao (cm)'], ['weight', 'Cân nặng (kg)']] as const
 
   return <Modal open={open} onClose={onClose} labelledBy="size-guide-title">
     <div className="flex items-center justify-between pb-4">
@@ -58,17 +65,21 @@ export default function SizeGuideModal({ open, onClose, sizes }: { open: boolean
 
     <fieldset className="mt-6 bg-surface-container-low p-4">
       <legend className="font-semibold text-on-surface px-1">Gợi ý size theo số đo của bạn</legend>
-      <div className="grid grid-cols-3 gap-3 mt-2">
-        {(['bust', 'waist', 'hip'] as const).map((key) => <label key={key} className="text-sm text-on-surface-variant">
-          {COLUMNS.find(([k]) => k === key)![1]} (cm)
-          <input type="number" inputMode="decimal" min={50} max={150} value={body[key]} onChange={(event) => setBody({ ...body, [key]: event.target.value })} className="mt-1 w-full bg-surface px-3 py-2 border border-outline-variant focus:border-primary outline-none" />
+      <p className="text-xs text-on-surface-variant mt-1">Nhập 3 vòng để chọn chính xác; thêm chiều cao để kiểm tra độ dài tà và tay. Chưa đo vòng thì nhập chiều cao + cân nặng để ước lượng.</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
+        {fields.map(([key, text]) => <label key={key} className="text-sm text-on-surface-variant">
+          {text}
+          <input type="number" inputMode="decimal" min={key === 'weight' ? 25 : 50} max={key === 'weight' ? 150 : 200} value={body[key]} onChange={(event) => setBody({ ...body, [key]: event.target.value })} className="mt-1 w-full bg-surface px-3 py-2 border border-outline-variant focus:border-primary outline-none" />
         </label>)}
       </div>
-      <p className="mt-3 text-sm min-h-5" aria-live="polite">
-        {suggestion === null && 'Số đo nằm ngoài bảng size may sẵn — áo may đo riêng sẽ vừa hơn.'}
-        {suggestion && available && <>Size phù hợp: <strong className="text-primary">{suggestion}</strong>. Nếu vòng nào nằm giữa hai size, hãy chọn size lớn hơn.</>}
-        {suggestion && !available && <>Bạn hợp size <strong className="text-primary">{suggestion}</strong>, nhưng mẫu này chưa có size đó.</>}
-      </p>
+      <div className="mt-3 text-sm min-h-5 space-y-1" aria-live="polite">
+        {suggestion === null && <p>{estimated ? 'Chiều cao, cân nặng nằm ngoài bảng size may sẵn' : 'Số đo nằm ngoài bảng size may sẵn'} — áo may đo riêng sẽ vừa hơn.</p>}
+        {suggestion && available && <p>{estimated ? 'Size ước lượng' : 'Size phù hợp'}: <strong className="text-primary">{suggestion}</strong>.{' '}
+          {estimated ? 'Đây chỉ là ước lượng theo chiều cao, cân nặng; hãy đo 3 vòng để chọn chính xác.' : 'Nếu vòng nào nằm giữa hai size, hãy chọn size lớn hơn.'}</p>}
+        {suggestion && !available && <p>Bạn hợp size <strong className="text-primary">{suggestion}</strong>, nhưng mẫu này chưa có size đó.</p>}
+        {suggestion && length === 'short' && <p className="text-secondary">Với chiều cao {body.height} cm, tà và tay áo size {suggestion} (dành cho {SIZE_CHART[suggestion]!.height.join('–')} cm) có thể hơi ngắn. Nên đặt may đo để áo vừa cả dáng lẫn độ dài.</p>}
+        {suggestion && length === 'long' && <p className="text-secondary">Với chiều cao {body.height} cm, tà và tay áo size {suggestion} (dành cho {SIZE_CHART[suggestion]!.height.join('–')} cm) có thể hơi dài. Bạn có thể nhờ tiệm sửa lai, hoặc đặt may đo cho vừa.</p>}
+      </div>
     </fieldset>
 
     <p className="text-on-surface-variant text-sm mt-4 leading-relaxed">Áo dài ôm sát nên chênh 1–2 cm cũng ảnh hưởng dáng áo. Xem <Link to="/dich-vu-may-do" onClick={onClose} className="underline text-primary">cách đo 8 số đo</Link> hoặc đặt may đo để áo vừa từng đường cong.</p>

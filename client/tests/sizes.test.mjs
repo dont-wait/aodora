@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { STANDARD_SIZES, isStandardSize, sortSizes, SIZE_CHART, suggestSize } from '../src/features/catalog/sizes.ts'
+import { STANDARD_SIZES, isStandardSize, sortSizes, SIZE_CHART, suggestSize, estimateSizeFromBody, lengthFit } from '../src/features/catalog/sizes.ts'
 import {
   buildVariantDrafts, cleanColors, draftsToVariants, isHexColor, parseAccessoriesJson, parseColorNames, skuPart, suggestSku, variantKey,
 } from '../src/features/admin/catalog.ts'
@@ -95,4 +95,19 @@ test('suggestSize picks the largest size any girth needs', () => {
   assert.equal(suggestSize(70, 55, 80), 'XS')
   assert.equal(suggestSize(110, 70, 95), null)
   assert.equal(suggestSize(0, 64, 88), null)
+})
+
+test('height and weight give an estimate when girths are unknown', () => {
+  assert.equal(estimateSizeFromBody(155, 44), 'S')
+  assert.equal(estimateSizeFromBody(156, 48), 'M')
+  assert.equal(estimateSizeFromBody(162, 54), 'L')
+  assert.equal(estimateSizeFromBody(150, 25), null)
+  assert.equal(estimateSizeFromBody(0, 48), null)
+})
+
+test('lengthFit warns when the wearer is taller or shorter than the size', () => {
+  assert.equal(lengthFit('S', 153), 'ok')
+  assert.equal(lengthFit('S', 165), 'short')
+  assert.equal(lengthFit('XL', 150), 'long')
+  assert.equal(lengthFit('Freesize', 160), null)
 })

@@ -46,3 +46,34 @@ export function suggestSize(bust: number, waist: number, hip: number): StandardS
   if (indexes.some((index) => index === -1) || [bust, waist, hip].some((v) => !(v > 0))) return null
   return order[Math.max(...indexes)]
 }
+
+/**
+ * Rough size from height and weight only, for shoppers who have not measured
+ * their girths. Weight decides (it tracks girth); height only breaks ties.
+ */
+export function estimateSizeFromBody(height: number, weight: number): StandardSize | null {
+  if (!(height > 0) || !(weight > 0)) return null
+  const order = STANDARD_SIZES.filter((size) => SIZE_CHART[size])
+  const distance = ([min, max]: [number, number], value: number) => (value < min ? min - value : value > max ? value - max : 0)
+  let best: StandardSize | null = null
+  let bestScore = Infinity
+  for (const size of order) {
+    const m = SIZE_CHART[size]!
+    const score = distance(m.weight, weight) * 10 + distance(m.height, height)
+    if (score < bestScore) { best = size; bestScore = score }
+  }
+  // Far outside the chart (e.g. 30 kg or 95 kg): ready-made sizes will not fit.
+  const first = SIZE_CHART[order[0]]!.weight[0], last = SIZE_CHART[order[order.length - 1]]!.weight[1]
+  return weight < first - 4 || weight > last + 6 ? null : best
+}
+
+export type LengthFit = 'short' | 'long' | 'ok'
+
+/** Whether a size's length suits the wearer: taller than the size's range → tà/tay may be short. */
+export function lengthFit(size: StandardSize, height: number): LengthFit | null {
+  const m = SIZE_CHART[size]
+  if (!m || !(height > 0)) return null
+  if (height > m.height[1] + 2) return 'short'
+  if (height < m.height[0] - 2) return 'long'
+  return 'ok'
+}
