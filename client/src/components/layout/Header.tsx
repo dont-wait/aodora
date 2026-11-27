@@ -113,6 +113,7 @@ export default function Header() {
                 <p className="text-xs uppercase tracking-widest text-secondary mt-1">{user.role === 'admin' ? 'Chủ cửa hàng' : 'Khách hàng'}</p>
               </div>
               <Link role="menuitem" to={ROUTES.account} className="flex items-center gap-2 px-3 py-3 text-on-surface-variant hover:bg-surface-container" onClick={() => setAccountOpen(false)}><Icon name="person" size={18} className="text-secondary" />Tài khoản của tôi</Link>
+              {user.role === 'admin' && <Link role="menuitem" to="/admin" className="flex items-center gap-2 px-3 py-3 text-on-surface-variant hover:bg-surface-container" onClick={() => setAccountOpen(false)}><Icon name="dashboard" size={18} className="text-secondary" />Trang quản trị</Link>}
               <button role="menuitem" type="button" className="w-full text-left px-3 py-3 text-red-700 hover:bg-surface-container" onClick={() => void logout().then(() => setAccountOpen(false)).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.', 'error'))}>Đăng xuất</button>
             </div>}
           </div> : <button aria-label="Đăng nhập" title="Đăng nhập" className="flex items-center ml-1" type="button" onClick={() => navigate(ROUTES.login)}>

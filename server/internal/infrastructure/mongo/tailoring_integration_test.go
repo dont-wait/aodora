@@ -61,7 +61,7 @@ func TestTailoringIntegration_RealMongoDB(t *testing.T) {
 	sessionToken := "tailoring-test-session-token-12345"
 	digest := sha256.Sum256([]byte(sessionToken))
 	tokenHash := hex.EncodeToString(digest[:])
-	if err := authRepo.CreateSession(ctx, custOID.Hex(), tokenHash, now.Add(24*time.Hour)); err != nil {
+	if err := authRepo.CreateSession(ctx, custOID.Hex(), "customer", tokenHash, now.Add(24*time.Hour)); err != nil {
 		t.Fatalf("create test customer session: %v", err)
 	}
 

@@ -30,7 +30,7 @@ func (r *authHTTPRepository) FindCustomerByEmail(context.Context, string) (app.U
 	}
 	return r.user, r.password, nil
 }
-func (r *authHTTPRepository) CreateSession(_ context.Context, _ string, tokenHash string, expiresAt time.Time) error {
+func (r *authHTTPRepository) CreateSession(_ context.Context, _, _ string, tokenHash string, expiresAt time.Time) error {
 	r.tokenHash, r.expiresAt = tokenHash, expiresAt
 	return nil
 }

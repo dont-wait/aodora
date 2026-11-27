@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthApiError } from '@/features/auth/api'
 import { useAuth } from '@/features/auth/useAuth'
-import { safeNextPath } from '@/features/auth/redirect'
+import { landingPath, safeNextPath } from '@/features/auth/redirect'
 import { ROUTES } from '@/data/site'
 import Icon from '@/components/ui/Icon'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const registered = params.get('registered') === '1'
@@ -23,12 +23,15 @@ export default function LoginPage() {
     event.preventDefault()
     setBusy(true); setError('')
     try {
-      await login(email, password)
-      navigate(next, { replace: true })
+      const user = await login(email, password)
+      navigate(landingPath(user.role, params.get('next')), { replace: true })
     } catch (err) {
       setError(err instanceof AuthApiError || err instanceof Error ? err.message : 'Đăng nhập thất bại')
     } finally { setBusy(false) }
   }
+
+  // Already signed in (e.g. back button to the login page): send them where their role belongs.
+  if (user && !busy) return <Navigate to={landingPath(user.role, params.get('next'))} replace />
 
   return <main className="max-w-[1180px] mx-auto px-5 py-10 lg:py-16">
     <div className="grid grid-cols-1 lg:grid-cols-2 bg-surface shadow-sm overflow-hidden">

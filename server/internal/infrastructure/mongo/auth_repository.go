@@ -82,16 +82,18 @@ func (r *AuthRepository) FindCustomerByEmail(ctx context.Context, email string) 
 
 type sessionDocument struct {
 	CustomerID bson.ObjectID `bson:"customer_id"`
+	Role       string        `bson:"role,omitempty"`
 	ExpiresAt  time.Time     `bson:"expires_at"`
 }
 
-func (r *AuthRepository) CreateSession(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
+// CreateSession stores the role granted at login; FindSessionUser ends the session once the account's role changes.
+func (r *AuthRepository) CreateSession(ctx context.Context, userID, role, tokenHash string, expiresAt time.Time) error {
 	id, err := bson.ObjectIDFromHex(userID)
 	if err != nil {
 		return fmt.Errorf("create session: invalid customer id: %w", err)
 	}
 	_, err = r.sessions.InsertOne(ctx, bson.M{
-		"token_hash": tokenHash, "customer_id": id,
+		"token_hash": tokenHash, "customer_id": id, "role": role,
 		"created_at": time.Now().UTC(), "expires_at": expiresAt,
 	})
 	return err
@@ -116,7 +118,13 @@ func (r *AuthRepository) FindSessionUser(ctx context.Context, tokenHash string, 
 	} else if err != nil {
 		return app.User{}, fmt.Errorf("find session customer: %w", err)
 	}
-	return userFromDocument(customer), nil
+	user := userFromDocument(customer)
+	// A promotion or demotion invalidates sessions opened under the old role.
+	if session.Role != "" && session.Role != user.Role {
+		_, _ = r.sessions.DeleteOne(ctx, bson.M{"token_hash": tokenHash})
+		return app.User{}, app.ErrSessionNotFound
+	}
+	return user, nil
 }
 
 func (r *AuthRepository) DeleteSession(ctx context.Context, tokenHash string) error {
