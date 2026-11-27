@@ -7,6 +7,10 @@ import (
 )
 
 type fakeRepo struct {
+	state ProductState
+	// adjustErr, when set, is returned by AdjustInventory.
+	adjustErr error
+
 	created  bool
 	edited   bool
 	adjusted bool
@@ -26,7 +30,8 @@ func (f *fakeRepo) ProductsBySlug(context.Context, []string) ([]map[string]any, 
 func (f *fakeRepo) SKUOwners(context.Context, []string) (map[string]string, error) {
 	return map[string]string{}, nil
 }
-func (f *fakeRepo) CategoryExists(context.Context, string) (bool, error) { return true, nil }
+func (f *fakeRepo) ProductState(context.Context, string) (ProductState, error) { return f.state, nil }
+func (f *fakeRepo) CategoryExists(context.Context, string) (bool, error)       { return true, nil }
 func (f *fakeRepo) CreateCategory(context.Context, CategoryInput) (map[string]any, error) {
 	f.created = true
 	return map[string]any{}, nil
@@ -54,6 +59,9 @@ func (f *fakeRepo) UpdateVariant(_ context.Context, _, _ string, v VariantDetail
 	return map[string]any{}, nil
 }
 func (f *fakeRepo) AdjustInventory(context.Context, string, string, int64, string) (map[string]any, error) {
+	if f.adjustErr != nil {
+		return nil, f.adjustErr
+	}
 	f.adjusted = true
 	return map[string]any{}, nil
 }
@@ -65,7 +73,7 @@ func (f *fakeRepo) UpdateProductContent(_ context.Context, id string, input Prod
 	return ContentRecord{ID: id, Version: *input.ExpectedVersion + 1, Story: input.Story, Fabric: input.Fabric, Craft: input.Craft}, nil
 }
 func goodCreate() ProductCreate {
-	return ProductCreate{ProductInput: ProductInput{Name: "Áo dài", Slug: "ao-dai", CategoryID: "670000000000000000000001", Price: 500000, IsActive: true}, Variants: []Variant{{SKU: "AO-DO-M", Color: "Đỏ", Size: "M", Stock: 10}}}
+	return ProductCreate{ProductInput: ProductInput{Name: "Áo dài", Slug: "ao-dai", CategoryID: "670000000000000000000001", Price: 500000, IsActive: true, Image: &Image{Src: "https://cdn.test/a.jpg", Alt: "Áo dài"}, Colors: []Color{{Name: "Đỏ"}}}, Variants: []Variant{{SKU: "AO-DO-M", Color: "Đỏ", Size: "M", Stock: 10}}}
 }
 func TestRejectInvalidWritesBeforeRepository(t *testing.T) {
 	cases := []struct {
@@ -124,7 +132,7 @@ func TestProductMetadataExcludesStockAndReviews(t *testing.T) {
 	// ProductInput is the only value accepted by UpdateProduct, so stock and
 	// review counts cannot accidentally enter the metadata update contract.
 	v := goodCreate().ProductInput
-	if err := validateProduct(v); err != nil {
+	if err := validateProduct(&v); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -133,16 +141,16 @@ func TestOptionalColorsAndAccessoryImages(t *testing.T) {
 	v := goodCreate().ProductInput
 	v.Colors = []Color{{Name: "Đỏ"}}
 	v.Accessories = []Accessory{{ID: "one", Name: "Phụ kiện", Price: 1000, Tag: "lụa", TagVariant: "hồng"}}
-	if err := validateProduct(v); err != nil {
+	if err := validateProduct(&v); err != nil {
 		t.Fatalf("legacy colors/accessories must be editable: %v", err)
 	}
 	v.Colors[0].Hex = "invalid"
-	if err := validateProduct(v); err == nil {
+	if err := validateProduct(&v); err == nil {
 		t.Fatal("bad non-empty hex accepted")
 	}
 }
 func TestVersionRequiredForPut(t *testing.T) {
-	service := NewService(&fakeRepo{})
+	service := NewService(&fakeRepo{state: ProductState{Active: true}})
 	v := goodCreate().ProductInput
 	if _, err := service.UpdateProduct(context.Background(), "abcdef123456abcdef123456", v); err == nil {
 		t.Fatal("PUT without expected_version must be rejected")
@@ -168,7 +176,7 @@ func TestSizeMustBeStandard(t *testing.T) {
 		v.Variants[0].Size = size
 		_, err := NewService(repo).CreateProduct(context.Background(), v)
 		var invalid Invalid
-		if !errors.As(err, &invalid) || invalid.Field != "size" || invalid.Message != "Cỡ phải là một trong XS, S, M, L, XL, XXL, Freesize" || repo.created {
+		if !errors.As(err, &invalid) || invalid.Field != "variants[0].size" || invalid.Message != "Cỡ phải là một trong XS, S, M, L, XL, XXL, Freesize" || repo.created {
 			t.Fatalf("create with size %q: err=%v created=%v", size, err, repo.created)
 		}
 		repo = &fakeRepo{}
@@ -184,7 +192,7 @@ func TestSizeMustBeStandard(t *testing.T) {
 func TestSizeIsStoredInStandardSpelling(t *testing.T) {
 	repo := &fakeRepo{}
 	v := goodCreate()
-	v.Variants = []Variant{{SKU: "A", Color: "Đỏ", Size: "freesize", Stock: 1}, {SKU: "B", Color: "Đỏ", Size: " xl ", Stock: 1}, {SKU: "C", Color: "Đỏ", Size: "", Stock: 1}}
+	v.Variants = []Variant{{SKU: "AO-A", Color: "Đỏ", Size: "freesize", Stock: 1}, {SKU: "AO-B", Color: "Đỏ", Size: " xl ", Stock: 1}, {SKU: "AO-C", Color: "Đỏ", Size: "", Stock: 1}}
 	if _, err := NewService(repo).CreateProduct(context.Background(), v); err != nil {
 		t.Fatal(err)
 	}
@@ -192,10 +200,10 @@ func TestSizeIsStoredInStandardSpelling(t *testing.T) {
 	if got[0] != "Freesize" || got[1] != "XL" || got[2] != "" {
 		t.Fatalf("sizes not canonicalised: %v", got)
 	}
-	if _, err := NewService(repo).AddVariant(context.Background(), "id", Variant{SKU: "D", Color: "Xanh", Size: "xxl"}); err != nil || repo.addedVariant.Size != "XXL" {
+	if _, err := NewService(repo).AddVariant(context.Background(), "id", Variant{SKU: "AO-D", Color: "Xanh", Size: "xxl"}); err != nil || repo.addedVariant.Size != "XXL" {
 		t.Fatalf("add variant: %v %q", err, repo.addedVariant.Size)
 	}
-	if _, err := NewService(repo).UpdateVariant(context.Background(), "id", "D", VariantDetails{Color: "Xanh", Size: "xs"}); err != nil || repo.updatedSize != "XS" {
+	if _, err := NewService(repo).UpdateVariant(context.Background(), "id", "AO-D", VariantDetails{Color: "Xanh", Size: "xs"}); err != nil || repo.updatedSize != "XS" {
 		t.Fatalf("update variant: %v %q", err, repo.updatedSize)
 	}
 }

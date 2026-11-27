@@ -6,14 +6,8 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"math"
-	"net/url"
 	"regexp"
 	"strings"
-	"unicode/utf8"
-
-	"github.com/your-org/aodora/server/internal/domain/catalog"
 )
 
 var (
@@ -25,8 +19,6 @@ var (
 type Invalid struct{ Field, Message string }
 
 func (e Invalid) Error() string { return e.Field + ": " + e.Message }
-
-var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 type Image struct {
 	Src string `json:"src" bson:"src"`
@@ -107,6 +99,8 @@ type Repository interface {
 	// ProductsBySlug and SKUOwners back the bulk import (lookups only, no writes).
 	ProductsBySlug(context.Context, []string) ([]map[string]any, error)
 	SKUOwners(context.Context, []string) (map[string]string, error)
+	// ProductState is the current stored state used by validation (images, colours, SKUs).
+	ProductState(context.Context, string) (ProductState, error)
 	CategoryExists(context.Context, string) (bool, error)
 	CreateCategory(context.Context, CategoryInput) (map[string]any, error)
 	UpdateCategory(context.Context, string, CategoryInput) (map[string]any, error)
@@ -118,9 +112,27 @@ type Repository interface {
 	ProductContent(context.Context, string) (ContentRecord, error)
 	UpdateProductContent(context.Context, string, ProductContent) (ContentRecord, error)
 }
-type Service struct{ repo Repository }
+type Service struct {
+	repo        Repository
+	imagePrefix string
+}
 
-func NewService(repo Repository) *Service { return &Service{repo: repo} }
+// Option configures a Service.
+type Option func(*Service)
+
+// WithImagePrefix makes the service accept only images stored under the given public bucket URL
+// (plus URLs already present in the record being edited).
+func WithImagePrefix(prefix string) Option {
+	return func(s *Service) { s.imagePrefix = strings.TrimRight(strings.TrimSpace(prefix), "/") }
+}
+
+func NewService(repo Repository, opts ...Option) *Service {
+	s := &Service{repo: repo}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
 func (s *Service) Categories(ctx context.Context) ([]map[string]any, error) {
 	return s.repo.Categories(ctx)
 }
@@ -134,150 +146,6 @@ func (s *Service) Products(ctx context.Context, page, pageSize int64) (ProductPa
 	return s.repo.Products(ctx, page, pageSize)
 }
 
-func field(v, name string, limit int) error {
-	v = strings.TrimSpace(v)
-	if v == "" || !utf8.ValidString(v) || utf8.RuneCountInString(v) > limit || strings.ContainsAny(v, "\x00\r\n") {
-		return Invalid{name, "Giá trị bắt buộc, không hợp lệ hoặc quá dài"}
-	}
-	return nil
-}
-func validateSlug(v string) error {
-	if len(v) > 150 || !slugPattern.MatchString(v) {
-		return Invalid{"slug", "Dùng chữ thường, số và dấu gạch ngang"}
-	}
-	return nil
-}
-func validateImage(i *Image, path string) error {
-	if i == nil {
-		return nil
-	}
-	if err := field(i.Src, path+".src", 2048); err != nil {
-		return err
-	}
-	if err := field(i.Alt, path+".alt", 200); err != nil {
-		return err
-	}
-	u, err := url.Parse(i.Src)
-	if err != nil || u.User != nil || (u.Scheme != "https" && u.Scheme != "http" && !(u.Scheme == "" && strings.HasPrefix(i.Src, "/"))) {
-		return Invalid{path + ".src", "Chỉ chấp nhận URL http(s) hoặc đường dẫn nội bộ"}
-	}
-	if u.Scheme == "" && u.Host != "" {
-		return Invalid{path + ".src", "Đường dẫn nội bộ không được bắt đầu bằng //"}
-	}
-	if u.Scheme != "" && u.Host == "" {
-		return Invalid{path + ".src", "Tên miền ảnh không hợp lệ"}
-	}
-	return nil
-}
-func validateCategory(c CategoryInput) error {
-	if err := field(c.Name, "name", 150); err != nil {
-		return err
-	}
-	if err := validateSlug(c.Slug); err != nil {
-		return err
-	}
-	if utf8.RuneCountInString(c.Description) > 2000 {
-		return Invalid{"description", "Mô tả quá dài"}
-	}
-	if c.SortOrder < 0 || c.SortOrder > 1000000 {
-		return Invalid{"sort_order", "Thứ tự phải từ 0 đến 1000000"}
-	}
-	return validateImage(c.Image, "image")
-}
-func validateProduct(p ProductInput) error {
-	if err := field(p.Name, "name", 200); err != nil {
-		return err
-	}
-	if err := validateSlug(p.Slug); err != nil {
-		return err
-	}
-	if err := field(p.CategoryID, "category_id", 24); err != nil {
-		return err
-	}
-	if len(p.CategoryID) != 24 {
-		return Invalid{"category_id", "Mã danh mục không hợp lệ"}
-	}
-	if p.Price < 0 || p.Price > math.MaxInt64/2 {
-		return Invalid{"price", "Giá không hợp lệ"}
-	}
-	if p.CompareAtPrice != nil && *p.CompareAtPrice < 0 {
-		return Invalid{"compare_at_price", "Giá không được âm"}
-	}
-	if utf8.RuneCountInString(p.Description) > 4000 {
-		return Invalid{"description", "Mô tả quá dài"}
-	}
-	if utf8.RuneCountInString(p.Material) > 200 {
-		return Invalid{"material", "Chất liệu quá dài"}
-	}
-	if len(p.Images) > 40 || len(p.Gallery) > 40 {
-		return Invalid{"images", "Quá nhiều hình ảnh"}
-	}
-	if err := validateImage(p.Image, "image"); err != nil {
-		return err
-	}
-	for i, x := range p.Gallery {
-		if err := validateImage(&x, fmt.Sprintf("gallery[%d]", i)); err != nil {
-			return err
-		}
-	}
-	for i, s := range p.Images {
-		if err := validateImage(&Image{Src: s, Alt: p.Name}, fmt.Sprintf("images[%d]", i)); err != nil {
-			return err
-		}
-	}
-	if len(p.Colors) > 100 || len(p.Accessories) > 40 {
-		return Invalid{"colors", "Quá nhiều màu hoặc phụ kiện"}
-	}
-	for i, c := range p.Colors {
-		if err := field(c.Name, fmt.Sprintf("colors[%d].name", i), 80); err != nil {
-			return err
-		}
-		if c.Hex != "" && !regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`).MatchString(c.Hex) {
-			return Invalid{"colors.hex", "Mã HEX phải có dạng #RRGGBB"}
-		}
-	}
-	for i, a := range p.Accessories {
-		if err := field(a.ID, fmt.Sprintf("accessories[%d].id", i), 80); err != nil {
-			return err
-		}
-		if err := field(a.Name, fmt.Sprintf("accessories[%d].name", i), 200); err != nil {
-			return err
-		}
-		if a.Price < 0 {
-			return Invalid{"accessories.price", "Giá phụ kiện không được âm"}
-		}
-		if err := validateImage(a.Image, fmt.Sprintf("accessories[%d].image", i)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// canonicalSize validates size against the standard list and returns its stored spelling.
-func canonicalSize(size string) (string, error) {
-	canonical, ok := catalog.CanonicalSize(size)
-	if !ok {
-		return "", Invalid{"size", catalog.SizeMessage}
-	}
-	return canonical, nil
-}
-func validateVariant(v *Variant) error {
-	if err := field(v.SKU, "sku", 80); err != nil {
-		return err
-	}
-	if err := field(v.Color, "color", 80); err != nil {
-		return err
-	}
-	size, err := canonicalSize(v.Size)
-	if err != nil {
-		return err
-	}
-	v.Size = size
-	if v.Stock < 0 || v.Stock > 1000000000 {
-		return Invalid{"stock", "Tồn kho không hợp lệ"}
-	}
-	return nil
-}
 func (s *Service) checkCategory(ctx context.Context, id string) error {
 	exists, err := s.repo.CategoryExists(ctx, id)
 	if err != nil {
@@ -287,101 +155,6 @@ func (s *Service) checkCategory(ctx context.Context, id string) error {
 		return Invalid{"category_id", "Danh mục không tồn tại"}
 	}
 	return nil
-}
-func (s *Service) CreateCategory(ctx context.Context, v CategoryInput) (map[string]any, error) {
-	if err := validateCategory(v); err != nil {
-		return nil, err
-	}
-	return s.repo.CreateCategory(ctx, v)
-}
-func (s *Service) UpdateCategory(ctx context.Context, id string, v CategoryInput) (map[string]any, error) {
-	if err := validateCategory(v); err != nil {
-		return nil, err
-	}
-	if canonicalObjectID(id) != "" && canonicalObjectID(id) == canonicalObjectID(v.ParentID) {
-		return nil, Invalid{"parent_id", "Danh mục không thể là cha của chính nó"}
-	}
-	if err := expectedVersion(v.ExpectedVersion); err != nil {
-		return nil, err
-	}
-	return s.repo.UpdateCategory(ctx, id, v)
-}
-func (s *Service) CreateProduct(ctx context.Context, v ProductCreate) (map[string]any, error) {
-	if err := validateProduct(v.ProductInput); err != nil {
-		return nil, err
-	}
-	if err := s.checkCategory(ctx, v.CategoryID); err != nil {
-		return nil, err
-	}
-	if len(v.Variants) < 1 || len(v.Variants) > 100 {
-		return nil, Invalid{"variants", "Cần từ 1 đến 100 SKU"}
-	}
-	uniqueSKU := map[string]bool{}
-	uniqueCombo := map[string]bool{}
-	total := int64(0)
-	for i := range v.Variants {
-		variant := &v.Variants[i]
-		if err := validateVariant(variant); err != nil {
-			return nil, err
-		}
-		key := strings.ToLower(variant.SKU)
-		combo := strings.ToLower(variant.Color) + "\x00" + strings.ToLower(variant.Size)
-		if uniqueSKU[key] || uniqueCombo[combo] {
-			return nil, Invalid{"variants", "SKU hoặc tổ hợp màu/cỡ bị trùng"}
-		}
-		uniqueSKU[key] = true
-		uniqueCombo[combo] = true
-		if total > math.MaxInt64-variant.Stock {
-			return nil, Invalid{"stock", "Tổng tồn kho quá lớn"}
-		}
-		total += variant.Stock
-	}
-	return s.repo.CreateProduct(ctx, v)
-}
-func (s *Service) UpdateProduct(ctx context.Context, id string, v ProductInput) (map[string]any, error) {
-	if err := validateProduct(v); err != nil {
-		return nil, err
-	}
-	if err := s.checkCategory(ctx, v.CategoryID); err != nil {
-		return nil, err
-	}
-	if err := expectedVersion(v.ExpectedVersion); err != nil {
-		return nil, err
-	}
-	return s.repo.UpdateProduct(ctx, id, v)
-}
-func (s *Service) AddVariant(ctx context.Context, id string, v Variant) (map[string]any, error) {
-	// Newly added SKUs start with no stock; inventory must be changed through
-	// an atomic delta so concurrent orders cannot be silently overwritten.
-	if err := validateVariant(&v); err != nil {
-		return nil, err
-	}
-	if v.Stock != 0 {
-		return nil, Invalid{"stock", "SKU mới bắt đầu với tồn kho bằng 0"}
-	}
-	return s.repo.AddVariant(ctx, id, v)
-}
-func (s *Service) UpdateVariant(ctx context.Context, id, sku string, v VariantDetails) (map[string]any, error) {
-	if err := field(v.Color, "color", 80); err != nil {
-		return nil, err
-	}
-	size, err := canonicalSize(v.Size)
-	if err != nil {
-		return nil, err
-	}
-	v.Size = size
-	return s.repo.UpdateVariant(ctx, id, sku, v)
-}
-func (s *Service) AdjustInventory(ctx context.Context, id, sku string, delta int64, requestID string) (map[string]any, error) {
-	if delta == 0 || delta < -1000000000 || delta > 1000000000 {
-		return nil, Invalid{"delta", "Thay đổi tồn kho phải khác 0 và trong giới hạn cho phép"}
-	}
-	// Retry identity is mandatory: a repeated network request must not apply
-	// a second delta, even if the previous response was lost.
-	if !uuidPattern.MatchString(requestID) {
-		return nil, Invalid{"request_id", "Cần mã yêu cầu UUID hợp lệ"}
-	}
-	return s.repo.AdjustInventory(ctx, id, sku, delta, strings.ToLower(requestID))
 }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
@@ -400,4 +173,18 @@ func canonicalObjectID(v string) string {
 		return ""
 	}
 	return strings.ToLower(v)
+}
+
+// ProductState is the stored state of one product, read for validation only.
+type ProductState struct {
+	ID       string
+	Slug     string
+	Active   bool
+	Images   []string // every image URL on the record (main, gallery, images[], accessories)
+	Colors   []string
+	Variants []StateVariant
+}
+type StateVariant struct {
+	SKU, Color, Size string
+	Stock            int64
 }

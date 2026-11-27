@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import RichText from '@/components/ui/RichText'
-import { guideImages, measurementFormFields, measurements } from '@/data/guide'
+import { measurementFormFields, measurements } from '@/data/guide'
+import MeasurementDiagram from './MeasurementDiagram'
 import { useToast } from '@/hooks/useToast'
 import { accountApi, type Measurements } from '@/features/account/api'
 import { useAuth } from '@/features/auth/useAuth'
@@ -116,27 +117,13 @@ export default function MeasurementSection() {
           </p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          <div className="lg:col-span-5 bg-surface-container-high p-8 flex flex-col items-center justify-center relative shadow-sm">
+          <div className="lg:col-span-5 lg:sticky lg:top-28 bg-surface-container-high p-6 sm:p-8 flex flex-col items-center justify-center relative shadow-sm">
             <div className="w-full flex items-center justify-between mb-4">
               <span className="font-label-uppercase text-label-uppercase text-on-surface-variant">Sơ đồ đo nhân trắc học</span>
               <span className="font-label-uppercase text-label-uppercase text-secondary">{current.indicator}</span>
             </div>
-            <div className="relative w-full max-w-[340px] aspect-[1/2] bg-surface-container flex items-center justify-center overflow-hidden shadow-inner">
-              <img src={guideImages.diagram.src} alt={guideImages.diagram.alt} className="w-full h-full object-cover opacity-85" />
-              {measurements.map((m) => (
-                <button
-                  key={m.step}
-                  type="button"
-                  aria-label={`Số đo ${m.step}: ${m.title}`}
-                  aria-pressed={m.step === step}
-                  onClick={() => setStep(m.step)}
-                  className={`absolute ${m.dotPosition} w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-md hover:scale-125 ${
-                    m.step === step ? 'bg-primary text-on-primary ring-4 ring-primary/20' : 'bg-surface-bright text-on-surface ring-2 ring-primary/30'
-                  }`}
-                >
-                  {m.step}
-                </button>
-              ))}
+            <div className="w-full max-w-[420px] shadow-inner">
+              <MeasurementDiagram step={step} onSelect={setStep} titles={Object.fromEntries(measurements.map((m) => [m.step, m.title]))} />
             </div>
             <div className="mt-6 w-full p-4 bg-surface text-center">
               <span className="font-title-editorial text-title-editorial italic text-primary">{current.focusName}</span>

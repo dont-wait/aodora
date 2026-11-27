@@ -317,7 +317,7 @@ func (s *Service) ImportCategories(ctx context.Context, rows []Row, commit bool)
 			}
 			in.Image = &Image{Src: url, Alt: alt}
 		}
-		if err := validateCategory(*in); err != nil {
+		if err := validateCategory(in); err != nil {
 			invalidToErr(&report.Errors, row.Number, err, "slug")
 			continue
 		}
@@ -326,6 +326,16 @@ func (s *Service) ImportCategories(ctx context.Context, rows []Row, commit bool)
 			continue
 		}
 		p.existing = bySlug[in.Slug]
+		if in.Image != nil {
+			existing := map[string]bool{}
+			if p.existing != nil {
+				existing = storedImageURLs(p.existing)
+			}
+			if err := s.checkImageURL(existing, "image_url", in.Image.Src); err != nil {
+				invalidToErr(&report.Errors, row.Number, err, "image_url")
+				continue
+			}
+		}
 		plans[in.Slug] = p
 		order = append(order, p)
 	}
@@ -705,7 +715,7 @@ func (s *Service) fillProductFields(report *ImportReport, p *productPlan, row Ro
 		in.Gallery = append(in.Gallery, Image{Src: g, Alt: in.Name})
 		p.hasImage = true
 	}
-	if err := validateProduct(*in); err != nil && len(report.Errors) == before {
+	if err := validateProduct(in); err != nil && len(report.Errors) == before {
 		invalidToErr(&report.Errors, row.Number, err, "name")
 	}
 }
@@ -750,6 +760,9 @@ func (s *Service) finishProduct(report *ImportReport, p *productPlan, owners map
 		if len(p.variants) > 100 {
 			addErr(&report.Errors, p.first, "sku", "Tối đa 100 SKU cho mỗi sản phẩm")
 		}
+		if err := s.checkProductImages(nil, p.input); err != nil {
+			invalidToErr(&report.Errors, p.first, err, "image_url")
+		}
 		p.detail = append(p.detail, fmt.Sprintf("%d SKU mới", len(p.variants)))
 		return
 	}
@@ -769,12 +782,29 @@ func (s *Service) finishProduct(report *ImportReport, p *productPlan, owners map
 		merged.Image, merged.Gallery, merged.Images = p.input.Image, p.input.Gallery, p.input.Images
 	}
 	if p.hasColor {
-		merged.Colors = p.colors
+		// Union: colours already on the product (possibly used by SKUs) are never dropped by an import.
+		for _, c := range p.colors {
+			found := false
+			for i, old := range merged.Colors {
+				if strings.EqualFold(old.Name, c.Name) {
+					found = true
+					if c.Hex != "" {
+						merged.Colors[i].Hex = c.Hex
+					}
+				}
+			}
+			if !found {
+				merged.Colors = append(merged.Colors, c)
+			}
+		}
 	}
 	version := mapInt(p.existing, "version")
 	merged.ExpectedVersion = &version
-	if err := validateProduct(merged); err != nil {
+	if err := validateProduct(&merged); err != nil {
 		invalidToErr(&report.Errors, p.first, err, "name")
+	}
+	if err := s.checkProductImages(storedImageURLs(p.existing), merged); err != nil {
+		invalidToErr(&report.Errors, p.first, err, "image_url")
 	}
 	old.ExpectedVersion = &version
 	emptyNotNil(&old)

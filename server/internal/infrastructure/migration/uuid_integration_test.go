@@ -120,15 +120,22 @@ func TestUUIDAdoptsRepositoryLegacyHistoryWithoutReplaying(t *testing.T) {
 		}
 		before[name] = n
 	}
+	// Later UUID migrations may remove data (e.g. the non-áo-dài demo seed), but
+	// adoption must never replay legacy inserts, and a second "up" is a no-op.
+	after := map[string]int64{}
 	for i := 0; i < 2; i++ {
 		if err := Run(uri, files, "up"); err != nil {
 			t.Fatal(err)
 		}
-	}
-	for _, name := range collections {
-		n, err := db.Collection(name).CountDocuments(ctx, bson.M{})
-		if err != nil || n != before[name] {
-			t.Fatalf("adoption changed %s: count=%d before=%d err=%v", name, n, before[name], err)
+		for _, name := range collections {
+			n, err := db.Collection(name).CountDocuments(ctx, bson.M{})
+			if err != nil || n > before[name] {
+				t.Fatalf("adoption replayed %s: count=%d before=%d err=%v", name, n, before[name], err)
+			}
+			if i == 1 && n != after[name] {
+				t.Fatalf("second up changed %s: count=%d first=%d", name, n, after[name])
+			}
+			after[name] = n
 		}
 	}
 	all, err := Load(files)

@@ -1,13 +1,9 @@
 import type { Img } from '@/types'
 
-export const guideImages: Record<'hero' | 'diagram' | 'heritageA' | 'heritageB' | 'artisan', Img> = {
+export const guideImages: Record<'hero' | 'heritageA' | 'heritageB' | 'artisan', Img> = {
   hero: {
-    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOn-rIu_1H7CHVcSsHlh4NXSJyoiuG_mSYDBYy6thPr89HO8AQI4TPzSlINMhbPSbRO3cEKGgr9y-tb3SfxKikTHiGwgq1ZQvz5PlVAseiTo_5YB4xDkPZWrUVSqfwRpGGAp6QIbOCpUsY2Ixg7g7ecZ69q6GuOWpj3qk04-8FJGiFy3ojFSVR9uqIFZY_THuWyfUDEfNRUEZCxmT3wrAUM4eMt5cIb0RJ8CzJu9SssuJTPnig8FAmSQ',
+    src: '/guide/hero.jpg',
     alt: 'Nghệ nhân may đo áo dài tại xưởng AODORA',
-  },
-  diagram: {
-    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBZMLJX6H_5jrVjRAlxFtNhucwY5rYXzlKtM-vBuWv-hZadQGHbq4IncjtMeMC_aMmbxTLiR_Fol3mgXR0r5Mv2XqjIpEEBE6TIJ6Y4Jh8QFOXsNznaOsggoCf2KzDWsYEULzGIpDZ0MTovqROPkeZi0qUW8sYLwV5IPEGmIGLIALfI7aEduU4EUjqOg9z_P42h7E6fZHzAbi9Wp7uSOjhN2_xT4tyJ1LJq6Xtlg9rZ-v5FupVrlCgvQw',
-    alt: 'Hình minh hoạ 8 vị trí số đo trên áo dài',
   },
   heritageA: {
     src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBkyJDC1td4phZh7SvYNR45nlQggIuaeh2BsJe1S2NOuUq9Un5a22HqVFVp32PUx0VnuV0SOdSyYlHutKlAWTe_rUFJHjOp3MnsFFjY5tHTj9hJbOA3xqAMsdO31dALb6T7s7FQoFq2UfK09NOeD-xdEXvTek5ESicxf-ctmuPj7BmsJJjZOlV0cFTpTWjmM769VzZm551p5XW6CWFlGoEDFCtPy14ybQdSs3cQxshTyJUu2xfh62Ctsg',
@@ -23,12 +19,20 @@ export const guideImages: Record<'hero' | 'diagram' | 'heritageA' | 'heritageB' 
   },
 }
 
+/** Photo behind the measurement diagram. Korea.net / Korean Culture and Information Service (Jeon Han), CC BY-SA 2.0, cropped. */
+export const DIAGRAM_PHOTO = {
+  src: '/guide/ao-dai-measure.jpg',
+  alt: 'Người mẫu mặc áo dài xanh ngọc đứng thẳng, dùng để chỉ 8 vị trí lấy số đo',
+  credit: 'Ảnh: Korea.net / KOCIS (Jeon Han)',
+  license: 'CC BY-SA 2.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0/',
+  sourceUrl: 'https://commons.wikimedia.org/wiki/File:KOCIS_Korea_Hanbok-AoDai_FashionShow_03_(9766157012).jpg',
+}
+
 export interface Measurement {
   step: number
   title: string
   icon: string
-  /** Vị trí chấm số trên hình minh hoạ (class Tailwind) */
-  dotPosition: string
   indicator: string
   focusName: string
   focusDesc: string
@@ -40,7 +44,6 @@ export const measurements: Measurement[] = [
     step: 1,
     title: 'Chiều cao & Cân nặng',
     icon: 'tune',
-    dotPosition: 'top-[14%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 1/8',
     focusName: '1. Chiều Cao & Cân Nặng Thực Tế',
     focusDesc: 'Xác định tỉ lệ nhân trắc tổng thể để căn chỉnh độ rơi của tà áo và độ mở của quần lụa thướt tha.',
@@ -50,7 +53,6 @@ export const measurements: Measurement[] = [
     step: 2,
     title: 'Vòng cổ',
     icon: 'straighten',
-    dotPosition: 'top-[19%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 2/8',
     focusName: '2. Vòng Cổ (Neck)',
     focusDesc: 'Đo sát chân cổ trên nền vải mềm để tạo dáng cổ đứng truyền thống 2cm - 3.5cm êm ái, thanh thoát.',
@@ -61,7 +63,6 @@ export const measurements: Measurement[] = [
     step: 3,
     title: 'Vòng ngực (Bust)',
     icon: 'straighten',
-    dotPosition: 'top-[28%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 3/8',
     focusName: '3. Vòng Ngực (Bust)',
     focusDesc: 'Đo ngang đỉnh ngực cao nhất. Thước giữ phẳng ngang lưng để áo ôm tôn đường cong mà không bức bối.',
@@ -72,7 +73,6 @@ export const measurements: Measurement[] = [
     step: 4,
     title: 'Hạ ngực & Dang ngực',
     icon: 'straighten',
-    dotPosition: 'top-[34%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 4/8',
     focusName: '4. Hạ Ngực & Dang Ngực',
     focusDesc: 'Căn chuẩn tâm điểm bầu ngực để cắt đường ben sườn và chích eo mượt mà, không bao giờ bị nhăn nhúm.',
@@ -83,7 +83,6 @@ export const measurements: Measurement[] = [
     step: 5,
     title: 'Vòng eo con kiến',
     icon: 'straighten',
-    dotPosition: 'top-[43%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 5/8',
     focusName: '5. Vòng Eo Thắt (Waist)',
     focusDesc: 'Đo eo trên rốn 2-3cm để tà áo dài tạo cảm giác chân dài miên man và đường cong eo con kiến quyến rũ.',
@@ -94,7 +93,6 @@ export const measurements: Measurement[] = [
     step: 6,
     title: 'Vòng mông & Điểm xẻ tà',
     icon: 'straighten',
-    dotPosition: 'top-[52%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 6/8',
     focusName: '6. Vòng Mông & Vị Trí Xẻ Tà',
     focusDesc: 'Căn cứ xẻ tà tà trước và sau chạm đúng thắt lưng quần, giữ trọn sự kín đáo trang nghiêm khi đi lại.',
@@ -105,7 +103,6 @@ export const measurements: Measurement[] = [
     step: 7,
     title: 'Rộng vai & Dài tay áo',
     icon: 'straighten',
-    dotPosition: 'top-[22%] left-[20%]',
     indicator: 'Thông số 7/8',
     focusName: '7. Rộng Vai & Dài Tay Áo',
     focusDesc: 'Đo chuẩn từ chân cổ qua mỏm vai đến cổ tay, giúp phần nách raglan của áo dài phẳng phiu không đùn vải.',
@@ -115,7 +112,6 @@ export const measurements: Measurement[] = [
     step: 8,
     title: 'Dài áo & Dài quần',
     icon: 'straighten',
-    dotPosition: 'bottom-[10%] left-1/2 -translate-x-1/2',
     indicator: 'Thông số 8/8',
     focusName: '8. Dài Áo & Dài Quần',
     focusDesc: 'Đo từ gáy sau rủ thẳng qua gót chân, tính toán bù trừ hoàn hảo theo chiều cao đế giày của quý cô.',

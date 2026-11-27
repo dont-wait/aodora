@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { adminCatalog, AdminApiError, type Image } from '@/features/admin/catalog'
+import ImageUploader from './ImageUploader'
 import {
   blankStory, blankFabric, blankCraft, editableContent, moveEntry, validateEditorialInput, synchronizeContentVersion,
   type StoryContent, type FabricContent, type CraftContent, type ProductContentInput, type MetadataWrite,
@@ -12,16 +13,8 @@ const secondaryClass = 'border border-outline/40 px-3 py-2 rounded-sm disabled:o
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="flex flex-col gap-1.5 text-sm font-medium">{label}{children}</label>
 }
-function PictureFields({ image, onChange }: { image: Image | null; onChange: (image: Image | null) => void }) {
-  function change(src: string, alt: string) { onChange(src || alt ? { src, alt } : null) }
-  return <div className="grid sm:grid-cols-2 gap-3">
-    <Field label="URL ảnh minh họa (không bắt buộc)">
-      <input className={fieldClass} value={image?.src ?? ''} onChange={(e) => change(e.target.value, image?.alt ?? '')}/>
-    </Field>
-    <Field label="Mô tả ảnh (alt)">
-      <input className={fieldClass} value={image?.alt ?? ''} onChange={(e) => change(image?.src ?? '', e.target.value)}/>
-    </Field>
-  </div>
+function PictureFields({ image, onChange, altBase, prefix }: { image: Image | null; onChange: (image: Image | null) => void; altBase: string; prefix: string }) {
+  return <ImageUploader purpose="content" label="Ảnh minh họa (không bắt buộc)" items={image ? [image] : []} onChange={(items) => onChange(items[0] ?? null)} altBase={altBase} pathPrefix={prefix} />
 }
 function RowActions({ index, count, move, remove }: { index: number; count: number; move: (to: number) => void; remove: () => void }) {
   return <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -31,8 +24,8 @@ function RowActions({ index, count, move, remove }: { index: number; count: numb
   </div>
 }
 
-export default function ProductContentEditor({ productId, metadataWrites, onVersion, onForbidden }: {
-  productId: string; metadataWrites: MetadataWrite[]; onVersion: (version: number) => void; onForbidden: () => void
+export default function ProductContentEditor({ productId, productName, metadataWrites, onVersion, onForbidden }: {
+  productId: string; productName: string; metadataWrites: MetadataWrite[]; onVersion: (version: number) => void; onForbidden: () => void
 }) {
   const mounted = useRef(true)
   const [draft, setData] = useState<ProductContentInput | null>(null)
@@ -101,7 +94,7 @@ export default function ProductContentEditor({ productId, metadataWrites, onVers
             <Field label="Dòng dẫn (eyebrow)"><input className={fieldClass} maxLength={160} value={data.story.eyebrow} onChange={(e) => updateStory({ eyebrow: e.target.value })}/></Field>
             <Field label="Tiêu đề"><input className={fieldClass} maxLength={250} value={data.story.title} onChange={(e) => updateStory({ title: e.target.value })}/></Field>
           </div>
-          <PictureFields image={data.story.image} onChange={(image) => updateStory({ image })}/>
+          <PictureFields image={data.story.image} onChange={(image) => updateStory({ image })} altBase={productName + " — câu chuyện"} prefix="story.image"/>
           <h3 className="font-semibold">Các đoạn kể (hiển thị theo thứ tự)</h3>
           {data.story.paragraphs.map((p, i) => <div key={i} className="border border-outline/30 p-3 space-y-2">
             <Field label={`Đoạn ${i + 1}`}><textarea rows={4} className={fieldClass} value={p} maxLength={3000} onChange={(e) => updateStory({ paragraphs: data.story!.paragraphs.map((v, j) => j === i ? e.target.value : v) })}/></Field>
@@ -119,7 +112,7 @@ export default function ProductContentEditor({ productId, metadataWrites, onVers
             <Field label="Tiêu đề"><input className={fieldClass} maxLength={250} value={data.fabric.title} onChange={(e) => updateFabric({ title: e.target.value })}/></Field>
           </div>
           <Field label="Mô tả chất liệu"><textarea rows={3} className={fieldClass} maxLength={4000} value={data.fabric.description} onChange={(e) => updateFabric({ description: e.target.value })}/></Field>
-          <PictureFields image={data.fabric.image} onChange={(image) => updateFabric({ image })}/>
+          <PictureFields image={data.fabric.image} onChange={(image) => updateFabric({ image })} altBase={productName + " — chất liệu"} prefix="fabric.image"/>
           <h3 className="font-semibold">Hướng dẫn bảo quản</h3>
           {data.fabric.care.map((item, i) => <div key={i} className="border border-outline/30 p-3 space-y-2">
             <div className="grid sm:grid-cols-2 gap-3">
@@ -141,7 +134,7 @@ export default function ProductContentEditor({ productId, metadataWrites, onVers
             <Field label="Tiêu đề"><input className={fieldClass} maxLength={250} value={data.craft.title} onChange={(e) => updateCraft({ title: e.target.value })}/></Field>
           </div>
           <Field label="Mô tả quy trình"><textarea rows={3} className={fieldClass} maxLength={4000} value={data.craft.description} onChange={(e) => updateCraft({ description: e.target.value })}/></Field>
-          <PictureFields image={data.craft.image} onChange={(image) => updateCraft({ image })}/>
+          <PictureFields image={data.craft.image} onChange={(image) => updateCraft({ image })} altBase={productName + " — chế tác"} prefix="craft.image"/>
           <h3 className="font-semibold">Các bước chế tác</h3>
           {data.craft.steps.map((item, i) => <div key={i} className="border border-outline/30 p-3 space-y-2">
             <Field label={`Bước ${i+1} · Tên bước`}><input className={fieldClass} maxLength={200} value={item.title} onChange={(e) => updateCraft({ steps: data.craft!.steps.map((v,j) => i === j ? { ...v, title: e.target.value } : v) })}/></Field>

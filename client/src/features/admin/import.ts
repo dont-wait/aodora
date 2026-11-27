@@ -94,12 +94,16 @@ export function saveBlob(blob: Blob, filename: string): void {
 export const CATEGORY_COLUMNS = ['name', 'slug', 'description', 'parent_slug', 'sort_order', 'is_active', 'image_url', 'image_alt'] as const
 export const PRODUCT_COLUMNS = ['product_slug', 'name', 'category_slug', 'description', 'material', 'price', 'compare_at_price', 'is_active', 'image_url', 'gallery_urls', 'color_name', 'color_hex', 'size', 'sku', 'stock'] as const
 
+// Sample image URLs live under the bucket's public URL: the server only accepts its own images.
+const bucketUrl = ((import.meta.env?.VITE_RUSTFS_PUBLIC_URL as string | undefined) ?? 'http://localhost:9100/aodora-images').replace(/\/$/, '')
+const sampleImage = (name: string) => bucketUrl + '/uploads/product/2026/01/' + name
+
 const SAMPLE_CATEGORIES = [
-  ['Áo dài', 'ao-dai', 'Áo dài truyền thống', '', '1', 'true', 'https://example.com/ao-dai.jpg', 'Áo dài'],
+  ['Áo dài', 'ao-dai', 'Áo dài truyền thống', '', '1', 'true', sampleImage('ao-dai.jpg'), 'Áo dài'],
   ['Áo dài cưới', 'ao-dai-cuoi', '', 'ao-dai', '2', 'true', '', ''],
 ]
 const SAMPLE_PRODUCTS = [
-  ['ao-dai-lua-do', 'Áo dài lụa đỏ', 'ao-dai', 'Áo dài lụa tơ tằm', 'Lụa tơ tằm', '1500000', '1800000', 'true', 'https://example.com/a.jpg', 'https://example.com/a1.jpg|https://example.com/a2.jpg', 'Đỏ đô', '#8b0000', 'S', 'AO-DAI-LUA-DO-S', '10'],
+  ['ao-dai-lua-do', 'Áo dài lụa đỏ', 'ao-dai', 'Áo dài lụa tơ tằm', 'Lụa tơ tằm', '1500000', '1800000', 'true', sampleImage('a.jpg'), sampleImage('a1.jpg') + '|' + sampleImage('a2.jpg'), 'Đỏ đô', '#8b0000', 'S', 'AO-DAI-LUA-DO-S', '10'],
   ['ao-dai-lua-do', '', '', '', '', '', '', '', '', '', 'Đỏ đô', '#8b0000', 'M', 'AO-DAI-LUA-DO-M', '8'],
   ['ao-dai-lua-do', '', '', '', '', '', '', '', '', '', 'Trắng', '#ffffff', 'Freesize', 'AO-DAI-LUA-TRANG-F', '5'],
 ]
