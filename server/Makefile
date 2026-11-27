@@ -104,6 +104,7 @@ seed-fetch: ## Tải ảnh seed demo
 	python3 seeds/fetch_images.py
 
 seed-admin: sumire-env ## Tạo tài khoản demo admin@aodora.local + user@aodora.local (mật khẩu password@123), không đụng catalog
+	go run ./cmd/importsumire -verify-target
 	go run ./cmd/seed -accounts-only
 
 seed-demo: ## Seed dữ liệu demo

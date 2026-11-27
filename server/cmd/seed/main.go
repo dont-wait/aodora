@@ -16,6 +16,7 @@ import (
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -151,7 +152,10 @@ func seedAccounts(ctx context.Context, db *database.Mongo) error {
 	for _, doc := range authUsers {
 		result, err := db.DB.Collection("customers").UpdateOne(ctx, bson.M{"$or": bson.A{
 			bson.M{"_id": doc["_id"]}, bson.M{"email_normalized": doc["email_normalized"]}, bson.M{"email": doc["email"]},
-		}}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))
+		}}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true).SetCollation(&options.Collation{Locale: "en", Strength: 2}))
+		if mongo.IsDuplicateKeyError(err) {
+			continue // a concurrent run inserted it first
+		}
 		if err != nil {
 			return fmt.Errorf("seed customer %s: %w", doc["email"], err)
 		}
