@@ -56,9 +56,13 @@ func run() error {
 	manifestPath := flag.String("manifest", "seeds/forher.json", "curated catalog manifest")
 	assetsPath := flag.String("assets", "seeds/assets", "downloaded images directory")
 	checkOnly := flag.Bool("check", false, "validate manifest and images without database writes")
+	accountsOnly := flag.Bool("accounts-only", false, "only create the demo admin/customer accounts (no catalog, no images)")
 	flag.Parse()
 	if err := config.LoadEnv(); err != nil {
 		return err
+	}
+	if *accountsOnly {
+		return withMongo(seedAccounts)
 	}
 	data, err := os.ReadFile(*manifestPath)
 	if err != nil {
@@ -76,6 +80,16 @@ func run() error {
 		fmt.Printf("Validated %d categories, %d products and their images\n", len(seed.Categories), len(seed.Products))
 		return nil
 	}
+	return withMongo(func(ctx context.Context, db *database.Mongo) error {
+		if err := seedCatalog(ctx, db, seed, baseURL); err != nil {
+			return err
+		}
+		return seedAccounts(ctx, db)
+	})
+}
+
+// withMongo opens the configured database for one seeding run.
+func withMongo(fn func(context.Context, *database.Mongo) error) error {
 	mongoConfig, err := config.LoadMongoConfig()
 	if err != nil {
 		return err
@@ -87,6 +101,10 @@ func run() error {
 		return err
 	}
 	defer func() { _ = db.Close(context.Background()) }()
+	return fn(ctx, db)
+}
+
+func seedCatalog(ctx context.Context, db *database.Mongo, seed manifest, baseURL string) error {
 	for _, name := range []string{"categories", "products"} {
 		collections, err := db.DB.ListCollectionNames(ctx, bson.M{"name": name})
 		if err != nil {
@@ -112,6 +130,11 @@ func run() error {
 		}
 		fmt.Printf("%s: inserted %d, preserved %d\n", group.name, inserted, int64(len(group.docs))-inserted)
 	}
+	return nil
+}
+
+// seedAccounts upserts the demo accounts; existing accounts with the same id or email are left untouched.
+func seedAccounts(ctx context.Context, db *database.Mongo) error {
 	customers, err := db.DB.ListCollectionNames(ctx, bson.M{"name": "customers"})
 	if err != nil {
 		return err
