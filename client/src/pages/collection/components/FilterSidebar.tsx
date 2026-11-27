@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { sidebarFilterKeys, type SidebarFilters } from '../sidebarFilters'
+import { STANDARD_SIZES, isStandardSize } from '@/features/catalog/sizes'
 import { parseVNDInput, formatVNDInput } from '@/features/catalog/prices'
 const readValues = (params: URLSearchParams): SidebarFilters => Object.fromEntries(sidebarFilterKeys.map((key) => [key, params.get(key) || ''])) as unknown as SidebarFilters
 interface Props { params: URLSearchParams; onApply: (draft: SidebarFilters) => void; onClear: () => void }
@@ -32,8 +33,10 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
         onChange={(e) => update('material', e.target.value)} placeholder="Ví dụ: lụa tơ tằm" /></label>
       <label className="block"><span className={label}>Màu sắc</span><input className={field} value={draft.color}
         onChange={(e) => update('color', e.target.value)} placeholder="Ví dụ: đỏ đô" /></label>
-      <label className="block"><span className={label}>Kích cỡ</span><input className={field} value={draft.size}
-        onChange={(e) => update('size', e.target.value)} placeholder="Ví dụ: M" /></label>
+      <label className="block"><span className={label}>Kích cỡ</span><select className={field} value={draft.size} onChange={(e) => update('size', e.target.value)}>
+        <option value="">Tất cả cỡ</option>
+        {(draft.size && !isStandardSize(draft.size) ? [...STANDARD_SIZES, draft.size] : STANDARD_SIZES).map((size) => <option key={size} value={size}>{size}</option>)}
+      </select></label>
       <fieldset><legend className={label}>Khoảng giá (VNĐ)</legend><div className="grid grid-cols-2 gap-2">
         <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="text" inputMode="numeric" placeholder="400.000" value={formatVNDInput(draft.min_price)} onChange={(e) => update('min_price', e.target.value)} /></label>
         <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="text" inputMode="numeric" placeholder="500.000" value={formatVNDInput(draft.max_price)} onChange={(e) => update('max_price', e.target.value)} /></label>

@@ -5,6 +5,7 @@ import Icon from '@/components/ui/Icon'
 import StarRating from '@/components/ui/StarRating'
 import type { CatalogProduct } from '@/features/catalog/types'
 import { getSelectedVariant, createCartSelection, addSelectedProduct } from '@/features/catalog/selection'
+import { sortSizes } from '@/features/catalog/sizes'
 import { useToast } from '@/hooks/useToast'
 import { formatVND } from '@/utils/format'
 
@@ -22,7 +23,7 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
   const maxStock = variant ? Math.min(variant.stock, product.stock) : (product.variants.length ? 0 : product.stock)
   const inStock = product.ready_available && maxStock >= quantity && (variant?.available || (!product.variants.length && !!product.sku))
   const colors = [...new Set(product.variants.map((v) => v.color).filter(Boolean))]
-  const sizes = [...new Set(product.variants.map((v) => v.size).filter(Boolean))]
+  const sizes = sortSizes([...new Set(product.variants.map((v) => v.size).filter(Boolean))])
   const compare = product.compare_at_price || product.old_price
   const validColor = (name: string) => product.colors?.find((c) => c.name === name && c.hex)?.hex
 

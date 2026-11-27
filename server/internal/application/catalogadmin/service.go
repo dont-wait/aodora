@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/your-org/aodora/server/internal/domain/catalog"
 )
 
 var (
@@ -247,16 +249,27 @@ func validateProduct(p ProductInput) error {
 	}
 	return nil
 }
-func validateVariant(v Variant) error {
+
+// canonicalSize validates size against the standard list and returns its stored spelling.
+func canonicalSize(size string) (string, error) {
+	canonical, ok := catalog.CanonicalSize(size)
+	if !ok {
+		return "", Invalid{"size", catalog.SizeMessage}
+	}
+	return canonical, nil
+}
+func validateVariant(v *Variant) error {
 	if err := field(v.SKU, "sku", 80); err != nil {
 		return err
 	}
 	if err := field(v.Color, "color", 80); err != nil {
 		return err
 	}
-	if err := field(v.Size, "size", 40); err != nil {
+	size, err := canonicalSize(v.Size)
+	if err != nil {
 		return err
 	}
+	v.Size = size
 	if v.Stock < 0 || v.Stock > 1000000000 {
 		return Invalid{"stock", "Tồn kho không hợp lệ"}
 	}
@@ -303,7 +316,8 @@ func (s *Service) CreateProduct(ctx context.Context, v ProductCreate) (map[strin
 	uniqueSKU := map[string]bool{}
 	uniqueCombo := map[string]bool{}
 	total := int64(0)
-	for _, variant := range v.Variants {
+	for i := range v.Variants {
+		variant := &v.Variants[i]
 		if err := validateVariant(variant); err != nil {
 			return nil, err
 		}
@@ -336,7 +350,7 @@ func (s *Service) UpdateProduct(ctx context.Context, id string, v ProductInput) 
 func (s *Service) AddVariant(ctx context.Context, id string, v Variant) (map[string]any, error) {
 	// Newly added SKUs start with no stock; inventory must be changed through
 	// an atomic delta so concurrent orders cannot be silently overwritten.
-	if err := validateVariant(v); err != nil {
+	if err := validateVariant(&v); err != nil {
 		return nil, err
 	}
 	if v.Stock != 0 {
@@ -348,9 +362,11 @@ func (s *Service) UpdateVariant(ctx context.Context, id, sku string, v VariantDe
 	if err := field(v.Color, "color", 80); err != nil {
 		return nil, err
 	}
-	if err := field(v.Size, "size", 40); err != nil {
+	size, err := canonicalSize(v.Size)
+	if err != nil {
 		return nil, err
 	}
+	v.Size = size
 	return s.repo.UpdateVariant(ctx, id, sku, v)
 }
 func (s *Service) AdjustInventory(ctx context.Context, id, sku string, delta int64, requestID string) (map[string]any, error) {

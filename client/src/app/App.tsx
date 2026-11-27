@@ -5,6 +5,7 @@ import GuidePage from '@/pages/guide/GuidePage'
 import HomePage from '@/pages/home/HomePage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
+import AdminLayout from '@/pages/admin/AdminLayout'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
 import AdminOrdersPage from '@/pages/admin/AdminOrdersPage'
@@ -29,14 +30,17 @@ export default function App() {
     <Routes>
       <Route path="403" element={<ForbiddenPage />} />
       <Route path="admin" element={<AdminAccessGuard />}>
-        <Route index element={<Navigate to="/admin/catalog" replace />} />
-        <Route path="catalog" element={<AdminCatalogPage />} />
-        <Route path="orders" element={<AdminOrdersPage />} />
-        <Route path="orders/:id" element={<AdminOrderDetailPage />} />
-        <Route path="tailoring" element={<AdminTailoringPage />} />
-        <Route path="tailoring/:id" element={<AdminTailoringDetailPage />} />
-        <Route path="reviews" element={<AdminReviewsPage />} />
-        <Route path="*" element={<Navigate to="/403" replace />} />
+        <Route element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/catalog" replace />} />
+          <Route path="catalog" element={<AdminCatalogPage view="product" />} />
+          <Route path="categories" element={<AdminCatalogPage view="category" />} />
+          <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="orders/:id" element={<AdminOrderDetailPage />} />
+          <Route path="tailoring" element={<AdminTailoringPage />} />
+          <Route path="tailoring/:id" element={<AdminTailoringDetailPage />} />
+          <Route path="reviews" element={<AdminReviewsPage />} />
+          <Route path="*" element={<Navigate to="/403" replace />} />
+        </Route>
       </Route>
       <Route element={<Layout />}>
         <Route path="dang-nhap" element={<LoginPage />} />

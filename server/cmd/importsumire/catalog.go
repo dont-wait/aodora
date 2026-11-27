@@ -15,6 +15,8 @@ import (
 	"unicode/utf8"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"github.com/your-org/aodora/server/internal/domain/catalog"
 )
 
 const (
@@ -142,7 +144,12 @@ func categoryFor(p srcProduct) categoryDef {
 	return catDefault
 }
 
-// normalizeSize reduces "Size A", "Tú Trân / Size B" or "aa" to "A", "B", "AA".
+// legacySizeMap converts the Sumire letter sizes to the standard VN sizes
+// (same mapping as migration *_size_standard).
+var legacySizeMap = map[string]string{"AA": "XS", "A": "S", "B": "M", "C": "L", "D": "XL"}
+
+// normalizeSize reduces "Size A", "Tú Trân / Size B" or "aa" to the standard
+// size: "S", "M", "XS". Values that are neither legacy nor standard are kept upper-cased.
 func normalizeSize(raw string) string {
 	value := strings.TrimSpace(raw)
 	if i := strings.LastIndex(value, "/"); i >= 0 {
@@ -152,7 +159,27 @@ func normalizeSize(raw string) string {
 	if strings.EqualFold(value, "default title") {
 		return ""
 	}
-	return strings.ToUpper(value)
+	value = strings.ToUpper(value)
+	if mapped, ok := legacySizeMap[value]; ok {
+		return mapped
+	}
+	if canonical, ok := catalog.CanonicalSize(value); ok {
+		return canonical
+	}
+	return value
+}
+
+// sortSizes orders sizes by the standard list; unknown sizes keep their order at the end.
+func sortSizes(sizes []string) []string {
+	rank := func(size string) int {
+		if i := slices.Index(catalog.StandardSizes, size); i >= 0 {
+			return i
+		}
+		return len(catalog.StandardSizes)
+	}
+	out := slices.Clone(sizes)
+	slices.SortStableFunc(out, func(a, b string) int { return rank(a) - rank(b) })
+	return out
 }
 
 func parsePrice(raw string) (int64, error) {
@@ -431,7 +458,7 @@ func productDocument(p srcProduct, baseURL string, defaultStock int64, now time.
 		"name": strings.TrimSpace(p.Title), "slug": slugPrefix + p.Handle, "sku": productSKU(variants),
 		"description": description, "collection": collectionName,
 		"price": price, "compare_at_price": nil, "stock": stock, "variants": variants,
-		"images": urls, "image": images[0], "gallery": images[1:], "colors": colors, "sizes": sizes,
+		"images": urls, "image": images[0], "gallery": images[1:], "colors": colors, "sizes": sortSizes(sizes),
 		"is_active": true, "bespoke": false,
 		"seed_source": seedSource, "source_url": p.SourceURL, "source_handle": p.Handle,
 		"accessories": []bson.M{}, "trust": []bson.M{},
@@ -463,11 +490,24 @@ func maxVariantPrice(variants []bson.M) int64 {
 	return max
 }
 
-// productSKU strips the size suffix from the first variant SKU, e.g. AD000041AA/AA -> AD000041.
+// productSKU strips the size suffix from the first variant SKU, e.g. AD000041AA (size XS, legacy AA) -> AD000041.
+// SKUs keep the legacy letter suffix, so the legacy letter for the size is tried before the standard size.
 func productSKU(variants []bson.M) string {
 	first := variants[0]["sku"].(string)
-	if size := variants[0]["size"].(string); size != "" && strings.HasSuffix(first, size) && len(first) > len(size) {
-		return strings.TrimSuffix(first, size)
+	size := variants[0]["size"].(string)
+	if size == "" {
+		return first
+	}
+	suffixes := []string{size}
+	for legacy, standard := range legacySizeMap {
+		if standard == size {
+			suffixes = []string{legacy, size}
+		}
+	}
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(first, suffix) && len(first) > len(suffix) {
+			return strings.TrimSuffix(first, suffix)
+		}
 	}
 	return first
 }

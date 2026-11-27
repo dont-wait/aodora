@@ -1,3 +1,4 @@
+import { STANDARD_SIZES } from '../catalog/sizes.ts'
 import type { ProductContentInput, ProductContentRecord } from './content'
 export type Image = { src: string; alt: string }
 export type CategoryInput = {
@@ -86,4 +87,90 @@ export function editableGallery(product: Pick<Product, 'name' | 'image' | 'image
     }
   }
   return items
+}
+
+/** Upper-case ASCII fragment for SKUs: "Đỏ đô" -> "DO-DO". */
+export function skuPart(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u{300}-\u{36f}]/gu, '')
+    .replace(/đ/gi, 'd')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/** Suggested SKU: SLUG-COLOR-SIZE; empty parts are skipped. */
+export function suggestSku(slug: string, color: string, size: string): string {
+  return [skuPart(slug), skuPart(color), skuPart(size)].filter(Boolean).join('-')
+}
+
+/** Splits comma/newline separated colours into unique trimmed names (case-insensitive), keeping order. */
+export function parseColorNames(input: string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of input.split(/[,\n]/)) {
+    const name = part.trim()
+    const key = name.toLowerCase()
+    if (name && !seen.has(key)) { seen.add(key); out.push(name) }
+  }
+  return out
+}
+
+export type VariantDraft = { key: string; color: string; size: string; sku: string; stock: string }
+export type VariantEdits = Record<string, { sku?: string; stock?: string }>
+export const variantKey = (color: string, size: string) => color + '||' + size
+
+/**
+ * Rows for the create-product builder: every colour x every chosen size (no sizes => one row per colour
+ * with an empty size). Hand edits to sku/stock survive regenerating; untouched SKUs follow the slug.
+ */
+export function buildVariantDrafts(slug: string, colors: string[], sizes: string[], edits: VariantEdits = {}): VariantDraft[] {
+  const ordered = STANDARD_SIZES.filter((size) => sizes.includes(size))
+  const sizeList: string[] = ordered.length ? [...ordered] : ['']
+  return colors.flatMap((color) =>
+    sizeList.map((size) => {
+      const key = variantKey(color, size)
+      return { key, color, size, sku: edits[key]?.sku ?? suggestSku(slug, color, size), stock: edits[key]?.stock ?? '0' }
+    }),
+  )
+}
+
+/** Validates builder rows and converts them to API variants. */
+export function draftsToVariants(rows: VariantDraft[]): Variant[] {
+  if (rows.length === 0) throw new Error('Thêm ít nhất một màu để tạo SKU')
+  return rows.map((row) => {
+    const sku = row.sku.trim()
+    if (!sku) throw new Error('SKU của ' + row.color + (row.size ? ' / ' + row.size : '') + ' đang trống')
+    const stock = Number(row.stock.trim() === '' ? NaN : row.stock)
+    if (!Number.isSafeInteger(stock) || stock < 0) throw new Error('Tồn kho của ' + sku + ' phải là số nguyên không âm')
+    return { sku, color: row.color, size: row.size, stock }
+  })
+}
+
+/** Parses the accessories JSON box; throws a readable message instead of a raw SyntaxError. */
+export function parseAccessoriesJson(text: string): ProductInput['accessories'] {
+  let value: unknown
+  try {
+    value = JSON.parse(text.trim() || '[]')
+  } catch (error) {
+    throw new Error('Phụ kiện: JSON không hợp lệ (' + (error instanceof Error ? error.message : 'lỗi cú pháp') + ')')
+  }
+  if (!Array.isArray(value)) throw new Error('Phụ kiện phải là một mảng JSON, ví dụ []')
+  return value as ProductInput['accessories']
+}
+
+export const isHexColor = (value: string) => /^#[0-9a-fA-F]{6}$/.test(value)
+
+/** Drops blank rows; sends hex only when it is a valid #rrggbb. */
+export function cleanColors(colors: { name: string; hex?: string }[]): { name: string; hex?: string }[] {
+  const out: { name: string; hex?: string }[] = []
+  for (const color of colors) {
+    const name = color.name.trim()
+    if (!name) continue
+    const hex = (color.hex ?? '').trim()
+    if (hex && !isHexColor(hex)) throw new Error('Mã màu của "' + name + '" phải có dạng #RRGGBB')
+    out.push(hex ? { name, hex } : { name })
+  }
+  return out
 }
