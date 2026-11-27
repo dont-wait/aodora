@@ -38,13 +38,13 @@ export default function LoginPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/10 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-8 text-on-primary">
-          <p className="uppercase tracking-[0.25em] text-xs text-secondary-fixed">AN SOIE · Áo Dài Di Sản Việt</p>
+          <p className="uppercase tracking-[0.25em] text-xs text-secondary-fixed">AODORA · Áo Dài Di Sản Việt</p>
           <p className="font-title-editorial text-3xl mt-3">Tinh hoa Việt trong từng nếp lụa.</p>
         </div>
       </div>
       <div className="p-8 sm:p-12 lg:p-16 flex items-center">
         <div className="w-full max-w-md mx-auto space-y-6">
-          <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AN SOIE</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Đăng nhập</h1><p className="text-on-surface-variant mt-3">Tiếp tục hành trình khám phá những thiết kế áo dài mang hồn Việt.</p></div>
+          <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AODORA</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Đăng nhập</h1><p className="text-on-surface-variant mt-3">Tiếp tục hành trình khám phá những thiết kế áo dài mang hồn Việt.</p></div>
           <form className="space-y-4" onSubmit={(event) => void submit(event)}>
             <label className="block space-y-1"><span>Email</span><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-surface-container p-3" /></label>
             <label className="block space-y-1"><span>Mật khẩu</span><span className="relative block"><input required type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-surface-container p-3 pr-12" /><button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword((value) => !value)} className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex h-10 w-11 items-center justify-center leading-none text-on-surface-variant hover:text-primary"><Icon name={showPassword ? 'visibility_off' : 'visibility'} size={20} /></button></span></label>

@@ -12,7 +12,7 @@ export default function BespokeSection() {
     setSubmitting(true)
     // TODO: gọi API đăng ký lịch may đo khi server sẵn sàng
     window.setTimeout(() => {
-      showToast('Cảm ơn Quý khách! Chuyên viên may đo của AN SOIE sẽ liên hệ trong ít phút.')
+      showToast('Cảm ơn Quý khách! Chuyên viên may đo của AODORA sẽ liên hệ trong ít phút.')
       e.currentTarget.reset()
       setSubmitting(false)
     }, 400)
@@ -33,7 +33,7 @@ export default function BespokeSection() {
               Nhận Cuốn Sách Lụa Mẫu Miễn Phí
             </h2>
             <p className="font-body-lg text-body-lg text-on-primary-container max-w-xl font-light leading-relaxed">
-              Nghệ nhân may đo của AN SOIE sẽ trực tiếp mang hộp 32 mẫu lụa tơ tằm thực tế đến tư vấn phong thái và lấy số đo riêng tại không gian nhà quý khách
+              Nghệ nhân may đo của AODORA sẽ trực tiếp mang hộp 32 mẫu lụa tơ tằm thực tế đến tư vấn phong thái và lấy số đo riêng tại không gian nhà quý khách
               (Áp dụng tại Hà Nội & TP.HCM).
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

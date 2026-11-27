@@ -3,7 +3,7 @@ import type { Img } from '@/types'
 export const guideImages: Record<'hero' | 'diagram' | 'heritageA' | 'heritageB' | 'artisan', Img> = {
   hero: {
     src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOn-rIu_1H7CHVcSsHlh4NXSJyoiuG_mSYDBYy6thPr89HO8AQI4TPzSlINMhbPSbRO3cEKGgr9y-tb3SfxKikTHiGwgq1ZQvz5PlVAseiTo_5YB4xDkPZWrUVSqfwRpGGAp6QIbOCpUsY2Ixg7g7ecZ69q6GuOWpj3qk04-8FJGiFy3ojFSVR9uqIFZY_THuWyfUDEfNRUEZCxmT3wrAUM4eMt5cIb0RJ8CzJu9SssuJTPnig8FAmSQ',
-    alt: 'Nghệ nhân may đo áo dài tại xưởng AN SOIE',
+    alt: 'Nghệ nhân may đo áo dài tại xưởng AODORA',
   },
   diagram: {
     src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBZMLJX6H_5jrVjRAlxFtNhucwY5rYXzlKtM-vBuWv-hZadQGHbq4IncjtMeMC_aMmbxTLiR_Fol3mgXR0r5Mv2XqjIpEEBE6TIJ6Y4Jh8QFOXsNznaOsggoCf2KzDWsYEULzGIpDZ0MTovqROPkeZi0qUW8sYLwV5IPEGmIGLIALfI7aEduU4EUjqOg9z_P42h7E6fZHzAbi9Wp7uSOjhN2_xT4tyJ1LJq6Xtlg9rZ-v5FupVrlCgvQw',
@@ -99,7 +99,7 @@ export const measurements: Measurement[] = [
     focusName: '6. Vòng Mông & Vị Trí Xẻ Tà',
     focusDesc: 'Căn cứ xẻ tà tà trước và sau chạm đúng thắt lưng quần, giữ trọn sự kín đáo trang nghiêm khi đi lại.',
     guide:
-      'Đo vòng quanh điểm nở nhất của mông. Vị trí xẻ tà của AN SOIE được tính toán trùng khít đường cạp quần để không bao giờ bị hở lườn, kín đáo trang nhã.',
+      'Đo vòng quanh điểm nở nhất của mông. Vị trí xẻ tà của AODORA được tính toán trùng khít đường cạp quần để không bao giờ bị hở lườn, kín đáo trang nhã.',
   },
   {
     step: 7,
@@ -146,13 +146,13 @@ export const faqs: Faq[] = [
     id: 1,
     question: '1. Nếu áo may đo xong mặc không vừa vặn thì xử lý thế nào?',
     answer:
-      'AN SOIE áp dụng chính sách **Chỉnh sửa miễn phí trọn đời** cho mọi trang phục may đo. Nếu mặc chưa ưng ý dù chỉ 1cm ở nách, eo hay dài tà, quý khách chỉ cần gửi áo hoặc chuyên viên sẽ đến lấy lại và tinh chỉnh hoàn thiện trong 48h làm việc mà không phát sinh thêm bất cứ chi phí nào.',
+      'AODORA áp dụng chính sách **Chỉnh sửa miễn phí trọn đời** cho mọi trang phục may đo. Nếu mặc chưa ưng ý dù chỉ 1cm ở nách, eo hay dài tà, quý khách chỉ cần gửi áo hoặc chuyên viên sẽ đến lấy lại và tinh chỉnh hoàn thiện trong 48h làm việc mà không phát sinh thêm bất cứ chi phí nào.',
   },
   {
     id: 2,
     question: '2. Thời gian hoàn thiện một chiếc áo dài may đo mất bao lâu?',
     answer:
-      'Thời gian may thông thường từ **5 đến 7 ngày** đối với áo dài trơn lụa tơ tằm. Với các mẫu thêu tay kỳ công họa tiết dân gian từ làng Quất Động hoặc kết hạt cườm thủ công, thời gian cần từ **10 đến 15 ngày**. Trong trường hợp quý khách cần gấp cho lễ cưới hỏi hoặc sự kiện ngoại giao, AN SOIE có dịch vụ may tốc hành ưu tiên trong 72 giờ.',
+      'Thời gian may thông thường từ **5 đến 7 ngày** đối với áo dài trơn lụa tơ tằm. Với các mẫu thêu tay kỳ công họa tiết dân gian từ làng Quất Động hoặc kết hạt cườm thủ công, thời gian cần từ **10 đến 15 ngày**. Trong trường hợp quý khách cần gấp cho lễ cưới hỏi hoặc sự kiện ngoại giao, AODORA có dịch vụ may tốc hành ưu tiên trong 72 giờ.',
   },
   {
     id: 3,

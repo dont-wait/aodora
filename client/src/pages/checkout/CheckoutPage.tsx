@@ -275,7 +275,7 @@ export default function CheckoutPage() {
     <main className="max-w-[1180px] mx-auto px-5 py-8 lg:py-14 space-y-8">
       <Breadcrumb items={[{ label: 'Trang chủ', to: '/' }, { label: 'Giỏ hàng', to: '/gio-hang' }, { label: 'Đặt mua áo' }]} />
       <header>
-        <p className="text-secondary text-sm tracking-widest uppercase">An Soie · Đặt mua áo</p>
+        <p className="text-secondary text-sm tracking-widest uppercase">Aodora · Đặt mua áo</p>
         <h1 className="font-headline-lg text-4xl text-primary mt-2">Thông tin nhận áo</h1>
         <p className="mt-3 text-on-surface-variant">Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.</p>
       </header>

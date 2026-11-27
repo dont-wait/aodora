@@ -11,7 +11,7 @@ export default function PillarsSection() {
           className="max-w-2xl mb-16 space-y-3"
           eyebrow="Kỳ Công Từng Đường Kim"
           title="Triết Lý Nghệ Thuật & Chất Liệu"
-          description="Mỗi tác phẩm Áo Dài tại AN SOIE là một kiệt tác dung hòa giữa hồn tơ truyền thống, sự khắt khe của tay nghề thủ công và phom dáng tôn vinh tuyệt đối cốt cách người mặc."
+          description="Mỗi tác phẩm Áo Dài tại AODORA là một kiệt tác dung hòa giữa hồn tơ truyền thống, sự khắt khe của tay nghề thủ công và phom dáng tôn vinh tuyệt đối cốt cách người mặc."
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {pillars.map((p, i) => (

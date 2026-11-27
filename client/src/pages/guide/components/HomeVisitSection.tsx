@@ -28,7 +28,7 @@ export default function HomeVisitSection() {
             </div>
             <h2 className="font-headline-lg text-headline-lg text-primary tracking-tight">Dịch Vụ 'May Đo Tận Nơi' Tại Tư Gia & Cơ Quan</h2>
             <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-              Dành cho quý cô bận rộn hoặc mong muốn trải nghiệm may đo riêng tư, thư thái nhất. Chuyên viên may đo và stylist của AN SOIE sẽ mang toàn bộ
+              Dành cho quý cô bận rộn hoặc mong muốn trải nghiệm may đo riêng tư, thư thái nhất. Chuyên viên may đo và stylist của AODORA sẽ mang toàn bộ
               catalogue mẫu vải tơ tằm thượng hạng, bảng màu nhuộm tự nhiên và thước may đến tận nơi bạn yêu cầu.
             </p>
             <ul className="space-y-3 font-body-md text-body-md text-on-surface">

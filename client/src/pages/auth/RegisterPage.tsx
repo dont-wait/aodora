@@ -31,7 +31,7 @@ export default function RegisterPage() {
 
   return <main className="max-w-lg mx-auto px-5 py-16">
     <div className="bg-surface p-8 shadow-sm space-y-6">
-      <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AN SOIE</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Tạo tài khoản</h1></div>
+      <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AODORA</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Tạo tài khoản</h1></div>
       <form className="space-y-4" onSubmit={(event) => void submit(event)}>
         <label className="block space-y-1"><span>Họ và tên</span><input required autoComplete="name" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} className="w-full bg-surface-container p-3" /></label>
         <label className="block space-y-1"><span>Email</span><input required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full bg-surface-container p-3" /></label>
