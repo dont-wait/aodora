@@ -2,7 +2,7 @@ import type { Img } from '@/types'
 
 export const guideImages: Record<'hero' | 'heritageA' | 'heritageB' | 'artisan', Img> = {
   hero: {
-    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOn-rIu_1H7CHVcSsHlh4NXSJyoiuG_mSYDBYy6thPr89HO8AQI4TPzSlINMhbPSbRO3cEKGgr9y-tb3SfxKikTHiGwgq1ZQvz5PlVAseiTo_5YB4xDkPZWrUVSqfwRpGGAp6QIbOCpUsY2Ixg7g7ecZ69q6GuOWpj3qk04-8FJGiFy3ojFSVR9uqIFZY_THuWyfUDEfNRUEZCxmT3wrAUM4eMt5cIb0RJ8CzJu9SssuJTPnig8FAmSQ',
+    src: '/guide/hero.jpg',
     alt: 'Nghệ nhân may đo áo dài tại xưởng AODORA',
   },
   heritageA: {

@@ -2,11 +2,11 @@ import type { Img } from '@/types'
 
 export const heroImages: { main: Img; detail: Img } = {
   main: {
-    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBGYzE_LsU46KmIT3BetQwQsQjCH2mZAThdnx52hWYUDiRrVmFoIW5AjEJtuxvzuaTZyPlw1y5asudQpWJAssXfq-qK18s7KYdCilmf_xchO0EgmnIsSaK4s0fUShksP2zN4kUdhGLSj4hGDrOT3bt0W4zH5B9mmEXkfPWHAGCzGCoMuVCEkjuvD2h2YL4-707lGP4naTDeI5axXwCRaQ-zM3daduVrYKuFBGpurS1dXCvUqcCM-nHPbQ',
+    src: '/home/hero.jpg',
     alt: 'Người phụ nữ Việt mặc áo dài lụa đỏ thẫm giữa sân nhà cổ Huế',
   },
   detail: {
-    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC04of0E9gUUBhpcVQHfSblEuoH9xqGEc2ZfezwEj66-Q1UdvvLtkEiSX9o9LftIwkwzSLrokQtziXnLxUwJeieLyUbpFC6oVndkKaKIC__tsDsWRopqg2TZ4xQol7TBzDPzb7FsFsf2qqfMPKTIf5mqIvd8iyfgfXaqZjtwzJAyJwzGMWhQI0e32Y-PMQ5sRWp2loV8d1bBcpqkb3g9BpFwXd-eG9FznCrx_miTKEyim7RU7o9fgYJOw',
+    src: '/home/detail.jpg',
     alt: 'Cận cảnh họa tiết sen vàng thêu tay trên lụa tơ tằm màu ngà',
   },
 }
