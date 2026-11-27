@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { STANDARD_SIZES, isStandardSize, sortSizes } from '../src/features/catalog/sizes.ts'
+import { STANDARD_SIZES, isStandardSize, sortSizes, SIZE_CHART, suggestSize } from '../src/features/catalog/sizes.ts'
 import {
   buildVariantDrafts, cleanColors, draftsToVariants, isHexColor, parseAccessoriesJson, parseColorNames, skuPart, suggestSku, variantKey,
 } from '../src/features/admin/catalog.ts'
@@ -77,4 +77,22 @@ test('accessories JSON: clear error messages', () => {
   assert.deepEqual(parseAccessoriesJson('[{"id":"a"}]'), [{ id: 'a' }])
   assert.throws(() => parseAccessoriesJson('[{'), /Phụ kiện: JSON không hợp lệ/)
   assert.throws(() => parseAccessoriesJson('{}'), /mảng JSON/)
+})
+
+test('size chart ranges grow with the size and do not overlap', () => {
+  const rows = ['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((s) => SIZE_CHART[s])
+  for (let i = 1; i < rows.length; i++) {
+    for (const key of ['bust', 'waist', 'hip']) {
+      assert.ok(rows[i][key][0] > rows[i - 1][key][1], key + ' overlaps at ' + i)
+    }
+  }
+  assert.equal(SIZE_CHART.Freesize, undefined)
+})
+
+test('suggestSize picks the largest size any girth needs', () => {
+  assert.equal(suggestSize(82, 64, 88), 'S')
+  assert.equal(suggestSize(82, 68, 88), 'M')
+  assert.equal(suggestSize(70, 55, 80), 'XS')
+  assert.equal(suggestSize(110, 70, 95), null)
+  assert.equal(suggestSize(0, 64, 88), null)
 })
