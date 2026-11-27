@@ -17,10 +17,11 @@ import (
 
 // Every seeded document carries this tag so a rerun replaces the batch
 // instead of piling up, and -purge removes it without touching real data.
-const (
-	seedTag       = "order-history"
-	checkoutScope = "seed-order-history"
-)
+const seedTag = "order-history"
+
+// Demo customers cannot sign in: this is not a bcrypt hash, so every password
+// check fails, but it satisfies the customers schema (password_hash required).
+const noLoginPasswordHash = "!seed-order-history:no-login"
 
 var vnZone = time.FixedZone("ICT", 7*3600)
 
@@ -114,8 +115,8 @@ func generate(o options, products []product, wards []ward) (batch, error) {
 		customers[i] = c
 		out.Customers = append(out.Customers, bson.M{
 			"_id": c.ID, "full_name": c.Name, "email": c.Email, "email_normalized": c.Email, "phone": c.Phone, "role": "customer",
-			"addresses":  bson.A{bson.M{"recipient": c.Name, "phone": c.Phone, "line1": c.Address.Line1, "ward": c.Address.Ward, "city": c.Address.City, "is_default": true}},
-			"created_at": c.JoinedAt.UTC(), "updated_at": c.JoinedAt.UTC(), "seed_tag": seedTag,
+			"addresses":     bson.A{bson.M{"recipient": c.Name, "phone": c.Phone, "line1": c.Address.Line1, "ward": c.Address.Ward, "city": c.Address.City, "is_default": true}},
+			"password_hash": noLoginPasswordHash, "created_at": c.JoinedAt.UTC(), "updated_at": c.JoinedAt.UTC(), "seed_tag": seedTag,
 		})
 	}
 
@@ -199,15 +200,21 @@ func buildOrder(r *rand.Rand, o options, created time.Time, number string, buyer
 		"_id": bson.NewObjectID(), "order_number": number, "status": status, "payment_method": method, "payment_status": payment,
 		"subtotal": subtotal, "shipping_fee": fee, "total": subtotal + fee, "fulfillment_mode": "ready", "items": items,
 		"created_at": created.UTC(), "updated_at": updated.UTC(), "seed_tag": seedTag,
-		"checkout": bson.M{"scope": checkoutScope, "request_id": number, "request_hash": hashHex(number)},
 	}
+	// Same shape as a real checkout: the scope names the buyer (customer:<id> or
+	// guest:<access hash>) and the request id is a UUID, as the orders schema requires.
+	scope := ""
 	if buyer != nil {
 		doc["customer_id"] = buyer.ID
+		scope = "customer:" + buyer.ID.Hex()
 		recipient, tel, addr = buyer.Name, buyer.Phone, buyer.Address
 	} else {
 		recipient, tel = vietnameseName(r), phone(r)
-		doc["guest_access_hash"] = hashHex(number + "/guest")
+		access := hashHex(number + "/guest")
+		doc["guest_access_hash"] = access
+		scope = "guest:" + access
 	}
+	doc["checkout"] = bson.M{"scope": scope, "request_id": uuidV4(r), "request_hash": hashHex(number)}
 	doc["shipping_address"] = bson.M{"recipient": recipient, "phone": tel, "line1": addr.Line1, "ward": addr.Ward, "city": addr.City}
 	if r.Float64() < 0.18 {
 		doc["note"] = notes[r.IntN(len(notes))]
@@ -321,6 +328,17 @@ func phone(r *rand.Rand) string {
 func randomAddress(r *rand.Rand, wards []ward) address {
 	w := wards[r.IntN(len(wards))]
 	return address{Line1: fmt.Sprintf("%d %s", 1+r.IntN(320), streets[r.IntN(len(streets))]), Ward: w.Name, City: w.Province}
+}
+
+func uuidV4(r *rand.Rand) string {
+	var b [16]byte
+	for i := range b {
+		b[i] = byte(r.IntN(256))
+	}
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	h := hex.EncodeToString(b[:])
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 }
 
 func hashHex(s string) string {

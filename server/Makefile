@@ -42,7 +42,7 @@ test: ## Chạy unit test (race)
 
 test-migrations: ## Integration test migration (cần MONGO_TEST_URI)
 	@test -n "$${MONGO_TEST_URI:-}" || { echo "MONGO_TEST_URI is required"; exit 1; }
-	go test -race -tags=integration ./internal/infrastructure/migration -count=1 -v
+	go test -race -tags=integration ./internal/infrastructure/migration ./cmd/seedorders -count=1 -v
 
 test-orders: ## Integration test đơn hàng (cần MONGO_TEST_URI)
 	@test -n "$${MONGO_TEST_URI:-}" || { echo "MONGO_TEST_URI is required"; exit 1; }
