@@ -30,7 +30,7 @@ func (f *fakeRepository) FindCustomerByEmail(context.Context, string) (User, str
 	return f.user, f.password, nil
 }
 
-func (f *fakeRepository) CreateSession(_ context.Context, _ string, tokenHash string, expiresAt time.Time) error {
+func (f *fakeRepository) CreateSession(_ context.Context, _, _ string, tokenHash string, expiresAt time.Time) error {
 	f.session, f.expiresAt = tokenHash, expiresAt
 	return nil
 }

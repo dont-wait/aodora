@@ -46,7 +46,7 @@ type RegisterInput struct {
 type Repository interface {
 	CreateCustomer(context.Context, RegisterInput, string) (User, error)
 	FindCustomerByEmail(context.Context, string) (User, string, error)
-	CreateSession(context.Context, string, string, time.Time) error
+	CreateSession(ctx context.Context, userID, role, tokenHash string, expiresAt time.Time) error
 	FindSessionUser(context.Context, string, time.Time) (User, error)
 	DeleteSession(context.Context, string) error
 }
@@ -111,7 +111,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 		return User{}, "", time.Time{}, err
 	}
 	expiresAt := s.now().Add(s.sessionTTL)
-	if err := s.repo.CreateSession(ctx, user.ID, hashToken(token), expiresAt); err != nil {
+	if err := s.repo.CreateSession(ctx, user.ID, user.Role, hashToken(token), expiresAt); err != nil {
 		return User{}, "", time.Time{}, err
 	}
 	return user, token, expiresAt, nil

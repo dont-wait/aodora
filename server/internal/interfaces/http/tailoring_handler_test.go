@@ -64,7 +64,7 @@ func (r *tailoringAuthRepo) FindCustomerByEmail(context.Context, string) (appaut
 	return appauth.User{}, "", nil
 }
 
-func (r *tailoringAuthRepo) CreateSession(_ context.Context, _ string, tokenHash string, expiresAt time.Time) error {
+func (r *tailoringAuthRepo) CreateSession(_ context.Context, _, _ string, tokenHash string, expiresAt time.Time) error {
 	return nil
 }
 
