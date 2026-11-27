@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	model "github.com/your-org/aodora/server/internal/domain/catalog"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -329,9 +330,8 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 		terms = append(terms, bson.M{"price": price})
 	}
 	if f.Material != "" {
-		terms = append(terms, bson.M{"material": bson.Regex{
-			Pattern: "^" + regexp.QuoteMeta(f.Material) + "$", Options: "i",
-		}})
+		// "lụa", "lua to tam" and "Lụa tơ tằm" all find "Lụa tơ tằm dệt Nha Xá".
+		terms = append(terms, bson.M{"material": bson.Regex{Pattern: vietnameseContainsPattern(f.Material), Options: "i"}})
 	}
 	if f.Color != "" || f.Size != "" {
 		variant := bson.M{}
@@ -340,11 +340,13 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 			bson.M{"variants": bson.M{"$size": 0}},
 		}}}
 		if f.Color != "" {
-			exact := bson.Regex{Pattern: "^" + regexp.QuoteMeta(f.Color) + "$", Options: "i"}
-			variant["color"] = exact
+			// Shoppers type a colour family ("đỏ", "xanh"); variant names are
+			// specific ("Đỏ tươi", "Xanh cổ vịt"), so match words, not whole names.
+			name := bson.Regex{Pattern: vietnameseContainsPattern(f.Color), Options: "i"}
+			variant["color"] = name
 			fallback = append(fallback, bson.M{"$or": bson.A{
-				bson.M{"colors": bson.M{"$elemMatch": bson.M{"name": exact}}},
-				bson.M{"colors": bson.M{"$elemMatch": bson.M{"hex": exact}}},
+				bson.M{"colors": bson.M{"$elemMatch": bson.M{"name": name}}},
+				bson.M{"colors": bson.M{"$elemMatch": bson.M{"hex": bson.Regex{Pattern: "^" + regexp.QuoteMeta(f.Color) + "$", Options: "i"}}}},
 			}})
 		}
 		if f.Size != "" {
@@ -360,6 +362,41 @@ func productFilter(f model.Filter, categoryIDs []string) bson.M {
 		}})
 	}
 	return bson.M{"$and": terms}
+}
+
+// vietnameseFold groups each base letter with its Vietnamese diacritic forms so
+// a regex matches with or without accents (MongoDB regex has no collation).
+var vietnameseFold = map[rune]string{
+	'a': "aàáảãạăằắẳẵặâầấẩẫậ", 'e': "eèéẻẽẹêềếểễệ", 'i': "iìíỉĩị",
+	'o': "oòóỏõọôồốổỗộơờớởỡợ", 'u': "uùúủũụưừứửữự", 'y': "yỳýỷỹỵ", 'd': "dđ",
+}
+
+// vietnameseContainsPattern turns user text into a case-insensitive "contains"
+// regex where unaccented letters also match their accented forms; whitespace
+// runs match any whitespace run.
+func vietnameseContainsPattern(text string) string {
+	var b strings.Builder
+	space := false
+	for _, r := range strings.ToLower(strings.TrimSpace(text)) {
+		if unicode.IsSpace(r) {
+			if !space {
+				b.WriteString(`\s+`)
+			}
+			space = true
+			continue
+		}
+		space = false
+		// Only an unaccented letter is a wildcard: "do" finds Đỏ/Đô/Đỗ, while
+		// "đỏ" stays exact (case aside) and does not match "đỗ" (bean).
+		if forms, ok := vietnameseFold[r]; ok {
+			b.WriteByte('[')
+			b.WriteString(forms)
+			b.WriteByte(']')
+			continue
+		}
+		b.WriteString(regexp.QuoteMeta(string(r)))
+	}
+	return b.String()
 }
 
 func productSort(sortKey string) bson.D {

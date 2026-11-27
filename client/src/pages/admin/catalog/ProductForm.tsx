@@ -70,7 +70,7 @@ export default function ProductForm({ productId, product, originalSlug, categori
 
       <Card title="Giá">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Giá bán (VND)" path="price" error={errors.price} required hint="Từ 1.000 đến 1.000.000.000">
+          <Field label="Giá bán (VND)" path="price" error={errors.price} required hint="Từ 1.000 đến 1.000.000.000 · chỉ gõ số, hoặc 800k, 2tr">
             <MoneyInput value={product.price > 0 ? product.price : null} onChange={(v) => set({ price: v ?? 0 })} />
           </Field>
           <Field label="Giá gốc (nếu đang giảm giá)" path="compare_at_price" error={errors.compare_at_price} hint="Phải lớn hơn giá bán; để trống nếu không giảm giá">

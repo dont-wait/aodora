@@ -1,7 +1,8 @@
-import { Children, cloneElement, isValidElement, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactElement, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { Children, cloneElement, isValidElement, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactElement, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
-import { fieldId, formatThousands, parseThousands } from '@/features/admin/validation'
+import SharedMoneyInput from '@/components/ui/MoneyInput'
+import { fieldId } from '@/features/admin/validation'
 import { buttonClassFor, hintClass, inputClass, labelClass, textareaClass, toneClasses, type ButtonVariant, type Tone } from './uiStyles'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; loading?: boolean }
@@ -55,23 +56,9 @@ export function Field({ label, hint, children, className = '', path, error, requ
 
 /** Whole-VND input shown with thousands separators (650.000); onChange gets an integer or null when empty. */
 export function MoneyInput({ value, onChange, className = '', ...rest }: { value: number | null; onChange: (value: number | null) => void; className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
-  const [draft, setDraft] = useState<string | null>(null)
   return (
     <div className="relative">
-      <input
-        {...rest}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        className={`${inputClass} pr-10 tabular-nums ${className}`}
-        value={draft ?? formatThousands(value)}
-        onChange={(event) => {
-          const parsed = parseThousands(event.target.value)
-          setDraft(event.target.value === '' || Number.isNaN(parsed) ? event.target.value.replace(/[^\d.]/g, '') : formatThousands(parsed))
-          if (!Number.isNaN(parsed)) onChange(parsed)
-        }}
-        onBlur={() => setDraft(null)}
-      />
+      <SharedMoneyInput {...rest} value={value} onChange={onChange} className={`${inputClass} pr-10 tabular-nums ${className}`} />
       <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-on-surface-variant">₫</span>
     </div>
   )
