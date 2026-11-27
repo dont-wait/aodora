@@ -101,7 +101,7 @@ func (h adminCatalogHandler) preflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	method := r.Header.Get("Access-Control-Request-Method")
-	if !slices.Contains([]string{"GET", "POST", "PUT", "PATCH"}, method) {
+	if !slices.Contains([]string{"GET", "POST", "PUT", "PATCH", "DELETE"}, method) {
 		respondError(w, http.StatusBadRequest, "INVALID_PREFLIGHT", "", "Phương thức không được hỗ trợ")
 		return
 	}
@@ -112,7 +112,7 @@ func (h adminCatalogHandler) preflight(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.WriteHeader(http.StatusNoContent)

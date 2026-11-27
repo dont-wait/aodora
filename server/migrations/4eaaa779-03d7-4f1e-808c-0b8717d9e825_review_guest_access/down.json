@@ -1,0 +1,121 @@
+[
+  {
+    "collMod": "reviews",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "product_id",
+          "customer_id",
+          "rating",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "product_id": {
+            "bsonType": "objectId"
+          },
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "rating": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "content": {
+            "bsonType": "string"
+          },
+          "display_name": {
+            "bsonType": "string"
+          },
+          "initials": {
+            "bsonType": "string"
+          },
+          "location": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "meta": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "purchase_mode": {
+            "enum": [
+              "ready",
+              "custom"
+            ]
+          },
+          "purchase_size": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "verified_purchase": {
+            "bsonType": "bool"
+          },
+          "images": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "src",
+                "alt"
+              ],
+              "properties": {
+                "src": {
+                  "bsonType": "string"
+                },
+                "alt": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "dropIndexes": "reviews",
+    "index": [
+      "uq_reviews_order_product",
+      "uq_reviews_customer_product"
+    ]
+  },
+  {
+    "createIndexes": "reviews",
+    "indexes": [
+      {
+        "key": {
+          "customer_id": 1,
+          "product_id": 1
+        },
+        "name": "uq_reviews_customer_product",
+        "unique": true
+      }
+    ]
+  }
+]

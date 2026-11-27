@@ -1,0 +1,204 @@
+[
+  {
+    "collMod": "reviews",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "product_id",
+          "rating",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "product_id": {
+            "bsonType": "objectId"
+          },
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "order_id": {
+            "bsonType": "objectId"
+          },
+          "rating": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          },
+          "content": {
+            "bsonType": "string"
+          },
+          "display_name": {
+            "bsonType": "string"
+          },
+          "initials": {
+            "bsonType": "string"
+          },
+          "location": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "meta": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "purchase_mode": {
+            "enum": [
+              "ready",
+              "custom"
+            ]
+          },
+          "purchase_size": {
+            "bsonType": [
+              "string",
+              "null"
+            ]
+          },
+          "verified_purchase": {
+            "bsonType": "bool"
+          },
+          "images": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "src",
+                "alt"
+              ],
+              "properties": {
+                "src": {
+                  "bsonType": "string"
+                },
+                "alt": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "customer_id"
+            ]
+          },
+          {
+            "required": [
+              "order_id"
+            ]
+          }
+        ]
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "dropIndexes": "reviews",
+    "index": "uq_reviews_customer_product"
+  },
+  {
+    "createIndexes": "reviews",
+    "indexes": [
+      {
+        "key": {
+          "customer_id": 1,
+          "product_id": 1
+        },
+        "name": "uq_reviews_customer_product",
+        "unique": true,
+        "partialFilterExpression": {
+          "customer_id": {
+            "$type": "objectId"
+          }
+        }
+      },
+      {
+        "key": {
+          "order_id": 1,
+          "product_id": 1
+        },
+        "name": "uq_reviews_order_product",
+        "unique": true,
+        "partialFilterExpression": {
+          "order_id": {
+            "$type": "objectId"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "update": "products",
+    "updates": [
+      {
+        "q": {},
+        "u": {
+          "$set": {
+            "rating": 0,
+            "review_count": 0
+          }
+        },
+        "multi": true
+      }
+    ],
+    "bypassDocumentValidation": true
+  },
+  {
+    "aggregate": "reviews",
+    "pipeline": [
+      {
+        "$group": {
+          "_id": "$product_id",
+          "average": {
+            "$avg": "$rating"
+          },
+          "review_count": {
+            "$sum": 1
+          }
+        }
+      },
+      {
+        "$project": {
+          "_id": 1,
+          "rating": {
+            "$round": [
+              "$average",
+              2
+            ]
+          },
+          "review_count": 1
+        }
+      },
+      {
+        "$merge": {
+          "into": "products",
+          "on": "_id",
+          "whenMatched": "merge",
+          "whenNotMatched": "discard"
+        }
+      }
+    ],
+    "cursor": {},
+    "bypassDocumentValidation": true
+  }
+]

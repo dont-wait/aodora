@@ -14,6 +14,7 @@ export default function AdminOrderFrame({ title, children }: { title: string; ch
             <Link to="/admin/catalog">Danh mục & sản phẩm</Link>
             <Link to="/admin/orders">Quản trị đơn hàng</Link>
             <Link to="/admin/tailoring">Yêu cầu may đo</Link>
+            <Link to="/admin/reviews">Quản lý đánh giá</Link>
             <Link to="/">Trang khách</Link>
           </nav>
         </header>

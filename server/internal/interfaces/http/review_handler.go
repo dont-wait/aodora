@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,14 @@ type appService interface {
 	List(context.Context, string, int64, int64) (app.Page, error)
 	Own(context.Context, string, string) (*app.OwnReview, error)
 	Submit(context.Context, string, string, app.Input) (app.OwnReview, error)
+	GuestReviews(context.Context, string, string) ([]app.OwnReview, error)
+	SubmitGuest(context.Context, string, string, string, app.GuestInput) (app.OwnReview, error)
+}
+
+// AdminReviewService exposes only the moderation operations.
+type AdminReviewService interface {
+	AdminList(context.Context, app.AdminFilter) (app.AdminPage, error)
+	AdminDelete(context.Context, string) error
 }
 
 func WithReviews(service appService, guard *AuthGuard, catalog reviewCatalog, orders reviewOrders, log zerolog.Logger) RouterOption {
@@ -47,12 +56,54 @@ func WithReviews(service appService, guard *AuthGuard, catalog reviewCatalog, or
 		mux.HandleFunc("GET /api/v1/me/reviews", h.protected(h.own))
 		mux.HandleFunc("GET /api/v1/me/reviews/eligible-orders", h.protected(h.eligibleOrders))
 		mux.HandleFunc("PUT /api/v1/me/reviews/{product_id}", h.protected(h.submit))
+		// Guest reviews: the per-order access token from DW-03 is the only credential.
+		mux.HandleFunc("OPTIONS /api/v1/guest-orders/{path...}", h.guestPreflight)
+		mux.HandleFunc("GET /api/v1/guest-orders/{order_id}/reviews", h.guest(h.guestReviews))
+		mux.HandleFunc("PUT /api/v1/guest-orders/{order_id}/reviews/{product_id}", h.guest(h.guestSubmit))
+	}
+}
+
+// WithAdminReviews registers moderation routes behind the admin guard. The
+// shared OPTIONS /api/v1/admin/{path...} handler serves their preflight.
+func WithAdminReviews(service AdminReviewService, guard *AuthGuard, log zerolog.Logger, allowedOrigin string) RouterOption {
+	return func(mux *http.ServeMux) {
+		h := adminReviewHandler{service: service, guard: guard, log: log}
+		admin := adminCatalogHandler{authorize: guard.RequireAdmin, log: log, allowedOrigin: strings.TrimSuffix(strings.TrimSpace(allowedOrigin), "/")}
+		mux.HandleFunc("GET /api/v1/admin/reviews", admin.guard(h.list))
+		mux.HandleFunc("DELETE /api/v1/admin/reviews/{id}", admin.guard(h.delete))
 	}
 }
 
 func (h reviewHandler) protected(next http.HandlerFunc) http.HandlerFunc {
 	origin := authHandler{guard: h.guard}
 	return origin.withOrigin(h.guard.Require(next))
+}
+
+func (h reviewHandler) guestPreflight(w http.ResponseWriter, r *http.Request) {
+	h.guard.handlePreflight(w, r, []string{"x-order-access-token"}, "Content-Type, Accept, X-Order-Access-Token")
+}
+
+type guestHashKey struct{}
+
+func (h reviewHandler) guest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if !h.guard.cors(w, r) {
+			respondError(w, http.StatusForbidden, "ORIGIN_FORBIDDEN", "", "Nguồn truy cập không được cấp phép")
+			return
+		}
+		hash, _, err := domainorder.ValidateGuestAccessToken(r.Header.Get("X-Order-Access-Token"))
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "X-Order-Access-Token", "Mã truy cập khách không hợp lệ")
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), guestHashKey{}, hash)))
+	}
+}
+
+func guestHash(r *http.Request) string {
+	hash, _ := r.Context().Value(guestHashKey{}).(string)
+	return hash
 }
 
 func (h reviewHandler) public(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +118,7 @@ func (h reviewHandler) public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := h.service.List(r.Context(), product.ID, page, size)
-	h.respond(w, data, err)
+	respondReview(w, h.log, data, err)
 }
 
 func (h reviewHandler) own(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +134,7 @@ func (h reviewHandler) own(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.respond(w, nil, err)
+		respondReview(w, h.log, nil, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": data})
@@ -95,6 +146,9 @@ type eligibleOrder struct {
 	CreatedAt   string `json:"created_at"`
 }
 
+// eligibleOrderPageLimit bounds the scan; 50 pages × 100 orders per customer.
+const eligibleOrderPageLimit = 50
+
 func (h reviewHandler) eligibleOrders(w http.ResponseWriter, r *http.Request) {
 	productID := r.URL.Query().Get("product_id")
 	if productID == "" {
@@ -102,11 +156,22 @@ func (h reviewHandler) eligibleOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, _ := h.guard.Identity(r)
-	orders, _, _, _, err := h.orders.List(r.Context(), user.ID, 1, 100)
-	if err != nil {
-		h.respond(w, nil, err)
-		return
+	result := make([]eligibleOrder, 0)
+	for page := int64(1); page <= eligibleOrderPageLimit; page++ {
+		orders, total, _, size, err := h.orders.List(r.Context(), user.ID, page, 100)
+		if err != nil {
+			respondReview(w, h.log, nil, err)
+			return
+		}
+		result = append(result, deliveredWithProduct(orders, productID)...)
+		if len(orders) == 0 || page*size >= total {
+			break
+		}
 	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
+}
+
+func deliveredWithProduct(orders []domainorder.Order, productID string) []eligibleOrder {
 	result := make([]eligibleOrder, 0)
 	for _, order := range orders {
 		if order.Status != domainorder.StatusDelivered {
@@ -119,7 +184,7 @@ func (h reviewHandler) eligibleOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": result})
+	return result
 }
 
 func (h reviewHandler) submit(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +194,84 @@ func (h reviewHandler) submit(w http.ResponseWriter, r *http.Request) {
 	}
 	user, _ := h.guard.Identity(r)
 	data, err := h.service.Submit(r.Context(), user.ID, r.PathValue("product_id"), input)
-	h.respond(w, data, err)
+	respondReview(w, h.log, data, err)
+}
+
+func (h reviewHandler) guestReviews(w http.ResponseWriter, r *http.Request) {
+	data, err := h.service.GuestReviews(r.Context(), guestHash(r), r.PathValue("order_id"))
+	respondReview(w, h.log, data, err)
+}
+
+func (h reviewHandler) guestSubmit(w http.ResponseWriter, r *http.Request) {
+	var input app.GuestInput
+	if !decodeReviewJSON(w, r, &input) {
+		return
+	}
+	data, err := h.service.SubmitGuest(r.Context(), guestHash(r), r.PathValue("order_id"), r.PathValue("product_id"), input)
+	respondReview(w, h.log, data, err)
+}
+
+type adminReviewHandler struct {
+	service AdminReviewService
+	guard   *AuthGuard
+	log     zerolog.Logger
+}
+
+func (h adminReviewHandler) list(w http.ResponseWriter, r *http.Request) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "INVALID_FIELD", "query", "Tham số truy vấn không hợp lệ")
+		return
+	}
+	filter := app.AdminFilter{Page: 1, Size: 20}
+	for key, values := range query {
+		if len(values) != 1 {
+			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "query", "Không được lặp tham số truy vấn")
+			return
+		}
+		value := values[0]
+		switch key {
+		case "product_id":
+			filter.ProductID = value
+		case "rating", "page", "page_size":
+			n, err := strconv.ParseInt(value, 10, 64)
+			limits := map[string][2]int64{"rating": {1, 5}, "page": {1, 100000}, "page_size": {1, 100}}[key]
+			if err != nil || n < limits[0] || n > limits[1] {
+				respondError(w, http.StatusBadRequest, "INVALID_FIELD", key, "Giá trị không hợp lệ")
+				return
+			}
+			switch key {
+			case "rating":
+				filter.Rating = n
+			case "page":
+				filter.Page = n
+			default:
+				filter.Size = n
+			}
+		default:
+			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "query", "Tham số truy vấn không được hỗ trợ")
+			return
+		}
+	}
+	page, err := h.service.AdminList(r.Context(), filter)
+	if err != nil {
+		respondReview(w, h.log, nil, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (h adminReviewHandler) delete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	err := h.service.AdminDelete(r.Context(), id)
+	if err != nil {
+		respondReview(w, h.log, nil, err)
+		return
+	}
+	admin, _ := h.guard.Identity(r)
+	// Audit trail for a permanent moderation action; no review content logged.
+	h.log.Info().Str("admin_id", admin.ID).Str("review_id", id).Msg("admin deleted review")
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": id, "deleted": true}})
 }
 
 func reviewPagination(r *http.Request) (int64, int64, string) {
@@ -170,7 +312,7 @@ func decodeReviewJSON(w http.ResponseWriter, r *http.Request, out any) bool {
 	return true
 }
 
-func (h reviewHandler) respond(w http.ResponseWriter, data any, err error) {
+func respondReview(w http.ResponseWriter, log zerolog.Logger, data any, err error) {
 	if err != nil {
 		var invalid app.Invalid
 		switch {
@@ -178,12 +320,14 @@ func (h reviewHandler) respond(w http.ResponseWriter, data any, err error) {
 			respondError(w, http.StatusBadRequest, "INVALID_FIELD", invalid.Field, invalid.Message)
 		case errors.Is(err, app.ErrNotEligible):
 			respondError(w, http.StatusForbidden, "REVIEW_NOT_ELIGIBLE", "order_id", "Bạn chỉ có thể đánh giá sản phẩm trong đơn đã nhận")
+		case errors.Is(err, app.ErrOrderAccess):
+			respondError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "order_id", "Không tìm thấy đơn hàng với mã truy cập này")
 		case errors.Is(err, app.ErrNotFound):
 			respondError(w, http.StatusNotFound, "NOT_FOUND", "", "Không tìm thấy đánh giá")
 		case errors.Is(err, app.ErrProduct):
 			respondError(w, http.StatusNotFound, "PRODUCT_NOT_FOUND", "product_id", "Không tìm thấy sản phẩm")
 		default:
-			h.log.Error().Err(err).Msg("review request failed")
+			log.Error().Err(err).Msg("review request failed")
 			respondError(w, http.StatusServiceUnavailable, "REVIEW_UNAVAILABLE", "", "Dịch vụ đánh giá tạm thời không khả dụng")
 		}
 		return

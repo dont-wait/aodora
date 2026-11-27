@@ -106,6 +106,7 @@ func main() {
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithOrders(orderService, authGuard, *log),
 			httpapi.WithReviews(reviewService, authGuard, catalogService, orderService, *log),
+			httpapi.WithAdminReviews(reviewService, authGuard, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithTailoring(tailoringService, authGuard, *log),
 			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
