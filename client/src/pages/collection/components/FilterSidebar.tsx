@@ -1,7 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { sidebarFilterKeys, type SidebarFilters } from '../sidebarFilters'
 import { STANDARD_SIZES, isStandardSize } from '@/features/catalog/sizes'
-import { parseVNDInput, formatVNDInput } from '@/features/catalog/prices'
+import { parseVNDInput } from '@/features/catalog/prices'
+import MoneyInput from '@/components/ui/MoneyInput'
+
+// One-tap ranges matching the shop's real prices (650k – 2,48tr).
+const PRICE_PRESETS: { label: string; min: string; max: string }[] = [
+  { label: 'Dưới 1 triệu', min: '', max: '1000000' },
+  { label: '1 – 1,5 triệu', min: '1000000', max: '1500000' },
+  { label: '1,5 – 2 triệu', min: '1500000', max: '2000000' },
+  { label: 'Trên 2 triệu', min: '2000000', max: '' },
+]
+const asNumber = (value: string) => (value && /^\d+$/.test(value) ? Number(value) : null)
 const readValues = (params: URLSearchParams): SidebarFilters => Object.fromEntries(sidebarFilterKeys.map((key) => [key, params.get(key) || ''])) as unknown as SidebarFilters
 interface Props { params: URLSearchParams; onApply: (draft: SidebarFilters) => void; onClear: () => void }
 const field = 'w-full p-2.5 border border-outline-variant bg-surface text-on-surface focus:outline-primary'
@@ -38,9 +48,14 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
         {(draft.size && !isStandardSize(draft.size) ? [...STANDARD_SIZES, draft.size] : STANDARD_SIZES).map((size) => <option key={size} value={size}>{size}</option>)}
       </select></label>
       <fieldset><legend className={label}>Khoảng giá (VNĐ)</legend><div className="grid grid-cols-2 gap-2">
-        <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="text" inputMode="numeric" placeholder="800.000" value={formatVNDInput(draft.min_price)} onChange={(e) => update('min_price', e.target.value)} /></label>
-        <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="text" inputMode="numeric" placeholder="1.500.000" value={formatVNDInput(draft.max_price)} onChange={(e) => update('max_price', e.target.value)} /></label>
-      </div><p className="mt-2 text-xs text-on-surface-variant">Nhập số tiền đầy đủ (ví dụ 800.000 VNĐ, không phải 800).</p></fieldset>
+        <label><span className="text-sm">Từ</span><MoneyInput aria-label="Giá tối thiểu" className={field + ' tabular-nums'} placeholder="800.000" value={asNumber(draft.min_price)} onChange={(v) => update('min_price', v === null ? '' : String(v))} /></label>
+        <label><span className="text-sm">Đến</span><MoneyInput aria-label="Giá tối đa" className={field + ' tabular-nums'} placeholder="1.500.000" value={asNumber(draft.max_price)} onChange={(v) => update('max_price', v === null ? '' : String(v))} /></label>
+      </div><p className="mt-2 text-xs text-on-surface-variant">Chỉ cần gõ số, dấu chấm tự thêm. Gõ 800k = 800.000, 2tr = 2.000.000.</p>
+        <div className="mt-3 flex flex-wrap gap-2">{PRICE_PRESETS.map((preset) => {
+          const active = draft.min_price === preset.min && draft.max_price === preset.max
+          return <button key={preset.label} type="button" aria-pressed={active} onClick={() => setDraft((previous) => ({ ...previous, min_price: preset.min, max_price: preset.max }))}
+            className={`px-3 py-1.5 text-xs border ${active ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant bg-surface text-on-surface hover:border-primary'}`}>{preset.label}</button>
+        })}</div></fieldset>
       {error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
       <button type="submit" className="bg-primary text-on-primary px-5 py-3 w-full">Áp dụng bộ lọc</button>
     </form>

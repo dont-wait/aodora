@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import FieldErr from './FieldErr'
+import MoneyInput from '@/components/ui/MoneyInput'
 import AddressFields from '@/features/address/AddressFields'
 import { Link } from 'react-router-dom'
 import type { AdminTailoring } from '@/features/admin/tailoring'
@@ -74,7 +75,8 @@ export default function AdminCustomOrderPanel({
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="space-y-1 block">
               <span>Đơn giá chốt (₫) *</span>
-              <input className={input} inputMode="decimal" value={values.unit_price} placeholder="1500000" onChange={(e) => set('unit_price', e.target.value)} />
+              <MoneyInput className={input + ' tabular-nums'} value={values.unit_price.trim() && Number.isFinite(Number(values.unit_price)) ? Number(values.unit_price) : null} placeholder="1.500.000" onChange={(v) => set('unit_price', v === null ? '' : String(v))} />
+              <span className="block text-xs text-on-surface-variant">Gõ số, dấu chấm tự thêm. Gõ 800k = 800.000, 2tr = 2.000.000.</span>
               <FieldErr message={errors.unit_price} />
             </label>
             <label className="space-y-1 block">

@@ -4,6 +4,7 @@ import { createCartSelection, registerCartAddHandler, addSelectedProduct } from 
 import { getCategories, getProduct, listProducts, CatalogApiError } from '../src/features/catalog/api.ts'
 import { parseVNDInput, formatVNDInput } from '../src/features/catalog/prices.ts'
 import { productGallery } from '../src/features/catalog/gallery.ts'
+import { formatMoney, maskMoneyInput } from '../src/features/catalog/prices.ts'
 
 test('gallery gộp URL legacy và RustFS, bỏ trùng và giữ alt của ảnh chính', () => {
   const primary = { src: 'http://localhost:9100/aodora-images/main.jpg', alt: 'Ảnh chính' }
@@ -85,4 +86,28 @@ test('định dạng tiền VNĐ không tự nhân 1000 và không chấp nhận
   assert.equal(parseVNDInput('4.00'), null)
   assert.equal(parseVNDInput('-100'), null)
   assert.equal(parseVNDInput(''), '')
+})
+
+test('money input adds thousands dots while typing and keeps the caret', () => {
+  assert.equal(formatMoney(1250000), '1.250.000')
+  assert.equal(formatMoney(null), '')
+  // typing 4,0,0,0,0,0 one key at a time
+  let text = ''
+  for (const key of '400000') text = maskMoneyInput(text + key).text
+  assert.equal(text, '400.000')
+  // the user types a dot themselves: ignored, still the same number
+  assert.deepEqual(maskMoneyInput('400.000.'), { text: '400.000', caret: 7, value: 400000 })
+  // insert a 1 in front of "500.000" (caret after the typed digit)
+  assert.deepEqual(maskMoneyInput('1500.000', 1), { text: '1.500.000', caret: 1, value: 1500000 })
+  // delete the dot before 000 in "1.500.000" -> digits unchanged, caret stays near
+  assert.equal(maskMoneyInput('1.500000', 5).value, 1500000)
+  assert.deepEqual(maskMoneyInput(''), { text: '', caret: 0, value: null })
+  assert.equal(maskMoneyInput('007').value, 7)
+})
+
+test('money input understands k / tr shortcuts', () => {
+  assert.equal(maskMoneyInput('800k').value, 800000)
+  assert.equal(maskMoneyInput('2tr').value, 2000000)
+  assert.equal(maskMoneyInput('2 triệu').value, 2000000)
+  assert.equal(maskMoneyInput('3m').text, '3.000.000')
 })
