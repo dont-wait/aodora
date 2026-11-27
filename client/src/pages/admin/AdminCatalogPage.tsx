@@ -173,7 +173,7 @@ export default function AdminCatalogPage() {
   if (accessDenied) return <Navigate to="/403" replace />
   return <main className="min-h-screen bg-background px-5 py-10 text-on-surface">
     <div className="max-w-6xl mx-auto space-y-7">
-      <div className="flex items-center justify-between gap-4"><div><p className="text-secondary uppercase tracking-wider text-sm">Aodora · Chủ cửa hàng</p><h1 className="text-3xl font-title-editorial text-primary">Quản trị danh mục & sản phẩm</h1></div><Link className="underline" to="/">Trang khách</Link></div>
+      <div className="flex items-center justify-between gap-4"><div><p className="text-secondary uppercase tracking-wider text-sm">Aodora · Chủ cửa hàng</p><h1 className="text-3xl font-title-editorial text-primary">Quản trị danh mục & sản phẩm</h1></div><div className="flex flex-wrap gap-4"><Link className="underline" to="/admin/orders">Quản trị đơn hàng</Link><Link className="underline" to="/admin/tailoring">Yêu cầu may đo</Link><Link className="underline" to="/">Trang khách</Link></div></div>
       {loading && <p role="status">Đang kiểm tra quyền admin và tải dữ liệu...</p>}
       {!loading && <>
         <div className="flex gap-3"><button type="button" className={buttonClass} onClick={() => setTab('product')}>Sản phẩm</button><button type="button" className={buttonClass} onClick={() => setTab('category')}>Danh mục</button><button type="button" className="underline" onClick={refresh}>Tải lại</button></div>
