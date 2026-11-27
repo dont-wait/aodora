@@ -11,7 +11,7 @@ unexport name MIGRATIONS_PATH legacy_fingerprint
 .PHONY: help run build fmt lint test test-migrations test-orders test-orders-standalone test-integration \
 	migrate-create migrate-adopt migrate-up migrate-up-one migrate-down \
 	infra-up infra-down storage-up storage-down transactions-up transactions-down standalone-up \
-	seed-fetch seed-demo seed-admin seed-orders sumire-env sumire-fetch sumire-check sumire-images sumire-import sumire-purge \
+	seed-fetch seed-demo seed-admin seed-orders seed-orders-purge sumire-env sumire-fetch sumire-check sumire-images sumire-import sumire-purge \
 	navicat-build navicat-up navicat-down
 
 ##@ Chung
@@ -108,8 +108,9 @@ seed-admin: sumire-env ## Tạo tài khoản demo admin@aodora.local + user@aodo
 	go run ./cmd/importsumire -verify-target
 	go run ./cmd/seed -accounts-only
 
-seed-orders: ## Sinh lịch sử mua hàng giả lập từ 21/11/2026 tới hiện tại cho dashboard (chạy lại sẽ thay batch cũ; FROM=YYYY-MM-DD để đổi ngày bắt đầu)
-	go run ./cmd/seedorders -from "${FROM:-2026-11-21}"
+SEED_FROM ?= 2026-11-21
+seed-orders: ## Sinh lịch sử mua hàng giả lập từ 21/11/2026 tới hiện tại cho dashboard (chạy lại sẽ thay batch cũ; SEED_FROM=YYYY-MM-DD để đổi ngày bắt đầu)
+	go run ./cmd/seedorders -from "$(SEED_FROM)"
 
 seed-orders-purge: ## Xoá lịch sử mua hàng giả lập
 	go run ./cmd/seedorders -purge

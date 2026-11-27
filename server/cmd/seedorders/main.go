@@ -36,7 +36,10 @@ func run() error {
 	if err := config.LoadEnv(); err != nil {
 		return err
 	}
-	start, err := time.ParseInLocation("2006-01-02", *from, vnZone)
+	if strings.TrimSpace(*from) == "" {
+		*from = "2026-11-21"
+	}
+	start, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(*from), vnZone)
 	if err != nil {
 		return fmt.Errorf("-from: %w", err)
 	}
