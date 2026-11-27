@@ -19,6 +19,16 @@ export const guideImages: Record<'hero' | 'heritageA' | 'heritageB' | 'artisan',
   },
 }
 
+/** Photo behind the measurement diagram. Korea.net / Korean Culture and Information Service (Jeon Han), CC BY-SA 2.0, cropped. */
+export const DIAGRAM_PHOTO = {
+  src: '/guide/ao-dai-measure.jpg',
+  alt: 'Người mẫu mặc áo dài xanh ngọc đứng thẳng, dùng để chỉ 8 vị trí lấy số đo',
+  credit: 'Ảnh: Korea.net / KOCIS (Jeon Han)',
+  license: 'CC BY-SA 2.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0/',
+  sourceUrl: 'https://commons.wikimedia.org/wiki/File:KOCIS_Korea_Hanbok-AoDai_FashionShow_03_(9766157012).jpg',
+}
+
 export interface Measurement {
   step: number
   title: string
