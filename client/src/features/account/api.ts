@@ -4,6 +4,7 @@ export type Address = {
   phone: string
   line1: string
   ward?: string
+  /** chỉ đọc dữ liệu trước 07/2025 */
   district?: string
   city: string
   is_default: boolean

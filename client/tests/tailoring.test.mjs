@@ -141,3 +141,26 @@ test('hồ sơ KR-02 và yêu cầu may đo cho cùng kết quả số đo', () 
   assert.deepEqual(rest, measurementNumbers(f))
   assert.equal(body, undefined)
 })
+
+import { buildConsultBody, buildConsultNotes, validateConsult, consultFieldForServerField, consultSuccessMessage } from '../src/features/tailoring/consult.ts'
+
+test('consult notes: "Nhãn: giá trị" lines, blank values dropped and trimmed', () => {
+  assert.equal(buildConsultNotes([['Thành phố', 'Hà Nội'], ['Ghi chú', '   '], ['Ngày', ' 2026-12-01 ']]), 'Thành phố: Hà Nội\nNgày: 2026-12-01')
+  assert.equal(buildConsultNotes([['A', ''], ['B', ' ']]), '')
+})
+
+test('consult body: trims name/phone, omits notes when empty, never sends server-owned fields', () => {
+  assert.deepEqual(buildConsultBody({ name: ' An ', phone: ' 0900000001 ', extras: [['Ghi chú', '']] }), { full_name: 'An', phone: '0900000001' })
+  const body = buildConsultBody({ name: 'An', phone: '0900000001', extras: [['Khu vực', 'Hà Nội'], ['Địa chỉ', '1 Phố X']] })
+  assert.equal(body.notes, 'Khu vực: Hà Nội\nĐịa chỉ: 1 Phố X')
+  assert.deepEqual(Object.keys(body).sort(), ['full_name', 'notes', 'phone'])
+})
+
+test('consult validation and server field mapping', () => {
+  assert.deepEqual(Object.keys(validateConsult({ name: ' ', phone: '' })).sort(), ['name', 'phone'])
+  assert.deepEqual(validateConsult({ name: 'An', phone: '0900000001' }), {})
+  assert.equal(consultFieldForServerField('full_name'), 'name')
+  assert.equal(consultFieldForServerField('phone'), 'phone')
+  assert.equal(consultFieldForServerField('notes'), '')
+  assert.match(consultSuccessMessage, /chưa phải đặt đơn/)
+})

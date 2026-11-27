@@ -112,7 +112,7 @@ export default function MeasurementSection() {
           <span className="font-label-uppercase text-label-uppercase text-secondary tracking-widest uppercase">Quy trình chi tiết</span>
           <h2 className="font-headline-lg text-headline-lg text-primary">8 Thông Số Vàng Tạo Nên Cốt Cách Áo Dài</h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
-            Nhấp chọn từng vị trí để xem chi tiết cách đặt thước của thợ may thủ công AN SOIE.
+            Nhấp chọn từng vị trí để xem chi tiết cách đặt thước của thợ may thủ công AODORA.
           </p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">

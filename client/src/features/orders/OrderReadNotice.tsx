@@ -41,7 +41,7 @@ export default function OrderReadNotice({
           </button>
         </>
       ) : (
-        <p>Vui lòng sử dụng đúng tài khoản hoặc quyền khách đã lưu trên trình duyệt này.</p>
+        <p>Vui lòng đăng nhập đúng tài khoản đã đặt đơn, hoặc dùng lại trình duyệt đã đặt đơn khi chưa đăng nhập.</p>
       )}
       <Link className="text-primary underline block" to={backTo}>
         {backLabel}

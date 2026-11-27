@@ -12,7 +12,7 @@ export default function CheckoutResultPage() {
   return (
     <main className="max-w-3xl mx-auto px-5 py-10 lg:py-16 space-y-7">
       <header className="space-y-3">
-        <p className="text-secondary tracking-widest uppercase text-sm">Cảm ơn bạn đã chọn An Soie</p>
+        <p className="text-secondary tracking-widest uppercase text-sm">Cảm ơn bạn đã chọn Aodora</p>
         <h1 className="font-headline-lg text-4xl text-primary">Đơn hàng đã được ghi nhận</h1>
         <p>
           Mã đơn: <strong>{order.order_number}</strong>

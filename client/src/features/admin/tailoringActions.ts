@@ -202,13 +202,12 @@ export type CustomOrderValues = {
   phone: string
   line1: string
   ward: string
-  district: string
   city: string
   note: string
 }
 export const orderablePhase = (status: string) => status === 'measurement_confirmed' || status === 'in_progress'
 export function initialCustomOrder(t: AdminTailoring): CustomOrderValues {
-  return { unit_price: '', quantity: '1', payment_method: '', product_id: '', recipient: t.full_name, phone: t.phone, line1: '', ward: '', district: '', city: '', note: '' }
+  return { unit_price: '', quantity: '1', payment_method: '', product_id: '', recipient: t.full_name, phone: t.phone, line1: '', ward: '', city: '', note: '' }
 }
 export const paymentMethodLabels = { cod: 'Thu tiền khi giao (COD)', cash_at_counter: 'Thu tiền tại quầy' } as const
 
@@ -234,7 +233,7 @@ export function validateCustomOrder(t: Pick<AdminTailoring, 'product_id'>, v: Cu
   if (v.note.trim().length > 1000) errors.note = 'Ghi chú tối đa 1000 ký tự.'
   if (Object.keys(errors).length > 0) return { errors }
   const address: NonNullable<CustomOrderBody['shipping_address']> = { recipient: v.recipient.trim(), phone: v.phone.trim() }
-  for (const key of ['line1', 'ward', 'district', 'city'] as const) if (v[key].trim()) address[key] = v[key].trim()
+  for (const key of ['line1', 'ward', 'city'] as const) if (v[key].trim()) address[key] = v[key].trim()
   const body: CustomOrderBody = { unit_price: price, quantity, payment_method: v.payment_method as 'cod' | 'cash_at_counter', shipping_address: address }
   if (!t.product_id) body.product_id = product
   if (v.note.trim()) body.note = v.note.trim()

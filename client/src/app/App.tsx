@@ -3,6 +3,7 @@ import Layout from '@/components/layout/Layout'
 import CollectionPage from '@/pages/collection/CollectionPage'
 import GuidePage from '@/pages/guide/GuidePage'
 import HomePage from '@/pages/home/HomePage'
+import NotFoundPage from '@/pages/NotFoundPage'
 import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
@@ -53,7 +54,7 @@ export default function App() {
         <Route path="bo-suu-tap" element={<CollectionPage />} />
         <Route path="san-pham/:slug" element={<ProductDetailPage />} />
         <Route path="dich-vu-may-do" element={<GuidePage />} />
-        <Route path="*" element={<HomePage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   )

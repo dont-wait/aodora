@@ -168,7 +168,7 @@ export type CustomOrderBody = {
   unit_price: string
   quantity: number
   payment_method: 'cod' | 'cash_at_counter'
-  shipping_address?: { recipient: string; phone: string; line1?: string; ward?: string; district?: string; city?: string }
+  shipping_address?: { recipient: string; phone: string; line1?: string; ward?: string; /** chỉ đọc dữ liệu trước 07/2025 */ district?: string; city?: string }
   note?: string
 }
 export type CustomOrderResult = { orderId: string; orderNumber: string; created: boolean }

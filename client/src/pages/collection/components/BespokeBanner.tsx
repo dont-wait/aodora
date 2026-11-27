@@ -11,7 +11,7 @@ export default function BespokeBanner() {
       <div className="flex-1 text-center md:text-left">
         <h4 className="font-headline-sm text-headline-sm text-primary mb-2">Đặc Quyền May Đo Chuẩn Dáng Miễn Phí</h4>
         <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-          Mọi mẫu áo dài tại AN SOIE đều có thể tinh chỉnh theo số đo riêng của quý cô mà không phát sinh thêm phụ phí. Từng đường cắt lượn eo, tà áo và vòng
+          Mọi mẫu áo dài tại AODORA đều có thể tinh chỉnh theo số đo riêng của quý cô mà không phát sinh thêm phụ phí. Từng đường cắt lượn eo, tà áo và vòng
           nách đều được người thợ cả chăm chút tỉ mẩn nhằm tôn vinh vóc dáng yêu kiều của phụ nữ Việt.
         </p>
       </div>
