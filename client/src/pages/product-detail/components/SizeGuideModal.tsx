@@ -26,7 +26,7 @@ export default function SizeGuideModal({ open, onClose, sizes }: { open: boolean
     : estimated ? estimateSizeFromBody(Number(body.height), Number(body.weight)) : undefined
   const available = suggestion ? offered.size === 0 || offered.has(suggestion) : false
   const length = suggestion && body.height ? lengthFit(suggestion, Number(body.height)) : null
-  const fields = [['bust', 'Vòng ngực (cm)'], ['waist', 'Vòng eo (cm)'], ['hip', 'Vòng mông (cm)'], ['height', 'Chiều cao (cm)'], ['weight', 'Cân nặng (kg)']] as const
+  const fields = [['bust', 'Vòng ngực', 'cm'], ['waist', 'Vòng eo', 'cm'], ['hip', 'Vòng mông', 'cm'], ['height', 'Chiều cao', 'cm'], ['weight', 'Cân nặng', 'kg']] as const
 
   return <Modal open={open} onClose={onClose} labelledBy="size-guide-title">
     <div className="flex items-center justify-between pb-4">
@@ -66,10 +66,14 @@ export default function SizeGuideModal({ open, onClose, sizes }: { open: boolean
     <fieldset className="mt-6 bg-surface-container-low p-4">
       <legend className="font-semibold text-on-surface px-1">Gợi ý size theo số đo của bạn</legend>
       <p className="text-xs text-on-surface-variant mt-1">Nhập 3 vòng để chọn chính xác; thêm chiều cao để kiểm tra độ dài tà và tay. Chưa đo vòng thì nhập chiều cao + cân nặng để ước lượng.</p>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
-        {fields.map(([key, text]) => <label key={key} className="text-sm text-on-surface-variant">
-          {text}
-          <input type="number" inputMode="decimal" min={key === 'weight' ? 25 : 50} max={key === 'weight' ? 150 : 200} value={body[key]} onChange={(event) => setBody({ ...body, [key]: event.target.value })} className="mt-1 w-full bg-surface px-3 py-2 border border-outline-variant focus:border-primary outline-none" />
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3 items-end">
+        {fields.map(([key, text, unit]) => <label key={key} className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          <span className="whitespace-nowrap">{text}</span>
+          <span className="relative block">
+            <input type="number" inputMode="decimal" min={key === 'weight' ? 25 : 50} max={key === 'weight' ? 150 : 200} value={body[key]} onChange={(event) => setBody({ ...body, [key]: event.target.value })}
+              className="w-full bg-surface pl-3 pr-9 py-2 border border-outline-variant focus:border-primary outline-none tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+            <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">{unit}</span>
+          </span>
         </label>)}
       </div>
       <div className="mt-3 text-sm min-h-5 space-y-1" aria-live="polite">
