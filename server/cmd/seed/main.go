@@ -165,19 +165,7 @@ func seedAccounts(ctx context.Context, db *database.Mongo) error {
 	return nil
 }
 
-func publicURL() string {
-	if value := strings.TrimSpace(os.Getenv("RUSTFS_PUBLIC_URL")); value != "" {
-		return strings.TrimRight(value, "/")
-	}
-	port, bucket := os.Getenv("RUSTFS_API_PORT"), os.Getenv("RUSTFS_BUCKET")
-	if port == "" {
-		port = "9100"
-	}
-	if bucket == "" {
-		bucket = "aodora-images"
-	}
-	return "http://localhost:" + port + "/" + bucket
-}
+func publicURL() string { return config.RustFSPublicURL() }
 
 func validate(seed manifest, baseURL, assetsPath string) error {
 	u, err := url.Parse(baseURL)

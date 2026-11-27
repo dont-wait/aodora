@@ -19,10 +19,12 @@ import (
 	orderapp "github.com/your-org/aodora/server/internal/application/order"
 	reviewapp "github.com/your-org/aodora/server/internal/application/review"
 	tailoringapp "github.com/your-org/aodora/server/internal/application/tailoring"
+	uploadapp "github.com/your-org/aodora/server/internal/application/upload"
 	"github.com/your-org/aodora/server/internal/config"
 	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
 	catalogMongo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
+	"github.com/your-org/aodora/server/internal/infrastructure/storage"
 	httpapi "github.com/your-org/aodora/server/internal/interfaces/http"
 	"github.com/your-org/aodora/server/internal/logger"
 )
@@ -63,7 +65,15 @@ func main() {
 
 	service := health.NewService(db, *log)
 	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
-	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB))
+	storageCfg := config.LoadStorageConfig()
+	var imageStore storage.ObjectStore
+	if store, err := storage.New(storageCfg); err != nil {
+		log.Warn().Err(err).Msg("image storage is not configured; admin image uploads will answer STORAGE_UNAVAILABLE")
+	} else {
+		imageStore = store
+	}
+	uploadService := uploadapp.NewService(imageStore)
+	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB), admin.WithImagePrefix(storageCfg.PublicURL))
 	dashboardService := dashboardapp.NewService(catalogMongo.NewDashboardRepository(db.DB))
 	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
 	customerService := customerapp.NewService(catalogMongo.NewCustomerRepository(db.DB))
@@ -107,6 +117,7 @@ func main() {
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithAdminImport(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithAdminUploads(uploadService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithAdminDashboard(dashboardService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithOrders(orderService, authGuard, *log),
 			httpapi.WithReviews(reviewService, authGuard, catalogService, orderService, *log),

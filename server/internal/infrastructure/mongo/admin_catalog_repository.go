@@ -63,6 +63,53 @@ func (r *AdminCatalogRepository) ProductsBySlug(ctx context.Context, slugs []str
 	return adminDecodeList(ctx, cur)
 }
 
+// ProductState reads the stored state used for validation (images, colours, SKUs, stock).
+func (r *AdminCatalogRepository) ProductState(ctx context.Context, id string) (app.ProductState, error) {
+	itemID, err := oid(id)
+	if err != nil {
+		return app.ProductState{}, err
+	}
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
+	var doc struct {
+		ID       bson.ObjectID   `bson:"_id"`
+		Slug     string          `bson:"slug"`
+		Active   *bool           `bson:"is_active"`
+		Image    *app.Image      `bson:"image"`
+		Gallery  []app.Image     `bson:"gallery"`
+		Images   []string        `bson:"images"`
+		Colors   []app.Color     `bson:"colors"`
+		Access   []app.Accessory `bson:"accessories"`
+		Variants []app.Variant   `bson:"variants"`
+	}
+	if err := r.products.FindOne(ctx, bson.M{"_id": itemID}).Decode(&doc); err != nil {
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return app.ProductState{}, app.ErrNotFound
+		}
+		return app.ProductState{}, err
+	}
+	state := app.ProductState{ID: doc.ID.Hex(), Slug: doc.Slug, Active: doc.Active == nil || *doc.Active}
+	if doc.Image != nil {
+		state.Images = append(state.Images, doc.Image.Src)
+	}
+	for _, g := range doc.Gallery {
+		state.Images = append(state.Images, g.Src)
+	}
+	state.Images = append(state.Images, doc.Images...)
+	for _, a := range doc.Access {
+		if a.Image != nil {
+			state.Images = append(state.Images, a.Image.Src)
+		}
+	}
+	for _, c := range doc.Colors {
+		state.Colors = append(state.Colors, c.Name)
+	}
+	for _, v := range doc.Variants {
+		state.Variants = append(state.Variants, app.StateVariant{SKU: v.SKU, Color: v.Color, Size: v.Size, Stock: v.Stock})
+	}
+	return state, nil
+}
+
 // SKUOwners maps each requested SKU (lower-case) to the slug of the product that owns it.
 func (r *AdminCatalogRepository) SKUOwners(ctx context.Context, skus []string) (map[string]string, error) {
 	owners := map[string]string{}

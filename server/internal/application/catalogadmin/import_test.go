@@ -44,6 +44,24 @@ func (m *memRepo) UpdateCategory(_ context.Context, id string, v CategoryInput) 
 	}
 	return nil, ErrNotFound
 }
+func (m *memRepo) ProductState(_ context.Context, id string) (ProductState, error) {
+	p := m.find(id)
+	if p == nil {
+		return ProductState{}, ErrNotFound
+	}
+	active, _ := p["is_active"].(bool)
+	state := ProductState{ID: id, Slug: p["slug"].(string), Active: active}
+	if cs, ok := p["colors"].([]any); ok {
+		for _, c := range cs {
+			state.Colors = append(state.Colors, c.(map[string]any)["name"].(string))
+		}
+	}
+	for _, v := range p["variants"].([]any) {
+		mv := v.(map[string]any)
+		state.Variants = append(state.Variants, StateVariant{SKU: mv["sku"].(string), Color: mv["color"].(string), Size: mv["size"].(string), Stock: mv["stock"].(int64)})
+	}
+	return state, nil
+}
 func (m *memRepo) ProductsBySlug(_ context.Context, slugs []string) ([]map[string]any, error) {
 	var out []map[string]any
 	for _, p := range m.products {
@@ -223,7 +241,7 @@ func TestImportCategoriesParentInSameFileAnyOrder(t *testing.T) {
 func TestImportCategoriesRowErrors(t *testing.T) {
 	repo := &memRepo{}
 	svc := NewService(repo)
-	rows := parseCSV(t, catHeader+"A,Bad Slug,,,,,,\nB,b,,khong-co,,,,\nC,c,,c,,,,\nD,d,,,x,,,\nE,e,,,,maybe,,\nF,f,,,,,,\nF2,f,,,,,,\nG,g,,h,,,,\nH,h,,g,,,,\n", categoryColumns, []string{"name", "slug"})
+	rows := parseCSV(t, catHeader+"Aa,Bad Slug,,,,,,\nBb,b,,khong-co,,,,\nCc,c,,c,,,,\nDd,d,,,x,,,\nEe,e,,,,maybe,,\nFf,f,,,,,,\nF2,f,,,,,,\nGg,g,,h,,,,\nHh,h,,g,,,,\n", categoryColumns, []string{"name", "slug"})
 	got, err := svc.ImportCategories(context.Background(), rows, true)
 	if err != nil || got.Committed || len(repo.cats) != 0 {
 		t.Fatalf("errors must block commit: %+v", got)
@@ -291,15 +309,15 @@ func TestImportProductsRowErrors(t *testing.T) {
 	seedCategory(repo, "ao-dai")
 	svc := NewService(repo)
 	rows := parseCSV(t, prodHeader+
-		"p1,Áo,ao-dai,,,100,,,,,Đỏ,,XXXL,P1-A,1\n"+ // 2 bad size
-		"p2,Áo,khong-co,,,100,,,,,Đỏ,,M,P2-A,1\n"+ // 3 unknown category
-		"p3,Áo,ao-dai,,,abc,,,,,Đỏ,,M,P3-A,1\n"+ // 4 bad price
-		"p4,Áo,ao-dai,,,100,,,,,Đỏ,red,M,P4-A,1\n"+ // 5 bad hex
-		"p5,Áo,ao-dai,,,100,,,,,Đỏ,,M,P5-A,-2\n"+ // 6 bad stock
-		"p6,Áo,ao-dai,,,100,,,,,Đỏ,,M,DUP,1\n"+ // 7 ok
-		"p7,Áo,ao-dai,,,100,,,,,Đỏ,,M,dup,1\n"+ // 8 duplicate SKU
-		"p6,Khác,ao-dai,,,100,,,,,Xanh,,M,P6-B,1\n"+ // 9 contradicts name
-		"p8,Áo,ao-dai,,,100,,,,,Đỏ,,M,P8-A,1\np8,,,,,,,,,,Đỏ,,M,P8-B,1\n", // 10/11 duplicate colour+size
+		"p1,Áo thử,ao-dai,,,100000,,,,,Đỏ,,XXXL,P1-A,1\n"+ // 2 bad size
+		"p2,Áo thử,khong-co,,,100000,,,,,Đỏ,,M,P2-A,1\n"+ // 3 unknown category
+		"p3,Áo thử,ao-dai,,,abc,,,,,Đỏ,,M,P3-A,1\n"+ // 4 bad price
+		"p4,Áo thử,ao-dai,,,100000,,,,,Đỏ,red,M,P4-A,1\n"+ // 5 bad hex
+		"p5,Áo thử,ao-dai,,,100000,,,,,Đỏ,,M,P5-A,-2\n"+ // 6 bad stock
+		"p6,Áo thử,ao-dai,,,100000,,,,,Đỏ,,M,DUP,1\n"+ // 7 ok
+		"p7,Áo thử,ao-dai,,,100000,,,,,Đỏ,,M,dup,1\n"+ // 8 duplicate SKU
+		"p6,Khác,ao-dai,,,100000,,,,,Xanh,,M,P6-B,1\n"+ // 9 contradicts name
+		"p8,Áo thử,ao-dai,,,100000,,,,,Đỏ,,M,P8-A,1\np8,,,,,,,,,,Đỏ,,M,P8-B,1\n", // 10/11 duplicate colour+size
 		productColumns, []string{"product_slug", "name", "category_slug", "price", "sku"})
 	got, err := svc.ImportProducts(context.Background(), rows, false)
 	if err != nil {
@@ -323,11 +341,11 @@ func TestImportProductsNeverOverwritesExistingStock(t *testing.T) {
 	repo := &memRepo{}
 	cat := seedCategory(repo, "ao-dai")
 	svc := NewService(repo)
-	_, _ = repo.CreateProduct(context.Background(), ProductCreate{ProductInput: ProductInput{Name: "Áo A", Slug: "ao-a", CategoryID: cat, Price: 100, IsActive: true},
+	_, _ = repo.CreateProduct(context.Background(), ProductCreate{ProductInput: ProductInput{Name: "Áo A", Slug: "ao-a", CategoryID: cat, Price: 100000, IsActive: true},
 		Variants: []Variant{{SKU: "AO-A-DO-S", Color: "Đỏ", Size: "S", Stock: 5}}})
 	repo.log = nil
 	rows := parseCSV(t, prodHeader+
-		"ao-a,Áo A (mới),ao-dai,,,200,,true,,,Đỏ,,S,AO-A-DO-S,999\n"+
+		"ao-a,Áo A (mới),ao-dai,,,200000,,true,,,Đỏ,,S,AO-A-DO-S,999\n"+
 		"ao-a,,,,,,,,,,Đỏ,,M,AO-A-DO-M,4\n", productColumns, []string{"product_slug", "name", "category_slug", "price", "sku"})
 	dry, err := svc.ImportProducts(context.Background(), rows, false)
 	if err != nil || len(dry.Errors) != 0 || dry.Updated != 1 || dry.IgnoredStock != 1 || len(repo.log) != 0 {
@@ -349,7 +367,7 @@ func TestImportProductsNeverOverwritesExistingStock(t *testing.T) {
 	if byStock["AO-A-DO-M"] != 4 {
 		t.Fatalf("new SKU opening stock is applied as a delta: %d", byStock["AO-A-DO-M"])
 	}
-	if p["version"].(int64) != 1 || p["name"] != "Áo A (mới)" || p["price"].(int64) != 200 {
+	if p["version"].(int64) != 1 || p["name"] != "Áo A (mới)" || p["price"].(int64) != 200000 {
 		t.Fatalf("product update must bump version: %+v", p)
 	}
 	joined := strings.Join(repo.log, "|")
@@ -370,9 +388,9 @@ func TestImportProductsRejectsSKUOwnedByAnotherProduct(t *testing.T) {
 	repo := &memRepo{}
 	cat := seedCategory(repo, "ao-dai")
 	svc := NewService(repo)
-	_, _ = repo.CreateProduct(context.Background(), ProductCreate{ProductInput: ProductInput{Name: "Khác", Slug: "khac", CategoryID: cat, Price: 1, IsActive: true},
+	_, _ = repo.CreateProduct(context.Background(), ProductCreate{ProductInput: ProductInput{Name: "Khác", Slug: "khac", CategoryID: cat, Price: 1000, IsActive: true},
 		Variants: []Variant{{SKU: "TAKEN", Color: "Đỏ", Size: "S"}}})
-	rows := parseCSV(t, prodHeader+"moi,Mới,ao-dai,,,100,,,,,Đỏ,,S,taken,1\n", productColumns, []string{"product_slug", "name", "category_slug", "price", "sku"})
+	rows := parseCSV(t, prodHeader+"moi,Mới,ao-dai,,,100000,,,,,Đỏ,,S,taken,1\n", productColumns, []string{"product_slug", "name", "category_slug", "price", "sku"})
 	got, err := svc.ImportProducts(context.Background(), rows, true)
 	if err != nil || got.Committed || len(got.Errors) != 1 || got.Errors[0].Field != "sku" || !strings.Contains(got.Errors[0].Message, "khac") {
 		t.Fatalf("%+v err=%v", got, err)
@@ -384,7 +402,7 @@ func TestExportThenImportRoundTrips(t *testing.T) {
 	cat := seedCategory(repo, "ao-dai")
 	svc := NewService(repo)
 	_, _ = repo.CreateProduct(context.Background(), ProductCreate{
-		ProductInput: ProductInput{Name: "Áo A", Slug: "ao-a", CategoryID: cat, Price: 100, IsActive: true, Colors: []Color{{Name: "Đỏ", Hex: "#ff0000"}}},
+		ProductInput: ProductInput{Name: "Áo A", Slug: "ao-a", CategoryID: cat, Price: 100000, IsActive: true, Colors: []Color{{Name: "Đỏ", Hex: "#ff0000"}}},
 		Variants:     []Variant{{SKU: "A-1", Color: "Đỏ", Size: "S", Stock: 3}, {SKU: "A-2", Color: "Đỏ", Size: "M", Stock: 0}},
 	})
 	exported, err := svc.ExportProducts(context.Background())

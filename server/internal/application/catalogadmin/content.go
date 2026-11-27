@@ -170,5 +170,43 @@ func (s *Service) UpdateProductContent(ctx context.Context, id string, data Prod
 	if err := validateProductContent(&data); err != nil {
 		return ContentRecord{}, err
 	}
+	if s.imagePrefix != "" {
+		current, err := s.repo.ProductContent(ctx, id)
+		if err != nil {
+			return ContentRecord{}, err
+		}
+		existing := map[string]bool{}
+		for _, img := range []*Image{imageOf(current.Story), imageOf(current.Fabric), imageOf(current.Craft)} {
+			if img != nil {
+				existing[img.Src] = true
+			}
+		}
+		for path, img := range map[string]*Image{"story.image.src": imageOf(data.Story), "fabric.image.src": imageOf(data.Fabric), "craft.image.src": imageOf(data.Craft)} {
+			if img != nil {
+				if err := s.checkImageURL(existing, path, img.Src); err != nil {
+					return ContentRecord{}, err
+				}
+			}
+		}
+	}
 	return s.repo.UpdateProductContent(ctx, id, data)
+}
+
+// imageOf returns the section image or nil (v is *Story, *Fabric or *Craft).
+func imageOf(v any) *Image {
+	switch s := v.(type) {
+	case *Story:
+		if s != nil {
+			return s.Image
+		}
+	case *Fabric:
+		if s != nil {
+			return s.Image
+		}
+	case *Craft:
+		if s != nil {
+			return s.Image
+		}
+	}
+	return nil
 }

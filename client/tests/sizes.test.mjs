@@ -51,7 +51,9 @@ test('buildVariantDrafts keeps hand edits when regenerated; untouched SKUs follo
 
 test('builderRows: empty builder has no rows; draftsToVariants validates', () => {
   assert.deepEqual(builderRows('x', emptyBuilder), [])
-  const rows = builderRows('ao', { sizes: ['S'], colorText: 'Đỏ', edits: { [variantKey('Đỏ', 'S')]: { stock: '12' } } })
+  const rows = builderRows('ao', { sizes: ['S'], colors: ['Đỏ'], edits: { [variantKey('Đỏ', 'S')]: { stock: '12' } } })
+  // colours that are no longer in the product's colour list are dropped
+  assert.deepEqual(builderRows('ao', { sizes: ['S'], colors: ['Đỏ', 'Xanh'], edits: {} }, ['đỏ']).map((r) => r.color), ['Đỏ'])
   assert.deepEqual(draftsToVariants(rows), [{ sku: 'AO-DO-S', color: 'Đỏ', size: 'S', stock: 12 }])
   assert.throws(() => draftsToVariants([]), /ít nhất một màu/)
   assert.throws(() => draftsToVariants([{ key: 'k', color: 'Đỏ', size: 'S', sku: ' ', stock: '1' }]), /SKU/)

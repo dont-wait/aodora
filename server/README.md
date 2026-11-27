@@ -66,6 +66,8 @@ console và volume lưu dữ liệu riêng. Compose dùng tên project `aodora` 
 container/network/volume khỏi các repo khác. Aodora dùng cổng `9100`/`9101` để tránh
 trùng với RustFS của Anomaly. Có thể đổi bằng `RUSTFS_API_PORT` và
 `RUSTFS_CONSOLE_PORT` trong `.env`.
+
+Trang quản trị tải ảnh lên RustFS qua API (`POST /api/v1/admin/uploads/images`); cần `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, `RUSTFS_BUCKET` và có thể đặt `RUSTFS_ENDPOINT` (mặc định `http://localhost:$RUSTFS_API_PORT`). Chi tiết: `docs/ADMIN_DASHBOARD_IMPORT.md`.
 Volume MongoDB vẫn dùng tên cũ `server_mongo_data` để giữ dữ liệu đã có;
 nếu trước đây dùng tên project khác, đặt `MONGO_DATA_VOLUME` theo volume hiện tại.
 

@@ -73,3 +73,8 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+.admin-ui [aria-invalid='true'] {
+  border-color: #b91c1c;
+  background-color: #fef2f2;
+}
