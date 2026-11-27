@@ -44,6 +44,7 @@ migrate-adopt:
 
 infra-up:
 	docker compose up -d mongo rustfs
+	docker compose run --rm mongo-init
 	docker compose run --rm rustfs-init
 
 storage-up:
