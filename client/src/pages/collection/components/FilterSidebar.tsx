@@ -30,17 +30,17 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
       <label className="block"><span className={label}>Tìm theo tên, mô tả</span>
         <input value={draft.search} onChange={(e) => update('search', e.target.value)} className={field} placeholder="Nhập từ khóa..." /></label>
       <label className="block"><span className={label}>Chất liệu</span><input className={field} value={draft.material}
-        onChange={(e) => update('material', e.target.value)} placeholder="Ví dụ: lụa tơ tằm" /></label>
+        onChange={(e) => update('material', e.target.value)} placeholder="Ví dụ: lụa, gấm, linen" /></label>
       <label className="block"><span className={label}>Màu sắc</span><input className={field} value={draft.color}
-        onChange={(e) => update('color', e.target.value)} placeholder="Ví dụ: đỏ đô" /></label>
+        onChange={(e) => update('color', e.target.value)} placeholder="Ví dụ: đỏ, xanh, hồng" /></label>
       <label className="block"><span className={label}>Kích cỡ</span><select className={field} value={draft.size} onChange={(e) => update('size', e.target.value)}>
         <option value="">Tất cả cỡ</option>
         {(draft.size && !isStandardSize(draft.size) ? [...STANDARD_SIZES, draft.size] : STANDARD_SIZES).map((size) => <option key={size} value={size}>{size}</option>)}
       </select></label>
       <fieldset><legend className={label}>Khoảng giá (VNĐ)</legend><div className="grid grid-cols-2 gap-2">
-        <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="text" inputMode="numeric" placeholder="400.000" value={formatVNDInput(draft.min_price)} onChange={(e) => update('min_price', e.target.value)} /></label>
-        <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="text" inputMode="numeric" placeholder="500.000" value={formatVNDInput(draft.max_price)} onChange={(e) => update('max_price', e.target.value)} /></label>
-      </div><p className="mt-2 text-xs text-on-surface-variant">Nhập số tiền đầy đủ (ví dụ 400.000 VNĐ, không phải 400).</p></fieldset>
+        <label><span className="text-sm">Từ</span><input aria-label="Giá tối thiểu" className={field} type="text" inputMode="numeric" placeholder="800.000" value={formatVNDInput(draft.min_price)} onChange={(e) => update('min_price', e.target.value)} /></label>
+        <label><span className="text-sm">Đến</span><input aria-label="Giá tối đa" className={field} type="text" inputMode="numeric" placeholder="1.500.000" value={formatVNDInput(draft.max_price)} onChange={(e) => update('max_price', e.target.value)} /></label>
+      </div><p className="mt-2 text-xs text-on-surface-variant">Nhập số tiền đầy đủ (ví dụ 800.000 VNĐ, không phải 800).</p></fieldset>
       {error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
       <button type="submit" className="bg-primary text-on-primary px-5 py-3 w-full">Áp dụng bộ lọc</button>
     </form>

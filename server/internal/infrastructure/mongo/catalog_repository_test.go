@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -47,8 +48,31 @@ func TestProductFilterCombinesColorAndSizeInOneSKU(t *testing.T) {
 		t.Fatalf("not same-SKU filter: %#v", variant)
 	}
 	color, ok := variant["color"].(bson.Regex)
-	if !ok || color.Pattern != "^Đỏ$" || color.Options != "i" {
+	if !ok || color.Pattern != vietnameseContainsPattern("Đỏ") || color.Options != "i" {
 		t.Fatalf("wrong color constraint: %#v", variant["color"])
+	}
+}
+
+func TestVietnameseContainsPatternIgnoresAccentsAndCase(t *testing.T) {
+	cases := []struct {
+		query, value string
+		want         bool
+	}{
+		{"lụa tơ tằm", "Lụa tơ tằm dệt Nha Xá", true},
+		{"lua to tam", "Lụa tơ tằm dệt Nha Xá", true},
+		{"lụa", "Lụa tổng hợp polyeste", true},
+		{"đỏ", "Đỏ tươi", true},
+		{"do", "Xanh đô", true},
+		{"đỏ", "Hồng vỏ đỗ", false},
+		{"ĐỎ", "Đỏ đô", true},
+		{"gấm", "Lụa tơ tằm", false},
+		{"a.b", "axb", false},
+	}
+	for _, c := range cases {
+		re := regexp.MustCompile("(?i)" + vietnameseContainsPattern(c.query))
+		if got := re.MatchString(c.value); got != c.want {
+			t.Errorf("%q in %q = %v, want %v (pattern %s)", c.query, c.value, got, c.want, vietnameseContainsPattern(c.query))
+		}
 	}
 }
 
