@@ -1,9 +1,7 @@
-import { useState, type FormEvent } from 'react'
 import { FOOTER, SITE, ROUTES } from '@/data/site'
 import { Link } from 'react-router-dom'
 import { getCategories } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
-import { useToast } from '@/hooks/useToast'
 import BrandMark from './BrandMark'
 
 const linkItem = 'font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer'
@@ -11,17 +9,10 @@ const colTitle = 'font-label-uppercase text-label-uppercase text-primary mb-4 tr
 
 export default function Footer() {
   const categories = useCatalogRequest(getCategories, 'footer:categories')
-  const { showToast } = useToast()
-  const [email, setEmail] = useState('')
-
-  const subscribe = (e: FormEvent) => {
-    e.preventDefault()
-    showToast('Bản tin chưa được mở đăng ký. Vui lòng quay lại sau.')
-  }
 
   return (
     <footer className="w-full bg-surface-container-high text-on-surface mt-20">
-      <div className="max-w-[1440px] mx-auto px-margin-desktop py-16">
+      <div className="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-gutter-desktop">
           <div>
             <div className="flex items-center gap-3 mb-4">
@@ -47,8 +38,8 @@ export default function Footer() {
             <h4 className={colTitle}>Hỗ trợ Khách hàng</h4>
             <ul className="space-y-2.5">
               {FOOTER.support.map((c) => (
-                <li key={c} className={linkItem}>
-                  {c}
+                <li key={c.label} className={linkItem}>
+                  <Link to={c.to}>{c.label}</Link>
                 </li>
               ))}
             </ul>
@@ -66,35 +57,27 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className={colTitle}>Bản tin Thưởng lãm</h4>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
-              Đăng ký nhận thông tin các bộ sưu tập giới hạn và nhận ngay voucher may đo 500.000đ.
-            </p>
-            <form className="space-y-2" onSubmit={subscribe}>
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-surface text-on-surface px-3 py-2 text-body-sm font-body-sm focus:outline-none focus:bg-surface-bright"
-                placeholder="Địa chỉ email của quý khách..."
-              />
-              <button
-                className="w-full bg-primary hover:bg-primary-container text-on-primary font-label-uppercase text-label-uppercase py-2.5 transition-colors"
-                type="submit"
+            <h4 className={colTitle}>Liên hệ</h4>
+            <div className="space-y-3 font-body-sm text-body-sm text-on-surface-variant">
+              <p>
+                Hotline tư vấn: <a className="text-primary font-semibold" href={`tel:${SITE.hotline.replace(/\s/g, '')}`}>{SITE.hotline}</a>
+              </p>
+              <Link
+                to={`${ROUTES.tailoring}#bang-so-do`}
+                className="inline-block bg-primary hover:bg-primary-container text-on-primary font-label-uppercase text-label-uppercase px-4 py-2.5 transition-colors"
               >
-                Đăng ký nhận tin
-              </button>
-            </form>
+                Đặt lịch may đo
+              </Link>
+            </div>
           </div>
         </div>
 
         <div className="mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 font-body-sm text-body-sm text-on-surface-variant">
           <p>{FOOTER.copyright}</p>
           <div className="flex items-center gap-6 font-label-uppercase text-label-uppercase tracking-wider">
-            {FOOTER.socials.map((s) => (
-              <a key={s} className="hover:text-primary transition-colors" href="#">
-                {s}
+            {FOOTER.socials.filter((s) => s.href).map((s) => (
+              <a key={s.label} className="hover:text-primary transition-colors" href={s.href} target="_blank" rel="noreferrer">
+                {s.label}
               </a>
             ))}
           </div>

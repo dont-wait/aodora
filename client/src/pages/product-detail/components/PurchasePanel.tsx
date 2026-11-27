@@ -17,6 +17,7 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
   const [quantity, setQuantity] = useState(1)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [added, setAdded] = useState(false)
   const variant = getSelectedVariant(product, color, size)
   const maxStock = variant ? Math.min(variant.stock, product.stock) : (product.variants.length ? 0 : product.stock)
   const inStock = product.ready_available && maxStock >= quantity && (variant?.available || (!product.variants.length && !!product.sku))
@@ -27,12 +28,17 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
 
   async function addToCart() {
     setError('')
+    setAdded(false)
     try {
       const selection = createCartSelection(product, color, size, quantity)
       setSaving(true)
       await addSelectedProduct(selection)
-      showToast('Sản phẩm đã được lưu vào giỏ hàng.')
-    } catch (e) { setError(e instanceof Error ? e.message : 'Không thể thêm vào giỏ hàng.') }
+      setAdded(true)
+      showToast('Đã thêm sản phẩm vào giỏ hàng.')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Không thể thêm vào giỏ hàng.'
+      setError(message)
+    }
     finally { setSaving(false) }
   }
 
@@ -61,7 +67,7 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
         <div className="flex flex-wrap gap-2">{colors.map((value) => {
           const hex = validColor(value)
           return <button key={value} type="button" aria-pressed={color === value}
-            onClick={() => { setColor(value); setSize(product.variants.find((v) => v.color === value && v.available)?.size || ''); setQuantity(1); setError('') }}
+            onClick={() => { setColor(value); setSize(product.variants.find((v) => v.color === value && v.available)?.size || ''); setQuantity(1); setError(''); setAdded(false) }}
             className={`px-3 py-2 border ${color === value ? 'border-primary ring-1 ring-primary' : 'border-outline-variant'} flex items-center gap-2`}>
             {hex && <span className="w-5 h-5 rounded-full border" style={{ backgroundColor: hex }} />}{value}</button>
         })}</div>
@@ -69,28 +75,29 @@ export default function PurchasePanel({ product, onOpenSizeGuide }: { product: C
       {!!sizes.length && <fieldset className="mb-5"><legend className="font-semibold mb-2">Kích cỡ: {size || 'Chọn kích cỡ'}</legend>
         <div className="flex flex-wrap gap-2">{sizes.map((value) => {
           const available = product.variants.some((v) => v.color === color && v.size === value && v.available)
-          return <button key={value} type="button" aria-pressed={size === value} disabled={!available}
-            onClick={() => { setSize(value); setQuantity(1); setError('') }}
+          return <button key={value} type="button" aria-pressed={size === value} disabled={!available} title={available ? undefined : 'Hết hàng'}
+            onClick={() => { setSize(value); setQuantity(1); setError(''); setAdded(false) }}
             className={`min-w-12 px-3 py-2 border ${size === value ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant'} disabled:opacity-40 disabled:cursor-not-allowed`}>
-            {value}</button>
+            {value}{!available && <span className="sr-only"> (hết hàng)</span>}</button>
         })}</div>
         <button type="button" onClick={onOpenSizeGuide} className="underline text-primary mt-2 text-sm">Xem bảng kích cỡ tham khảo</button>
       </fieldset>}
-      <p role="status" className="mb-4 text-on-surface-variant text-sm">{variant ? `SKU: ${variant.sku} — Còn ${maxStock} sản phẩm` : product.sku ? `SKU: ${product.sku} — Còn ${maxStock} sản phẩm` : 'Không có SKU phù hợp.'}</p>
+      <p role="status" className="mb-4 text-on-surface-variant text-sm">{maxStock > 0 ? `Còn ${maxStock} sản phẩm` : 'Hết hàng với lựa chọn này'}</p>
       <div className="flex items-center gap-3 mb-4">
         <div className="flex items-center bg-surface-container px-2">
-          <button type="button" aria-label="Giảm số lượng" onClick={() => setQuantity((n) => Math.max(1, n - 1))} className="p-2"><Icon name="remove" size={18} /></button>
+          <button type="button" aria-label="Giảm số lượng" onClick={() => { setQuantity((n) => Math.max(1, n - 1)); setAdded(false) }} className="p-2"><Icon name="remove" size={18} /></button>
           <span className="w-9 text-center">{quantity}</span>
-          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= maxStock} onClick={() => setQuantity((n) => Math.min(maxStock, n + 1))} className="p-2 disabled:opacity-40"><Icon name="add" size={18} /></button>
+          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= maxStock} onClick={() => { setQuantity((n) => Math.min(maxStock, n + 1)); setAdded(false) }} className="p-2 disabled:opacity-40"><Icon name="add" size={18} /></button>
         </div>
         <button type="button" disabled={!inStock || saving} onClick={addToCart}
           className="flex-1 bg-primary hover:bg-primary-container disabled:opacity-50 text-on-primary py-3 px-4 uppercase text-sm">
           {saving ? 'Đang xử lý...' : 'Thêm vào giỏ'}</button>
       </div>
     </>}
-    {(!product.ready_available || mode === 'custom') && <p className="mb-4 text-on-surface-variant">{product.bespoke ? 'Mẫu này có hỗ trợ tư vấn may đo.' : 'Sản phẩm hiện không còn SKU may sẵn có thể mua.'}</p>}
+    {(!product.ready_available || mode === 'custom') && <p className="mb-4 text-on-surface-variant">{product.bespoke ? 'Mẫu này có hỗ trợ tư vấn may đo.' : 'Mẫu này hiện đã hết hàng may sẵn.'}</p>}
+    {added && <p role="status" className="mb-4 flex flex-wrap items-center gap-3 text-primary">Đã thêm vào giỏ hàng. <Link to={ROUTES.cart} className="underline font-semibold">Xem giỏ hàng</Link></p>}
     {error && <p role="alert" className="mb-4 text-red-700">{error}</p>}
     {product.bespoke && <Link to={`${ROUTES.tailoring}?${tailoringParams}`} className="block bg-surface-container-high text-primary py-3 px-5 text-center mb-4 font-semibold">Gửi yêu cầu tư vấn may đo (chưa phải đặt mua)</Link>}
-    <p className="text-xs text-on-surface-variant">Giá và tồn kho sẽ được kiểm tra lại khi đặt đơn. Giỏ hàng của bạn đã được lưu theo lựa chọn này.</p>
+    <p className="text-xs text-on-surface-variant">Giá và tồn kho sẽ được kiểm tra lại khi đặt đơn.{added && ' Giỏ hàng của bạn đã được lưu theo lựa chọn này.'}</p>
   </div>
 }

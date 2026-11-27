@@ -1,20 +1,35 @@
 import { useState, type FormEvent } from 'react'
-import { useToast } from '@/hooks/useToast'
+import { useConsultSubmit } from '@/features/tailoring/useConsultSubmit'
+
+const slots = ['Buổi sáng (09:00 - 11:30)', 'Buổi chiều (14:00 - 17:00)', 'Buổi tối (18:30 - 20:30)']
 
 export default function HomeVisitSection() {
-  const { showToast } = useToast()
-  const [submitting, setSubmitting] = useState(false)
+  const { submitting, success, error, fieldErrors: serverErrors, submit } = useConsultSubmit()
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [area, setArea] = useState('Hà Nội (Nội thành & Lân cận)')
+  const [date, setDate] = useState('')
+  const [slot, setSlot] = useState(slots[0])
+  const [address, setAddress] = useState('')
+  const [addressError, setAddressError] = useState('')
+  const fieldErrors: Record<string, string> = { ...serverErrors, ...(addressError ? { address: addressError } : {}) }
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const form = e.currentTarget
-    setSubmitting(true)
-    // TODO: gọi API đặt lịch may đo tận nơi
-    window.setTimeout(() => {
-      showToast('Cảm ơn quý khách! Lịch hẹn may đo đã được ghi nhận. Quản lý tư gia sẽ gọi xác nhận trong ít phút.')
-      form.reset()
-      setSubmitting(false)
-    }, 400)
+    if (!address.trim()) {
+      setAddressError('Vui lòng nhập địa chỉ để chuyên viên đến đo.')
+    } else {
+      setAddressError('')
+    }
+    if (!address.trim()) return
+    const ok = await submit({
+      name,
+      phone,
+      extras: [['Dịch vụ', 'May đo tận nơi'], ['Khu vực', area], ['Ngày mong muốn', date], ['Khung giờ', slot], ['Địa chỉ', address]],
+    })
+    if (ok) {
+      setName(''); setPhone(''); setArea('Hà Nội (Nội thành & Lân cận)'); setDate(''); setSlot(slots[0]); setAddress('')
+    }
   }
 
   return (
@@ -52,66 +67,51 @@ export default function HomeVisitSection() {
             <p className="font-body-sm text-body-sm text-on-surface-variant mb-6">
               Xin quý khách vui lòng để lại thông tin, nhân viên tư vấn sẽ liên hệ xác nhận trong 30 phút.
             </p>
-            <form className="space-y-4" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={(e) => void handleSubmit(e)} noValidate>
               <div>
-                <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Tên của bạn</label>
-                <input
-                  className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none"
-                  placeholder="Trần Khánh Vân"
-                  required
-                  type="text"
-                />
+                <label htmlFor="visit-name" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Tên của bạn</label>
+                <input id="visit-name" name="name" autoComplete="name" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" placeholder="Trần Khánh Vân" required type="text" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'visit-name-error' : undefined} />
+                {fieldErrors.name && <p id="visit-name-error" className="text-red-700 text-body-sm mt-1">{fieldErrors.name}</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Số điện thoại</label>
-                  <input
-                    className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none"
-                    placeholder="0912 xxx xxx"
-                    required
-                    type="tel"
-                  />
+                  <label htmlFor="visit-phone" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Số điện thoại</label>
+                  <input id="visit-phone" name="phone" autoComplete="tel" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" placeholder="0912 xxx xxx" required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? 'visit-phone-error' : undefined} />
+                  {fieldErrors.phone && <p id="visit-phone-error" className="text-red-700 text-body-sm mt-1">{fieldErrors.phone}</p>}
                 </div>
                 <div>
-                  <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Khu vực hẹn</label>
-                  <select className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none">
-                    <option value="HN">Hà Nội (Nội thành & Lân cận)</option>
-                    <option value="HCM">TP. Hồ Chí Minh (Các quận nội thành)</option>
+                  <label htmlFor="visit-area" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Khu vực hẹn</label>
+                  <select id="visit-area" name="area" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" value={area} onChange={(e) => setArea(e.target.value)}>
+                    <option value="Hà Nội (Nội thành & Lân cận)">Hà Nội (Nội thành &amp; Lân cận)</option>
+                    <option value="TP. Hồ Chí Minh (Các quận nội thành)">TP. Hồ Chí Minh (Các quận nội thành)</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Ngày mong muốn</label>
-                  <input
-                    className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none"
-                    type="date"
-                  />
+                  <label htmlFor="visit-date" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Ngày mong muốn</label>
+                  <input id="visit-date" name="date" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Khung giờ hẹn</label>
-                  <select className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none">
-                    <option>Buổi sáng (09:00 - 11:30)</option>
-                    <option>Buổi chiều (14:00 - 17:00)</option>
-                    <option>Buổi tối (18:30 - 20:30)</option>
+                  <label htmlFor="visit-slot" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Khung giờ hẹn</label>
+                  <select id="visit-slot" name="slot" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" value={slot} onChange={(e) => setSlot(e.target.value)}>
+                    {slots.map((s) => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Địa chỉ tư gia hoặc văn phòng</label>
-                <input
-                  className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none"
-                  placeholder="Số nhà, tên đường, phường/quận..."
-                  required
-                  type="text"
-                />
+                <label htmlFor="visit-address" className="block font-label-regular text-label-regular text-on-surface-variant mb-1">Địa chỉ tư gia hoặc văn phòng</label>
+                <input id="visit-address" name="address" autoComplete="street-address" className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface border-none" placeholder="Số nhà, tên đường, phường/quận..." required type="text" value={address} onChange={(e) => setAddress(e.target.value)} aria-invalid={Boolean(fieldErrors.address)} aria-describedby={fieldErrors.address ? 'visit-address-error' : undefined} />
+                {fieldErrors.address && <p id="visit-address-error" className="text-red-700 text-body-sm mt-1">{fieldErrors.address}</p>}
               </div>
+              {success && <p role="status" className="bg-surface-container text-primary px-4 py-3 text-body-sm">{success}</p>}
+              {error && <p role="alert" className="bg-error-container text-red-700 px-4 py-3 text-body-sm">{error}</p>}
               <button
-                className="w-full py-3.5 bg-primary text-on-primary font-label-uppercase text-label-uppercase tracking-widest shadow-md hover:bg-primary-container transition-colors mt-2"
+                className="w-full py-3.5 bg-primary text-on-primary font-label-uppercase text-label-uppercase tracking-widest shadow-md hover:bg-primary-container transition-colors mt-2 disabled:opacity-60"
                 type="submit"
                 disabled={submitting}
               >
-                Xác Nhận Đặt Lịch Chuyên Viên
+                {submitting ? 'Đang gửi...' : 'Gửi Yêu Cầu Đặt Lịch'}
               </button>
             </form>
           </div>

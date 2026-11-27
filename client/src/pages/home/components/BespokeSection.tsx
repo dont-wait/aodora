@@ -1,21 +1,26 @@
 import { useState, type FormEvent } from 'react'
 import { bespokeCities, bespokeInterests, bespokePerks } from '@/data/home'
-import { useToast } from '@/hooks/useToast'
+import { useConsultSubmit } from '@/features/tailoring/useConsultSubmit'
 import Icon from '@/components/ui/Icon'
 
 export default function BespokeSection() {
-  const { showToast } = useToast()
-  const [submitting, setSubmitting] = useState(false)
+  const { submitting, success, error, fieldErrors, submit } = useConsultSubmit()
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [city, setCity] = useState(bespokeCities[0])
+  const [interest, setInterest] = useState(bespokeInterests[0])
+  const [notes, setNotes] = useState('')
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSubmitting(true)
-    // TODO: gọi API đăng ký lịch may đo khi server sẵn sàng
-    window.setTimeout(() => {
-      showToast('Cảm ơn Quý khách! Chuyên viên may đo của AODORA sẽ liên hệ trong ít phút.')
-      e.currentTarget.reset()
-      setSubmitting(false)
-    }, 400)
+    const ok = await submit({
+      name,
+      phone,
+      extras: [['Thành phố', city], ['Dòng áo quan tâm', interest], ['Ghi chú', notes]],
+    })
+    if (ok) {
+      setName(''); setPhone(''); setCity(bespokeCities[0]); setInterest(bespokeInterests[0]); setNotes('')
+    }
   }
 
   return (
@@ -54,29 +59,45 @@ export default function BespokeSection() {
               <h3 className="font-headline-sm text-headline-sm text-primary">Đặt Lịch Nghệ Nhân Thăm Khám</h3>
               <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">Chuyên viên may đo sẽ liên hệ xác nhận trong vòng 30 phút.</p>
             </div>
-            <form className="space-y-4" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={(e) => void handleSubmit(e)} noValidate>
               <div>
-                <label className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Họ và tên quý khách *</label>
+                <label htmlFor="bespoke-name" className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Họ và tên quý khách *</label>
                 <input
+                  id="bespoke-name"
+                  name="name"
+                  autoComplete="name"
                   className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright"
                   placeholder="Ví dụ: Hoàng Như Ngọc"
                   required
                   type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  aria-describedby={fieldErrors.name ? 'bespoke-name-error' : undefined}
                 />
+                {fieldErrors.name && <p id="bespoke-name-error" className="text-red-700 text-body-sm mt-1">{fieldErrors.name}</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Số điện thoại *</label>
+                  <label htmlFor="bespoke-phone" className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Số điện thoại *</label>
                   <input
+                    id="bespoke-phone"
+                    name="phone"
+                    autoComplete="tel"
                     className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright"
                     placeholder="0988 xxx xxx"
                     required
                     type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    aria-invalid={Boolean(fieldErrors.phone)}
+                    aria-describedby={fieldErrors.phone ? 'bespoke-phone-error' : undefined}
                   />
+                  {fieldErrors.phone && <p id="bespoke-phone-error" className="text-red-700 text-body-sm mt-1">{fieldErrors.phone}</p>}
                 </div>
                 <div>
-                  <label className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Thành phố</label>
-                  <select className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright" name="city">
+                  <label htmlFor="bespoke-city" className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Thành phố</label>
+                  <select id="bespoke-city" className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright" name="city" value={city} onChange={(e) => setCity(e.target.value)}>
                     {bespokeCities.map((c) => (
                       <option key={c}>{c}</option>
                     ))}
@@ -84,30 +105,33 @@ export default function BespokeSection() {
                 </div>
               </div>
               <div>
-                <label className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Dịp may mặc & Dòng áo quan tâm</label>
-                <select
-                  className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright"
-                  name="interest"
-                >
+                <label htmlFor="bespoke-interest" className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Dịp may mặc &amp; Dòng áo quan tâm</label>
+                <select id="bespoke-interest" className="w-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright" name="interest" value={interest} onChange={(e) => setInterest(e.target.value)}>
                   {bespokeInterests.map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Ghi chú yêu cầu đặc biệt (tùy chọn)</label>
+                <label htmlFor="bespoke-notes" className="block font-label-uppercase text-label-uppercase text-secondary mb-1">Ghi chú yêu cầu đặc biệt (tùy chọn)</label>
                 <textarea
+                  id="bespoke-notes"
+                  name="notes"
                   className="w-full bg-surface-container px-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:bg-surface-bright resize-none"
                   placeholder="Ví dụ: Cần may gấp trong 5 ngày, yêu cầu đo tại nhà riêng vào cuối tuần..."
                   rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                 ></textarea>
               </div>
+              {success && <p role="status" className="bg-surface-container text-primary px-4 py-3 text-body-sm">{success}</p>}
+              {error && <p role="alert" className="bg-error-container text-red-700 px-4 py-3 text-body-sm">{error}</p>}
               <button
-                className="w-full bg-primary hover:bg-primary-container text-on-primary py-4 font-label-uppercase text-label-uppercase transition-colors shadow-md"
+                className="w-full bg-primary hover:bg-primary-container text-on-primary py-4 font-label-uppercase text-label-uppercase transition-colors shadow-md disabled:opacity-60"
                 type="submit"
                 disabled={submitting}
               >
-                Gửi Yêu Cầu May Đo & Nhận Sách Lụa
+                {submitting ? 'Đang gửi...' : 'Gửi Yêu Cầu May Đo & Nhận Sách Lụa'}
               </button>
             </form>
             <p className="font-body-sm text-body-sm text-outline text-center mt-4">

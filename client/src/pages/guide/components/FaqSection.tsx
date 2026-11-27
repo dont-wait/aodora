@@ -7,7 +7,7 @@ export default function FaqSection() {
   const [openId, setOpenId] = useState<number | null>(null)
 
   return (
-    <section className="w-full py-20 px-margin-tablet lg:px-margin-desktop bg-surface-container-lowest">
+    <section id="cau-hoi-thuong-gap" className="w-full py-20 px-margin-tablet lg:px-margin-desktop bg-surface-container-lowest">
       <div className="max-w-[1000px] mx-auto">
         <div className="text-center mb-14">
           <span className="font-label-uppercase text-label-uppercase text-secondary tracking-widest uppercase">Giải đáp thắc mắc</span>

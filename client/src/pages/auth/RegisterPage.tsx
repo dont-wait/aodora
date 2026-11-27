@@ -7,7 +7,7 @@ import { ROUTES } from '@/data/site'
 import Icon from '@/components/ui/Icon'
 
 export default function RegisterPage() {
-  const { register } = useAuth()
+  const { register, login } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', confirm: '' })
@@ -23,9 +23,19 @@ export default function RegisterPage() {
     setBusy(true)
     try {
       await register({ full_name: form.full_name, email: form.email, phone: form.phone, password: form.password })
-      navigate(`/dang-nhap?registered=1${next !== ROUTES.home ? `&next=${encodeURIComponent(next)}` : ''}`, { replace: true })
     } catch (err) {
       setError(err instanceof AuthApiError || err instanceof Error ? err.message : 'Đăng ký thất bại')
+      setBusy(false)
+      return
+    }
+    try {
+      await login(form.email, form.password)
+      navigate(next, { replace: true })
+    } catch {
+      // Account exists but auto sign-in failed: hand over to the login page with a notice and the email.
+      const query = new URLSearchParams({ registered: '1', email: form.email })
+      if (next !== ROUTES.home) query.set('next', next)
+      navigate(`/dang-nhap?${query.toString()}`, { replace: true })
     } finally { setBusy(false) }
   }
 
