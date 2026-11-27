@@ -2,10 +2,10 @@ import Icon from '@/components/ui/Icon'
 import Modal from '@/components/ui/Modal'
 
 export default function SizeGuideModal({ open, onClose, sizes }: { open: boolean; onClose: () => void; sizes: string[] }) {
-  return <Modal open={open} onClose={onClose}>
+  return <Modal open={open} onClose={onClose} labelledBy="size-guide-title">
     <div className="flex items-center justify-between pb-4">
       <div><p className="uppercase tracking-widest text-secondary text-sm">Hướng dẫn chọn kích thước</p>
-        <h3 className="font-headline-md text-headline-md text-primary">Thông Tin Size May Sẵn</h3></div>
+        <h3 id="size-guide-title" className="font-headline-md text-headline-md text-primary">Thông Tin Size May Sẵn</h3></div>
       <button type="button" aria-label="Đóng" onClick={onClose} className="p-2"><Icon name="close" size={24} /></button>
     </div>
     <p className="text-on-surface-variant leading-relaxed my-4">Các kích cỡ đang được công bố cho mẫu áo này:</p>

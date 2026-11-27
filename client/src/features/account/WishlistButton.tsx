@@ -21,7 +21,7 @@ export default function WishlistButton({ productId, className = '' }: { productI
       return
     }
     try { await toggle(productId) }
-    catch (error) { showToast(error instanceof Error ? error.message : 'Không thể cập nhật yêu thích.') }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Không thể cập nhật yêu thích.', 'error') }
   }
 
   return <button type="button" aria-label={saved ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'} aria-pressed={saved} disabled={loading && !!user} onClick={(event) => void click(event)} className={`inline-flex items-center justify-center disabled:opacity-50 ${className}`}>

@@ -48,7 +48,7 @@ export function readAttempt(storage: StorageAccess = localStorage): CheckoutAtte
       throw new Error()
     return value
   } catch {
-    throw new Error('Không đọc được lần đặt trước. Vui lòng giữ dữ liệu trình duyệt và liên hệ cửa hàng trước khi đặt lại.')
+    throw new Error('Không đọc được đơn bạn vừa gửi. Vui lòng giữ nguyên dữ liệu trình duyệt và liên hệ cửa hàng trước khi đặt lại.')
   }
 }
 export function clearAttempt(requestId: string, storage: StorageAccess = localStorage): void {
@@ -128,7 +128,7 @@ export function isDefinitiveOrderError(error: unknown): boolean {
 export class CheckoutIdentityError extends Error {}
 
 export async function verifyCheckoutIdentity(credential: OrderCredential, customerId: string | null) {
-  if (!matchesIdentity(credential, customerId)) throw new CheckoutIdentityError('Vui lòng dùng đúng tài khoản hoặc phiên khách của lần đặt trước.')
+  if (!matchesIdentity(credential, customerId)) throw new CheckoutIdentityError('Vui lòng dùng đúng tài khoản đã gửi đơn trước đó (hoặc đăng xuất nếu bạn đã đặt khi chưa đăng nhập).')
   let actualId: string | null
   try {
     actualId = (await authApi.me()).id
@@ -137,7 +137,7 @@ export async function verifyCheckoutIdentity(credential: OrderCredential, custom
     else throw error
   }
   if (!matchesIdentity(credential, actualId))
-    throw new CheckoutIdentityError('Phiên đăng nhập đã thay đổi. Vui lòng tải lại trang và dùng đúng phiên đã đặt đơn.')
+    throw new CheckoutIdentityError('Trạng thái đăng nhập đã thay đổi. Vui lòng tải lại trang và dùng đúng tài khoản đã gửi đơn.')
 }
 export async function sendAttempt(attempt: CheckoutAttempt, customerId: string | null) {
   await verifyCheckoutIdentity(attempt.credential, customerId)
@@ -145,7 +145,7 @@ export async function sendAttempt(attempt: CheckoutAttempt, customerId: string |
 }
 
 export async function lookupAttempt(attempt: CheckoutAttempt, customerId: string | null) {
-  if (!matchesIdentity(attempt.credential, customerId)) throw new Error('Vui lòng dùng đúng tài khoản hoặc phiên khách của lần đặt trước để tra cứu.')
+  if (!matchesIdentity(attempt.credential, customerId)) throw new Error('Vui lòng dùng đúng tài khoản đã gửi đơn trước đó (hoặc đăng xuất nếu bạn đã đặt khi chưa đăng nhập) để kiểm tra đơn.')
   await verifyCheckoutIdentity(attempt.credential, customerId)
   try {
     return await ordersApi.attempt(attempt)

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getCategories, listProducts } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
-import CatalogState from '@/features/catalog/CatalogState'
+import CatalogState, { ProductGridSkeleton } from '@/features/catalog/CatalogState'
 import type { CatalogFilters, CatalogSort } from '@/features/catalog/types'
 import CollectionHero from './components/CollectionHero'
 import CategoryTabs from './components/CategoryTabs'
@@ -17,7 +17,8 @@ const filterKeys = ['search', 'category', 'color', 'size', 'material', 'min_pric
 
 export default function CollectionPage() {
   const [params, setParams] = useSearchParams()
-  const [filterOpen, setFilterOpen] = useState(true)
+  const [filterOpen, setFilterOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(min-width: 1024px)').matches)
+  const gridTop = useRef<HTMLDivElement>(null)
   const key = params.toString()
   // Reset only when an applied sidebar filter changes (including browser Back/Forward).
   // Sorting and pagination must not discard unsaved filter edits.
@@ -69,16 +70,16 @@ export default function CollectionPage() {
         </CatalogState>
         <Toolbar shown={products.data?.data.length || 0} total={products.data?.total || 0} filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)} sort={sort} onSortChange={(v) => update('sort', v)} />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div ref={gridTop} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start scroll-mt-32">
           {filterOpen && <FilterSidebar key={sidebarKey} params={params} onApply={applyFilters} onClear={clearFilters} />}
           <div className={filterOpen ? 'lg:col-span-9' : 'lg:col-span-12'}>
-            <CatalogState loading={products.loading} error={products.error} onRetry={products.retry}>
+            <CatalogState loading={products.loading} error={products.error} onRetry={products.retry} skeleton={<ProductGridSkeleton />}>
               {products.data?.data.length ? (
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 ${filterOpen ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
                   {products.data.data.map((product) => <ProductCard key={product.id} product={product} />)}
                 </div>
               ) : <div className="py-16 text-center space-y-3"><p>Không có sản phẩm khớp bộ lọc.</p><button type="button" onClick={clearFilters} className="underline text-primary">Xóa bộ lọc</button></div>}
-              {!!products.data && products.data.total_pages > 1 && <Pagination page={page} totalPages={products.data.total_pages} onChange={(next) => update('page', String(next))} />}
+              {!!products.data && products.data.total_pages > 1 && <Pagination page={page} totalPages={products.data.total_pages} onChange={(next) => { update('page', String(next)); gridTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />}
             </CatalogState>
           </div>
         </div>

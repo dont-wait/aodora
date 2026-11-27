@@ -1,3 +1,4 @@
+import AddressFields from '@/features/address/AddressFields'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Breadcrumb from '@/components/ui/Breadcrumb'
@@ -24,7 +25,7 @@ import type { CheckoutAttempt, CheckoutBody, Order, PaymentMethod, Quote, Shippi
 
 const inputClass = 'w-full border border-outline-variant bg-surface-container-lowest px-4 py-3 focus:outline-primary'
 const buttonClass = 'bg-primary px-6 py-3 text-on-primary disabled:opacity-50 disabled:cursor-not-allowed'
-const emptyAddress: ShippingAddress = { recipient: '', phone: '', line1: '', ward: '', district: '', city: '' }
+const emptyAddress: ShippingAddress = { recipient: '', phone: '', line1: '', ward: '', city: '' }
 function initialCheckout() {
   try {
     const attempt = readAttempt()
@@ -37,7 +38,7 @@ function messageFor(error: unknown) {
   if (error instanceof CheckoutIdentityError) return error.message
   if (error instanceof OrderApiError) {
     if (error.code === 'SHIPPING_UNAVAILABLE')
-      return 'COD tạm không khả dụng vì chưa có phí giao hàng. Bạn có thể chọn nhận và thanh toán tại quầy khi không còn lần đặt đang chờ.'
+      return 'COD tạm không khả dụng vì chưa có phí giao hàng. Bạn có thể chọn nhận và thanh toán tại quầy khi không còn đơn nào đang gửi.'
     return error.message
   }
   return 'Chưa nhận được phản hồi rõ ràng. Vui lòng kiểm tra kết nối và tra cứu lại; không đặt đơn mới ở cửa sổ khác.'
@@ -49,6 +50,12 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<ShippingAddress>(initial.body?.shipping_address ?? emptyAddress)
   const [payment, setPayment] = useState<PaymentMethod>(initial.body?.payment_method ?? 'cod')
   const [note, setNote] = useState(initial.body?.note ?? '')
+  // District of a saved pre-07/2025 address; only used to flag that the ward must be chosen again.
+  const [legacyDistrict, setLegacyDistrict] = useState('')
+  const addressRef = useRef(address)
+  useEffect(() => {
+    addressRef.current = address
+  }, [address])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [profileError, setProfileError] = useState('')
   const [quote, setQuote] = useState<Quote | null>(null)
@@ -92,7 +99,7 @@ export default function CheckoutPage() {
     work.current = true
     setBusy(true)
     setError('')
-    setNotice('Đang tra cứu lần đặt trước...')
+    setNotice('Đang kiểm tra đơn bạn vừa gửi...')
     lookupAttempt(attempt, customerId)
       .then(async (order) => {
         if (order) await finish(order, attempt)
@@ -120,9 +127,9 @@ export default function CheckoutPage() {
           phone: current.phone || saved?.phone || next.phone || '',
           line1: current.line1 || saved?.line1 || '',
           ward: current.ward || saved?.ward || '',
-          district: current.district || saved?.district || '',
           city: current.city || saved?.city || '',
         }))
+        if (!addressRef.current.city && !addressRef.current.ward) setLegacyDistrict(saved?.district || '')
       })
       .catch(() => {
         if (active) setProfileError('Chưa tải được địa chỉ đã lưu. Bạn vẫn có thể nhập thông tin nhận áo bên dưới.')
@@ -153,17 +160,24 @@ export default function CheckoutPage() {
   }
   const bodyKey = JSON.stringify(body)
   const quoteCurrent = quote !== null && quoteFor === bodyKey && !expired
+  const cartLineOf = (item: { product_id: string; sku: string }) => cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
   const blocked = busy || authLoading || cartLoading || !!initial.error
   const identityMatches = !attempt || matchesIdentity(attempt.credential, customerId)
 
   function selectAddress(saved: Address) {
-    setAddress({ recipient: saved.recipient, phone: saved.phone, line1: saved.line1, ward: saved.ward ?? '', district: saved.district ?? '', city: saved.city })
+    setAddress({ recipient: saved.recipient, phone: saved.phone, line1: saved.line1, ward: saved.ward ?? '', city: saved.city })
+    setLegacyDistrict(saved.district ?? '')
     setAccepted(false)
   }
   function changeAddress(field: keyof ShippingAddress, value: string) {
     setAddress((current) => ({ ...current, [field]: value }))
     setAccepted(false)
   }
+  const changeRegion = useCallback((next: { city: string; ward: string }) => {
+    setAddress((current) => (current.city === next.city && current.ward === next.ward ? current : { ...current, ...next }))
+    setLegacyDistrict('')
+    setAccepted(false)
+  }, [])
   async function getQuote(event: FormEvent) {
     event.preventDefault()
     if (work.current || attempt || blocked || !cart.items.length || cart.issues.length || cartError) return
@@ -187,7 +201,7 @@ export default function CheckoutPage() {
       if (checked.issues.length) throw new OrderApiError(409, 'OUT_OF_STOCK', 'items', 'Một số dòng áo không còn đủ tồn kho. Vui lòng kiểm tra lại giỏ hàng.')
       const stockChanges = checked.items.flatMap((item) => {
         const old = cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
-        return old && old.stock !== item.stock ? [`${item.name || item.sku}: tồn khả dụng ${old.stock} → ${item.stock}.`] : []
+        return old && old.stock !== item.stock ? [`${item.name || 'Sản phẩm áo dài'}: chỉ còn ${item.stock} sản phẩm.`] : []
       })
       const next = await ordersApi.quote(body)
       const baseline = previousQuote.current ?? {
@@ -204,7 +218,7 @@ export default function CheckoutPage() {
       setQuote(null)
       setError(messageFor(error))
       if (error instanceof OrderApiError && ['OUT_OF_STOCK', 'QUOTE_CHANGED', 'QUOTE_EXPIRED'].includes(error.code)) {
-        setChanges(['Giá hoặc tồn kho không còn phù hợp. Vui lòng kiểm tra lại giỏ hàng và lấy báo giá mới.'])
+        setChanges(['Giá hoặc số lượng còn lại đã thay đổi. Vui lòng kiểm tra lại giỏ hàng và bấm “Tính tổng tiền” lần nữa.'])
         await refresh()
       }
     } finally {
@@ -255,7 +269,7 @@ export default function CheckoutPage() {
           setAttempt(null)
           setQuote(null)
           setAccepted(false)
-          setChanges(['Lần đặt này chưa thành công. Vui lòng xem lại thông tin, lấy báo giá mới và xác nhận lại.'])
+          setChanges(['Đơn này chưa gửi thành công. Vui lòng xem lại thông tin, bấm “Tính tổng tiền” và xác nhận lại.'])
           if (error instanceof OrderApiError && ['OUT_OF_STOCK', 'QUOTE_CHANGED'].includes(error.code)) await refresh()
         }
         throw error
@@ -264,7 +278,7 @@ export default function CheckoutPage() {
       await finish(order, pending)
     } catch (error) {
       setError(error instanceof Error && !(error instanceof OrderApiError) && !pending ? error.message : messageFor(error))
-      if (pending && !isDefinitiveOrderError(error)) setNotice('Nếu chưa có kết quả rõ ràng, lần đặt vẫn được giữ để tra cứu và gửi lại an toàn.')
+      if (pending && !isDefinitiveOrderError(error)) setNotice('Nếu chưa có kết quả rõ ràng, đơn vẫn được giữ lại để bạn kiểm tra và gửi lại an toàn.')
     } finally {
       work.current = false
       if (mounted.current) setBusy(false)
@@ -275,7 +289,7 @@ export default function CheckoutPage() {
     <main className="max-w-[1180px] mx-auto px-5 py-8 lg:py-14 space-y-8">
       <Breadcrumb items={[{ label: 'Trang chủ', to: '/' }, { label: 'Giỏ hàng', to: '/gio-hang' }, { label: 'Đặt mua áo' }]} />
       <header>
-        <p className="text-secondary text-sm tracking-widest uppercase">An Soie · Đặt mua áo</p>
+        <p className="text-secondary text-sm tracking-widest uppercase">Aodora · Đặt mua áo</p>
         <h1 className="font-headline-lg text-4xl text-primary mt-2">Thông tin nhận áo</h1>
         <p className="mt-3 text-on-surface-variant">Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.</p>
       </header>
@@ -290,15 +304,15 @@ export default function CheckoutPage() {
         </p>
       )}
       {authLoading ? (
-        <p role="status">Đang kiểm tra phiên...</p>
+        <p role="status">Đang kiểm tra đăng nhập...</p>
       ) : attempt ? (
         <section className="bg-surface-container-low p-6 space-y-5">
-          <h2 className="font-headline-md text-2xl text-primary">Lần đặt đang chờ kết quả</h2>
-          <p>Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; lần đặt này vẫn chỉ mua các dòng bên dưới.</p>
+          <h2 className="font-headline-md text-2xl text-primary">Đơn đang gửi, chờ kết quả</h2>
+          <p>Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.</p>
           <ul className="space-y-2">
             {attempt.snapshot.map((line) => (
               <li key={`${line.product_id}:${line.sku}`}>
-                {line.name || line.sku} · {line.sku} · {line.quantity} áo
+                {line.name || 'Sản phẩm áo dài'} · {line.quantity} áo
               </li>
             ))}
           </ul>
@@ -306,7 +320,7 @@ export default function CheckoutPage() {
             <p role="alert">
               {attempt.credential.kind === 'account'
                 ? 'Vui lòng đăng nhập lại đúng tài khoản đã đặt đơn.'
-                : 'Lần đặt này thuộc phiên khách. Vui lòng đăng xuất tài khoản để tra cứu bằng quyền khách đã lưu.'}{' '}
+                : 'Đơn này được gửi khi bạn chưa đăng nhập. Vui lòng đăng xuất khỏi tài khoản hiện tại để kiểm tra lại đơn trên trình duyệt này.'}{' '}
               <Link to="/dang-nhap?next=%2Fthanh-toan" className="underline">
                 Đăng nhập
               </Link>
@@ -405,37 +419,16 @@ export default function CheckoutPage() {
                       onChange={(event) => changeAddress('line1', event.target.value)}
                     />
                   </label>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <label className="space-y-2">
-                      <span>Phường / xã</span>
-                      <input
-                        className={inputClass}
-                        maxLength={100}
-                        value={address.ward || ''}
-                        onChange={(event) => changeAddress('ward', event.target.value)}
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span>Quận / huyện</span>
-                      <input
-                        className={inputClass}
-                        maxLength={100}
-                        value={address.district || ''}
-                        onChange={(event) => changeAddress('district', event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <label className="block space-y-2">
-                    <span>Tỉnh / thành phố *</span>
-                    <input
-                      autoComplete="address-level1"
-                      className={inputClass}
-                      required
-                      maxLength={100}
-                      value={address.city || ''}
-                      onChange={(event) => changeAddress('city', event.target.value)}
-                    />
-                  </label>
+                  <AddressFields
+                    idPrefix="checkout"
+                    required
+                    value={{ city: address.city || '', ward: address.ward || '' }}
+                    legacyDistrict={legacyDistrict}
+                    disabled={busy}
+                    labelClassName="space-y-2 block"
+                    selectClassName={inputClass}
+                    onChange={changeRegion}
+                  />
                 </div>
               )}
               <label className="block space-y-2">
@@ -457,7 +450,7 @@ export default function CheckoutPage() {
                   <p>{cartError || 'Một số lựa chọn trong giỏ cần được kiểm tra lại.'}</p>
                   {cart.issues.map((item) => (
                     <p key={`${item.product_id}:${item.sku}`}>
-                      {item.name || item.sku}: {item.issue_detail || 'Giá hoặc tồn kho đã thay đổi.'}
+                      {item.name || 'Sản phẩm trong giỏ'}: {item.issue_detail || 'Giá hoặc tồn kho đã thay đổi.'}
                     </p>
                   ))}
                   <Link to="/gio-hang" className="underline">
@@ -474,7 +467,7 @@ export default function CheckoutPage() {
                 </p>
               )}
               <button type="submit" className={buttonClass} disabled={blocked || !cart.items.length || !!cart.issues.length || !!cartError}>
-                {busy ? 'Đang lấy báo giá...' : 'Xem báo giá mới nhất'}
+                {busy ? 'Đang tính tổng tiền...' : 'Tính tổng tiền'}
               </button>
             </fieldset>
           </form>
@@ -486,10 +479,10 @@ export default function CheckoutPage() {
                   {quote.items.map((item) => (
                     <li className="py-3 space-y-1" key={`${item.product_id}:${item.sku}`}>
                       <p className="font-semibold">
-                        {cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)?.name || item.sku}
+                        {cartLineOf(item)?.name || 'Sản phẩm áo dài'}
                       </p>
                       <p className="text-sm text-on-surface-variant">
-                        {item.sku} · {item.quantity} áo · Đơn giá {formatOrderMoney(item.unit_price)}
+                        {[cartLineOf(item)?.color, cartLineOf(item)?.size].filter(Boolean).join(' · ') || 'Áo dài'} · {item.quantity} áo · Đơn giá {formatOrderMoney(item.unit_price)}
                       </p>
                     </li>
                   ))}
@@ -511,8 +504,8 @@ export default function CheckoutPage() {
                 {!quoteCurrent && (
                   <p role="alert" className="text-error">
                     {expired
-                      ? 'Báo giá đã hết hạn. Vui lòng lấy báo giá mới và xác nhận lại.'
-                      : 'Thông tin hoặc giỏ hàng đã thay đổi. Vui lòng lấy báo giá mới.'}
+                      ? 'Tổng tiền đã hết hạn. Vui lòng bấm “Tính tổng tiền” lần nữa và xác nhận lại.'
+                      : 'Thông tin hoặc giỏ hàng đã thay đổi. Vui lòng bấm “Tính tổng tiền” lần nữa.'}
                   </p>
                 )}
                 {!!changes.length && (
@@ -530,7 +523,7 @@ export default function CheckoutPage() {
                     disabled={!quoteCurrent || busy}
                     onChange={(event) => setAccepted(event.target.checked)}
                   />
-                  <span>Tôi đã kiểm tra thông tin, các dòng áo và tổng tiền báo giá mới nhất.</span>
+                  <span>Tôi đã kiểm tra thông tin, các dòng áo và tổng tiền mới nhất.</span>
                 </label>
                 <button
                   type="button"
@@ -542,7 +535,26 @@ export default function CheckoutPage() {
                 </button>
               </>
             ) : (
-              <p>Phí và tổng tiền sẽ lấy trực tiếp từ báo giá của cửa hàng. Chọn “Xem báo giá mới nhất” để tiếp tục.</p>
+              <>
+                <ul className="divide-y divide-outline-variant">
+                  {cart.items.map((item) => (
+                    <li className="py-3 flex justify-between gap-4" key={`${item.product_id}:${item.sku}`}>
+                      <div className="min-w-0">
+                        <p className="font-semibold">{item.name || 'Sản phẩm áo dài'}</p>
+                        <p className="text-sm text-on-surface-variant">
+                          {[item.color, item.size].filter(Boolean).join(' · ')}{item.color || item.size ? ' · ' : ''}{item.quantity} áo
+                        </p>
+                      </div>
+                      <span>{formatOrderMoney(String(item.line_total))}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-between gap-4 border-t border-outline-variant pt-4">
+                  <span>Tạm tính</span>
+                  <strong className="text-primary">{formatOrderMoney(String(cart.subtotal))}</strong>
+                </div>
+                <p>Phí giao và tổng tiền được chốt ở bước “Tính tổng tiền”.</p>
+              </>
             )}
             <p className="text-sm text-on-surface-variant">Đơn mới chưa được thanh toán. Cửa hàng chỉ ghi nhận đã thu tiền khi thực tế nhận đủ tiền.</p>
           </aside>

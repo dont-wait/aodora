@@ -29,9 +29,9 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
       <label className="block"><span className={label}>Tìm theo tên, mô tả</span>
         <input value={draft.search} onChange={(e) => update('search', e.target.value)} className={field} placeholder="Nhập từ khóa..." /></label>
       <label className="block"><span className={label}>Chất liệu</span><input className={field} value={draft.material}
-        onChange={(e) => update('material', e.target.value)} placeholder="Nhập tên chất liệu chính xác" /></label>
+        onChange={(e) => update('material', e.target.value)} placeholder="Ví dụ: lụa tơ tằm" /></label>
       <label className="block"><span className={label}>Màu sắc</span><input className={field} value={draft.color}
-        onChange={(e) => update('color', e.target.value)} placeholder="Tên màu của SKU" /></label>
+        onChange={(e) => update('color', e.target.value)} placeholder="Ví dụ: đỏ đô" /></label>
       <label className="block"><span className={label}>Kích cỡ</span><input className={field} value={draft.size}
         onChange={(e) => update('size', e.target.value)} placeholder="Ví dụ: M" /></label>
       <fieldset><legend className={label}>Khoảng giá (VNĐ)</legend><div className="grid grid-cols-2 gap-2">
@@ -41,6 +41,6 @@ export default function FilterSidebar({ params, onApply, onClear }: Props) {
       {error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
       <button type="submit" className="bg-primary text-on-primary px-5 py-3 w-full">Áp dụng bộ lọc</button>
     </form>
-    <p className="text-sm text-on-surface-variant">Bộ lọc được thực hiện trên MongoDB; màu và kích cỡ phải cùng một SKU.</p>
+    <p className="text-sm text-on-surface-variant">Màu và kích cỡ được lọc cùng nhau: chỉ hiện áo có đúng cặp màu – cỡ bạn chọn.</p>
   </aside>
 }

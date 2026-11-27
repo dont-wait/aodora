@@ -1,3 +1,4 @@
+import { formatAddress } from '../address/divisions.ts'
 import type { Order } from './types.ts'
 
 const fulfillmentLabels: Record<string, string> = {
@@ -19,7 +20,7 @@ export function orderPaymentLabel(method: string): string {
 }
 export function orderDeliveryAddress(order: Pick<Order, 'payment_method' | 'shipping_address'>): string | null {
   if (order.payment_method !== 'cod') return null
-  return [order.shipping_address.line1, order.shipping_address.ward, order.shipping_address.district, order.shipping_address.city].filter(Boolean).join(', ')
+  return formatAddress(order.shipping_address)
 }
 export function formatOrderDate(value: string): string {
   const date = new Date(value)

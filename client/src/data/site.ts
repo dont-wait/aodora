@@ -1,5 +1,5 @@
 export const SITE = {
-  name: 'AN SOIE',
+  name: 'AODORA',
   tagline: 'Áo Dài Di Sản Việt',
   announcement: 'Miễn phí vận chuyển toàn quốc cho đơn hàng từ 1.500.000đ | Dịch vụ may đo chuẩn dáng tận nơi',
   hotline: '0988 888 888',
@@ -26,13 +26,21 @@ export const NAV_ITEMS = [
 export const FOOTER = {
   about: 'Gìn giữ và tôn vinh cốt cách Áo Dài Việt Nam qua từng tấc lụa tơ tằm thượng hạng dệt thủ công từ làng nghề nghìn năm tuổi.',
   badge: 'Lụa Tơ Tằm Tự Nhiên',
-  support: ['Hướng dẫn lấy số đo', 'Chính sách may đo bespoke', 'Bảo hành chỉ may trọn đời', 'Đổi trả & Giao hàng tận nơi', 'Câu hỏi thường gặp'],
+  support: [
+    { label: 'Hướng dẫn lấy số đo', to: `${ROUTES.tailoring}#bang-so-do` },
+    { label: 'Đặt lịch may đo tận nơi', to: `${ROUTES.tailoring}#dat-lich-tan-noi` },
+    { label: 'Câu hỏi thường gặp', to: `${ROUTES.tailoring}#cau-hoi-thuong-gap` },
+  ],
   showrooms: [
-    { label: 'Hà Nội', value: 'Làng Lụa Vạn Phúc, Hà Đông & 18 Tràng Tiền, Hoàn Kiếm' },
-    { label: 'TP. Hồ Chí Minh', value: '68 Đồng Khởi, Quận 1' },
-    { label: 'Hotline', value: '0988 888 888' },
+    { label: 'Địa chỉ', value: '140 Lê Trọng Tấn' },
     { label: 'Giờ mở cửa', value: '09:00 - 21:00 hàng ngày' },
   ],
-  socials: ['Instagram', 'Facebook', 'Pinterest', 'Youtube'],
-  copyright: '© 2025 AN SOIE. Bản quyền thuộc về Công ty TNHH Áo Dài Di Sản Việt. Tinh hoa tơ tằm Việt Nam.',
+  /** Chỉ hiển thị khi có href thật. */
+  socials: [
+    { label: 'Instagram' },
+    { label: 'Facebook' },
+    { label: 'Pinterest' },
+    { label: 'Youtube' },
+  ] as { label: string; href?: string }[],
+  copyright: '© 2025 AODORA. Bản quyền thuộc về Công ty TNHH Áo Dài Di Sản Việt. Tinh hoa tơ tằm Việt Nam.',
 }

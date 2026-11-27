@@ -33,14 +33,14 @@ export default function HeritageSection() {
             </div>
             <h2 className="font-headline-lg text-headline-lg text-primary tracking-tight leading-tight">Về Lại Cái Nôi Lụa Vạn Phúc & Đất Thêu Quất Động</h2>
             <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-              Mỗi thước vải tại AN SOIE không đơn thuần là phục trang may sẵn, mà là kết tinh từ đôi bàn tay gầy guộc của những nghệ nhân ưu tú đã gắn bó cả
+              Mỗi thước vải tại AODORA không đơn thuần là phục trang may sẵn, mà là kết tinh từ đôi bàn tay gầy guộc của những nghệ nhân ưu tú đã gắn bó cả
               cuộc đời với khung cửi bên dòng sông Nhuệ và nghệ thuật thêu tay cung đình Quất Động. Tơ tằm được quay sợi tự nhiên, nhuộm bằng thảo mộc cổ truyền
               để giữ nguyên độ óng ánh dịu dàng và cảm giác mát rượi khi chạm vào làn da.
             </p>
             <div className="mt-4 p-6 bg-surface shadow-sm space-y-4">
               <div className="flex items-center gap-2 text-primary font-label-uppercase text-label-uppercase tracking-widest pb-2">
                 <span className="material-symbols-outlined text-[20px] text-secondary">verified</span>
-                <span>Bản Cam Kết '3 KHÔNG' Từ AN SOIE</span>
+                <span>Bản Cam Kết '3 KHÔNG' Từ AODORA</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-surface-container p-4 flex flex-col gap-2">
@@ -69,7 +69,7 @@ export default function HeritageSection() {
               </div>
               <div>
                 <p className="font-title-editorial text-title-editorial font-bold text-on-surface m-0">Nghệ nhân Ưu tú Nguyễn Thị Thương</p>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">Cố vấn trưởng kỹ thuật cắt may tà áo truyền thống AN SOIE</span>
+                <span className="font-body-sm text-body-sm text-on-surface-variant">Cố vấn trưởng kỹ thuật cắt may tà áo truyền thống AODORA</span>
               </div>
             </div>
           </div>

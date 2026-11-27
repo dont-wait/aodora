@@ -4,7 +4,7 @@ import Breadcrumb from '@/components/ui/Breadcrumb'
 import { ROUTES } from '@/data/site'
 import { getProduct } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
-import CatalogState from '@/features/catalog/CatalogState'
+import CatalogState, { ProductDetailSkeleton } from '@/features/catalog/CatalogState'
 import ProductGallery from './components/ProductGallery'
 import PurchasePanel from './components/PurchasePanel'
 import InfoTabs from './components/InfoTabs'
@@ -26,7 +26,7 @@ export default function ProductDetailPage() {
         <p>{product.error}</p>
         <Link to={ROUTES.collection} className="underline text-primary block">Quay lại bộ sưu tập</Link>
         <button type="button" onClick={product.retry} className="px-4 py-2 bg-primary text-on-primary">Thử tải lại</button>
-      </div> : <CatalogState loading={product.loading} error={null} onRetry={product.retry}>
+      </div> : <CatalogState loading={product.loading} error={null} onRetry={product.retry} skeleton={<ProductDetailSkeleton />}>
         {product.data && <>
           <section className="py-8 lg:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-gutter-desktop items-start">
             <ProductGallery key={product.data.id} product={product.data} />

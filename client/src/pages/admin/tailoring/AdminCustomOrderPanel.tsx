@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import FieldErr from './FieldErr'
+import AddressFields from '@/features/address/AddressFields'
 import { Link } from 'react-router-dom'
 import type { AdminTailoring } from '@/features/admin/tailoring'
 import {
@@ -25,6 +26,10 @@ export default function AdminCustomOrderPanel({
     setValues((previous) => ({ ...previous, [key]: value }))
     setErrors((previous) => (previous[key] ? { ...previous, [key]: '' } : previous))
   }
+  const changeRegion = useCallback((next: { city: string; ward: string }) => {
+    setValues((previous) => (previous.city === next.city && previous.ward === next.ward ? previous : { ...previous, ...next }))
+    setErrors((previous) => (previous.city || previous.ward ? { ...previous, city: '', ward: '' } : previous))
+  }, [])
   const placed = outcome?.kind === 'created' || outcome?.kind === 'exists' ? outcome : null
   const done = placed !== null
   async function submit(event: React.FormEvent) {
@@ -111,13 +116,18 @@ export default function AdminCustomOrderPanel({
                   <input className={input} value={values.line1} onChange={(e) => set('line1', e.target.value)} />
                   <FieldErr message={errors.line1} />
                 </label>
-                <label className="space-y-1 block"><span>Phường/xã</span><input className={input} value={values.ward} onChange={(e) => set('ward', e.target.value)} /></label>
-                <label className="space-y-1 block"><span>Quận/huyện</span><input className={input} value={values.district} onChange={(e) => set('district', e.target.value)} /></label>
-                <label className="space-y-1 block sm:col-span-2">
-                  <span>Tỉnh/thành phố *</span>
-                  <input className={input} value={values.city} onChange={(e) => set('city', e.target.value)} />
-                  <FieldErr message={errors.city} />
-                </label>
+                <div className="sm:col-span-2">
+                  <AddressFields
+                    idPrefix="custom-order"
+                    required
+                    wardRequired={false}
+                    value={{ city: values.city, ward: values.ward }}
+                    errors={{ city: errors.city, ward: errors.ward }}
+                    onChange={changeRegion}
+                    selectClassName={input}
+                    labelClassName="space-y-1 block"
+                  />
+                </div>
               </>
             )}
             <label className="space-y-1 block sm:col-span-2">

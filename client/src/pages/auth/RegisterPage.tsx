@@ -7,7 +7,7 @@ import { ROUTES } from '@/data/site'
 import Icon from '@/components/ui/Icon'
 
 export default function RegisterPage() {
-  const { register } = useAuth()
+  const { register, login } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', confirm: '' })
@@ -23,15 +23,25 @@ export default function RegisterPage() {
     setBusy(true)
     try {
       await register({ full_name: form.full_name, email: form.email, phone: form.phone, password: form.password })
-      navigate(`/dang-nhap?registered=1${next !== ROUTES.home ? `&next=${encodeURIComponent(next)}` : ''}`, { replace: true })
     } catch (err) {
       setError(err instanceof AuthApiError || err instanceof Error ? err.message : 'Đăng ký thất bại')
+      setBusy(false)
+      return
+    }
+    try {
+      await login(form.email, form.password)
+      navigate(next, { replace: true })
+    } catch {
+      // Account exists but auto sign-in failed: hand over to the login page with a notice and the email.
+      const query = new URLSearchParams({ registered: '1', email: form.email })
+      if (next !== ROUTES.home) query.set('next', next)
+      navigate(`/dang-nhap?${query.toString()}`, { replace: true })
     } finally { setBusy(false) }
   }
 
   return <main className="max-w-lg mx-auto px-5 py-16">
     <div className="bg-surface p-8 shadow-sm space-y-6">
-      <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AN SOIE</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Tạo tài khoản</h1></div>
+      <div><p className="uppercase tracking-widest text-secondary text-sm">Tài khoản AODORA</p><h1 className="font-headline-lg text-headline-lg text-primary mt-2">Tạo tài khoản</h1></div>
       <form className="space-y-4" onSubmit={(event) => void submit(event)}>
         <label className="block space-y-1"><span>Họ và tên</span><input required autoComplete="name" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} className="w-full bg-surface-container p-3" /></label>
         <label className="block space-y-1"><span>Email</span><input required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full bg-surface-container p-3" /></label>
