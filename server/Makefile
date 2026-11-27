@@ -11,7 +11,7 @@ unexport name MIGRATIONS_PATH legacy_fingerprint
 .PHONY: help run build fmt lint test test-migrations test-orders test-orders-standalone test-integration \
 	migrate-create migrate-adopt migrate-up migrate-up-one migrate-down \
 	infra-up infra-down storage-up storage-down transactions-up transactions-down standalone-up \
-	seed-fetch seed-demo sumire-env sumire-fetch sumire-check sumire-images sumire-import sumire-purge \
+	seed-fetch seed-demo seed-admin sumire-env sumire-fetch sumire-check sumire-images sumire-import sumire-purge \
 	navicat-build navicat-up navicat-down
 
 ##@ Chung
@@ -102,6 +102,10 @@ standalone-up: ## Bật Mongo standalone
 
 seed-fetch: ## Tải ảnh seed demo
 	python3 seeds/fetch_images.py
+
+seed-admin: sumire-env ## Tạo tài khoản demo admin@aodora.local + user@aodora.local (mật khẩu password@123), không đụng catalog
+	go run ./cmd/importsumire -verify-target
+	go run ./cmd/seed -accounts-only
 
 seed-demo: ## Seed dữ liệu demo
 	$(MAKE) seed-fetch

@@ -16,6 +16,7 @@ import (
 	"github.com/your-org/aodora/server/internal/config"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -56,9 +57,13 @@ func run() error {
 	manifestPath := flag.String("manifest", "seeds/forher.json", "curated catalog manifest")
 	assetsPath := flag.String("assets", "seeds/assets", "downloaded images directory")
 	checkOnly := flag.Bool("check", false, "validate manifest and images without database writes")
+	accountsOnly := flag.Bool("accounts-only", false, "only create the demo admin/customer accounts (no catalog, no images)")
 	flag.Parse()
 	if err := config.LoadEnv(); err != nil {
 		return err
+	}
+	if *accountsOnly {
+		return withMongo(seedAccounts)
 	}
 	data, err := os.ReadFile(*manifestPath)
 	if err != nil {
@@ -76,6 +81,16 @@ func run() error {
 		fmt.Printf("Validated %d categories, %d products and their images\n", len(seed.Categories), len(seed.Products))
 		return nil
 	}
+	return withMongo(func(ctx context.Context, db *database.Mongo) error {
+		if err := seedCatalog(ctx, db, seed, baseURL); err != nil {
+			return err
+		}
+		return seedAccounts(ctx, db)
+	})
+}
+
+// withMongo opens the configured database for one seeding run.
+func withMongo(fn func(context.Context, *database.Mongo) error) error {
 	mongoConfig, err := config.LoadMongoConfig()
 	if err != nil {
 		return err
@@ -87,6 +102,10 @@ func run() error {
 		return err
 	}
 	defer func() { _ = db.Close(context.Background()) }()
+	return fn(ctx, db)
+}
+
+func seedCatalog(ctx context.Context, db *database.Mongo, seed manifest, baseURL string) error {
 	for _, name := range []string{"categories", "products"} {
 		collections, err := db.DB.ListCollectionNames(ctx, bson.M{"name": name})
 		if err != nil {
@@ -112,6 +131,11 @@ func run() error {
 		}
 		fmt.Printf("%s: inserted %d, preserved %d\n", group.name, inserted, int64(len(group.docs))-inserted)
 	}
+	return nil
+}
+
+// seedAccounts upserts the demo accounts; existing accounts with the same id or email are left untouched.
+func seedAccounts(ctx context.Context, db *database.Mongo) error {
 	customers, err := db.DB.ListCollectionNames(ctx, bson.M{"name": "customers"})
 	if err != nil {
 		return err
@@ -128,7 +152,10 @@ func run() error {
 	for _, doc := range authUsers {
 		result, err := db.DB.Collection("customers").UpdateOne(ctx, bson.M{"$or": bson.A{
 			bson.M{"_id": doc["_id"]}, bson.M{"email_normalized": doc["email_normalized"]}, bson.M{"email": doc["email"]},
-		}}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true))
+		}}, bson.M{"$setOnInsert": doc}, options.UpdateOne().SetUpsert(true).SetCollation(&options.Collation{Locale: "en", Strength: 2}))
+		if mongo.IsDuplicateKeyError(err) {
+			continue // a concurrent run inserted it first
+		}
 		if err != nil {
 			return fmt.Errorf("seed customer %s: %w", doc["email"], err)
 		}
