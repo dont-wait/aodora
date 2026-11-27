@@ -27,7 +27,7 @@ func sample() srcProduct {
 }
 
 func TestNormalizeSize(t *testing.T) {
-	for in, want := range map[string]string{"Size A": "A", "A": "A", "aa": "AA", "Tú Trân / Size B": "B", "Default Title": "", " Size  D ": "D"} {
+	for in, want := range map[string]string{"Size A": "S", "A": "S", "aa": "XS", "Tú Trân / Size B": "M", "Default Title": "", " Size  D ": "XL", "Size C": "L", "xxl": "XXL", "freesize": "Freesize", "Size XL": "XL"} {
 		if got := normalizeSize(in); got != want {
 			t.Errorf("normalizeSize(%q) = %q, want %q", in, got, want)
 		}
@@ -117,10 +117,10 @@ func TestBuildPlanProductDocument(t *testing.T) {
 		t.Fatalf("stock/active wrong: %v %v", doc["stock"], doc["is_active"])
 	}
 	variants := doc["variants"].([]bson.M)
-	if variants[0]["size"] != "AA" || variants[1]["size"] != "A" || variants[1]["stock"] != int64(0) || variants[0]["color"] != "Đỏ" {
+	if variants[0]["size"] != "XS" || variants[1]["size"] != "S" || variants[1]["stock"] != int64(0) || variants[0]["color"] != "Đỏ" {
 		t.Fatalf("bad variants: %v", variants)
 	}
-	if got := doc["sizes"].([]string); len(got) != 2 || got[0] != "AA" {
+	if got := doc["sizes"].([]string); len(got) != 2 || got[0] != "XS" || got[1] != "S" {
 		t.Fatalf("bad sizes: %v", got)
 	}
 	urls := doc["images"].([]string)
@@ -308,7 +308,7 @@ func TestOptionsUsePositionNotArrayIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	v := p.Products[0]["variants"].([]bson.M)[0]
-	if v["size"] != "A" || v["color"] != "Đỏ" {
+	if v["size"] != "S" || v["color"] != "Đỏ" {
 		t.Fatalf("options resolved by array index instead of position: %v", v)
 	}
 }
@@ -345,5 +345,15 @@ func TestJPEGExtensionIsRejected(t *testing.T) {
 	}
 	if err := validateImages([]imageRef{{"h", "01.jpeg"}}, dir); err == nil {
 		t.Fatal(".jpeg is not synced by rustfs-sumire and must be rejected")
+	}
+}
+
+func TestSortSizesFollowsStandardOrder(t *testing.T) {
+	got := sortSizes([]string{"XL", "XS", "Custom", "M", "S"})
+	want := []string{"XS", "S", "M", "XL", "Custom"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("sortSizes = %v, want %v", got, want)
+		}
 	}
 }

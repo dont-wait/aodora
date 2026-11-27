@@ -108,7 +108,7 @@ Không dùng 1 danh mục chung. Suy từ `tags` và tên (hằng số trong `ca
 | `gallery[]` | các ảnh còn lại, `alt` = `title — ảnh N` |
 | `images[]` | danh sách URL (field legacy mà seed đang ghi) |
 | `colors[]` | giá trị option "Màu sắc" → `{name, hex}`; hex = từ màu xuất hiện **sớm nhất** trong tên ("Nền trắng hoa tím" → trắng), bảng trong `catalog.go`; tên riêng như "Nguyệt Mai" dùng `#CCCCCC` và in cảnh báo |
-| `sizes[]` | giá trị option "Kích thước", chuẩn hóa về `AA/A/B/C/D` (bỏ tiền tố "Size ", bỏ tên mẫu như "Tú Trân / ") |
+| `sizes[]` | giá trị option "Kích thước", chuẩn hóa về size chuẩn VN `XS/S/M/L/XL/XXL/Freesize`: bỏ tiền tố "Size ", bỏ tên mẫu như "Tú Trân / ", rồi map `AA→XS, A→S, B→M, C→L, D→XL`; sắp theo thứ tự chuẩn (SKU giữ nguyên hậu tố cũ). Dữ liệu đã import trước đó được đổi bằng migration `*_size_standard` |
 | `variants[]` | `{sku, size, color, stock, price}` mỗi variant Shopify. Option size/màu lấy theo `position` của option, không theo thứ tự mảng. `price` theo từng variant; `price` sản phẩm = giá thấp nhất (chỉ 1 sản phẩm có giá khác nhau, có cảnh báo khi import) |
 | `stock` | tổng `variants[].stock` |
 | `is_active` | true, trừ khi theo 5.4 |

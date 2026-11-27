@@ -1,0 +1,232 @@
+[
+  {
+    "update": "products",
+    "updates": [
+      {
+        "q": {
+          "$or": [
+            {
+              "variants.size": {
+                "$in": [
+                  "XS",
+                  "S",
+                  "M",
+                  "L",
+                  "XL"
+                ]
+              }
+            },
+            {
+              "sizes": {
+                "$in": [
+                  "XS",
+                  "S",
+                  "M",
+                  "L",
+                  "XL"
+                ]
+              }
+            }
+          ]
+        },
+        "u": [
+          {
+            "$set": {
+              "variants": {
+                "$cond": [
+                  {
+                    "$isArray": "$variants"
+                  },
+                  {
+                    "$map": {
+                      "input": "$variants",
+                      "as": "v",
+                      "in": {
+                        "$mergeObjects": [
+                          "$$v",
+                          {
+                            "size": {
+                              "$switch": {
+                                "branches": [
+                                  {
+                                    "case": {
+                                      "$eq": [
+                                        "$$v.size",
+                                        "XS"
+                                      ]
+                                    },
+                                    "then": "AA"
+                                  },
+                                  {
+                                    "case": {
+                                      "$eq": [
+                                        "$$v.size",
+                                        "S"
+                                      ]
+                                    },
+                                    "then": "A"
+                                  },
+                                  {
+                                    "case": {
+                                      "$eq": [
+                                        "$$v.size",
+                                        "M"
+                                      ]
+                                    },
+                                    "then": "B"
+                                  },
+                                  {
+                                    "case": {
+                                      "$eq": [
+                                        "$$v.size",
+                                        "L"
+                                      ]
+                                    },
+                                    "then": "C"
+                                  },
+                                  {
+                                    "case": {
+                                      "$eq": [
+                                        "$$v.size",
+                                        "XL"
+                                      ]
+                                    },
+                                    "then": "D"
+                                  }
+                                ],
+                                "default": "$$v.size"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "$variants"
+                ]
+              }
+            }
+          },
+          {
+            "$set": {
+              "sizes": {
+                "$let": {
+                  "vars": {
+                    "mapped": {
+                      "$map": {
+                        "input": {
+                          "$ifNull": [
+                            "$sizes",
+                            []
+                          ]
+                        },
+                        "as": "s",
+                        "in": {
+                          "$switch": {
+                            "branches": [
+                              {
+                                "case": {
+                                  "$eq": [
+                                    "$$s",
+                                    "XS"
+                                  ]
+                                },
+                                "then": "AA"
+                              },
+                              {
+                                "case": {
+                                  "$eq": [
+                                    "$$s",
+                                    "S"
+                                  ]
+                                },
+                                "then": "A"
+                              },
+                              {
+                                "case": {
+                                  "$eq": [
+                                    "$$s",
+                                    "M"
+                                  ]
+                                },
+                                "then": "B"
+                              },
+                              {
+                                "case": {
+                                  "$eq": [
+                                    "$$s",
+                                    "L"
+                                  ]
+                                },
+                                "then": "C"
+                              },
+                              {
+                                "case": {
+                                  "$eq": [
+                                    "$$s",
+                                    "XL"
+                                  ]
+                                },
+                                "then": "D"
+                              }
+                            ],
+                            "default": "$$s"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "in": {
+                    "$concatArrays": [
+                      {
+                        "$filter": {
+                          "input": [
+                            "AA",
+                            "A",
+                            "B",
+                            "C",
+                            "D"
+                          ],
+                          "as": "o",
+                          "cond": {
+                            "$in": [
+                              "$$o",
+                              "$$mapped"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "$filter": {
+                          "input": "$$mapped",
+                          "as": "m",
+                          "cond": {
+                            "$not": [
+                              {
+                                "$in": [
+                                  "$$m",
+                                  [
+                                    "AA",
+                                    "A",
+                                    "B",
+                                    "C",
+                                    "D"
+                                  ]
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "multi": true
+      }
+    ]
+  }
+]

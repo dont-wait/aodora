@@ -10,6 +10,10 @@ type fakeRepo struct {
 	created  bool
 	edited   bool
 	adjusted bool
+
+	createdVariants []Variant
+	addedVariant    Variant
+	updatedSize     string
 }
 
 func (f *fakeRepo) Categories(context.Context) ([]map[string]any, error) { return nil, nil }
@@ -24,20 +28,23 @@ func (f *fakeRepo) CreateCategory(context.Context, CategoryInput) (map[string]an
 func (f *fakeRepo) UpdateCategory(context.Context, string, CategoryInput) (map[string]any, error) {
 	return nil, nil
 }
-func (f *fakeRepo) CreateProduct(context.Context, ProductCreate) (map[string]any, error) {
+func (f *fakeRepo) CreateProduct(_ context.Context, v ProductCreate) (map[string]any, error) {
 	f.created = true
+	f.createdVariants = v.Variants
 	return map[string]any{}, nil
 }
 func (f *fakeRepo) UpdateProduct(context.Context, string, ProductInput) (map[string]any, error) {
 	f.edited = true
 	return map[string]any{}, nil
 }
-func (f *fakeRepo) AddVariant(context.Context, string, Variant) (map[string]any, error) {
+func (f *fakeRepo) AddVariant(_ context.Context, _ string, v Variant) (map[string]any, error) {
 	f.edited = true
+	f.addedVariant = v
 	return map[string]any{}, nil
 }
-func (f *fakeRepo) UpdateVariant(context.Context, string, string, VariantDetails) (map[string]any, error) {
+func (f *fakeRepo) UpdateVariant(_ context.Context, _, _ string, v VariantDetails) (map[string]any, error) {
 	f.edited = true
+	f.updatedSize = v.Size
 	return map[string]any{}, nil
 }
 func (f *fakeRepo) AdjustInventory(context.Context, string, string, int64, string) (map[string]any, error) {
@@ -145,5 +152,44 @@ func TestInventoryRequiresRetryID(t *testing.T) {
 	_, err := service.AdjustInventory(context.Background(), "id", "sku", 3, "")
 	if err == nil {
 		t.Fatal("request without idempotency key accepted")
+	}
+}
+
+func TestSizeMustBeStandard(t *testing.T) {
+	for _, size := range []string{"A", "AA", "XXXL", "42", "Size M"} {
+		repo := &fakeRepo{}
+		v := goodCreate()
+		v.Variants[0].Size = size
+		_, err := NewService(repo).CreateProduct(context.Background(), v)
+		var invalid Invalid
+		if !errors.As(err, &invalid) || invalid.Field != "size" || invalid.Message != "Cỡ phải là một trong XS, S, M, L, XL, XXL, Freesize" || repo.created {
+			t.Fatalf("create with size %q: err=%v created=%v", size, err, repo.created)
+		}
+		repo = &fakeRepo{}
+		if _, err = NewService(repo).AddVariant(context.Background(), "id", Variant{SKU: "X", Color: "Đỏ", Size: size}); !errors.As(err, &invalid) || repo.edited {
+			t.Fatalf("add variant with size %q: %v", size, err)
+		}
+		if _, err = NewService(repo).UpdateVariant(context.Background(), "id", "X", VariantDetails{Color: "Đỏ", Size: size}); !errors.As(err, &invalid) || repo.edited {
+			t.Fatalf("update variant with size %q: %v", size, err)
+		}
+	}
+}
+
+func TestSizeIsStoredInStandardSpelling(t *testing.T) {
+	repo := &fakeRepo{}
+	v := goodCreate()
+	v.Variants = []Variant{{SKU: "A", Color: "Đỏ", Size: "freesize", Stock: 1}, {SKU: "B", Color: "Đỏ", Size: " xl ", Stock: 1}, {SKU: "C", Color: "Đỏ", Size: "", Stock: 1}}
+	if _, err := NewService(repo).CreateProduct(context.Background(), v); err != nil {
+		t.Fatal(err)
+	}
+	got := []string{repo.createdVariants[0].Size, repo.createdVariants[1].Size, repo.createdVariants[2].Size}
+	if got[0] != "Freesize" || got[1] != "XL" || got[2] != "" {
+		t.Fatalf("sizes not canonicalised: %v", got)
+	}
+	if _, err := NewService(repo).AddVariant(context.Background(), "id", Variant{SKU: "D", Color: "Xanh", Size: "xxl"}); err != nil || repo.addedVariant.Size != "XXL" {
+		t.Fatalf("add variant: %v %q", err, repo.addedVariant.Size)
+	}
+	if _, err := NewService(repo).UpdateVariant(context.Background(), "id", "D", VariantDetails{Color: "Xanh", Size: "xs"}); err != nil || repo.updatedSize != "XS" {
+		t.Fatalf("update variant: %v %q", err, repo.updatedSize)
 	}
 }

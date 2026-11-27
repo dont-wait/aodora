@@ -4,6 +4,7 @@ import Breadcrumb from '@/components/ui/Breadcrumb'
 import { ROUTES } from '@/data/site'
 import { getProduct } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
+import { sortSizes } from '@/features/catalog/sizes'
 import CatalogState, { ProductDetailSkeleton } from '@/features/catalog/CatalogState'
 import ProductGallery from './components/ProductGallery'
 import PurchasePanel from './components/PurchasePanel'
@@ -42,7 +43,7 @@ export default function ProductDetailPage() {
       <ReviewsSection product={product.data} />
       <RelatedProductsSection key={product.data.id} product={product.data} />
       <AccessoriesSection accessories={product.data.accessories || []} />
-      <SizeGuideModal open={sizeGuideOpen} sizes={product.data.sizes || []} onClose={() => setSizeGuideOpen(false)} />
+      <SizeGuideModal open={sizeGuideOpen} sizes={sortSizes(product.data.sizes || [])} onClose={() => setSizeGuideOpen(false)} />
     </>}
   </div>
 }
