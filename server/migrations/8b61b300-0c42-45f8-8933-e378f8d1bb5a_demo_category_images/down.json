@@ -1,0 +1,40 @@
+[
+  {
+    "update": "categories",
+    "updates": [
+      {
+        "q": {
+          "slug": "ao-nam",
+          "image.src": "/categories/ao-nam.jpg"
+        },
+        "u": {
+          "$unset": {
+            "image": ""
+          }
+        }
+      },
+      {
+        "q": {
+          "slug": "quan-nam",
+          "image.src": "/categories/quan-nam.jpg"
+        },
+        "u": {
+          "$unset": {
+            "image": ""
+          }
+        }
+      },
+      {
+        "q": {
+          "slug": "thoi-trang-nu",
+          "image.src": "/categories/thoi-trang-nu.jpg"
+        },
+        "u": {
+          "$unset": {
+            "image": ""
+          }
+        }
+      }
+    ]
+  }
+]

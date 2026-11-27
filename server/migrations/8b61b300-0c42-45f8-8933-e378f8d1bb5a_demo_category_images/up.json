@@ -1,0 +1,100 @@
+[
+  {
+    "update": "categories",
+    "updates": [
+      {
+        "q": {
+          "slug": "ao-nam",
+          "$or": [
+            {
+              "image": {
+                "$exists": false
+              }
+            },
+            {
+              "image": null
+            },
+            {
+              "image.src": {
+                "$in": [
+                  "",
+                  null
+                ]
+              }
+            }
+          ]
+        },
+        "u": {
+          "$set": {
+            "image": {
+              "src": "/categories/ao-nam.jpg",
+              "alt": "Áo nam – áo sơ mi caro"
+            }
+          }
+        }
+      },
+      {
+        "q": {
+          "slug": "quan-nam",
+          "$or": [
+            {
+              "image": {
+                "$exists": false
+              }
+            },
+            {
+              "image": null
+            },
+            {
+              "image.src": {
+                "$in": [
+                  "",
+                  null
+                ]
+              }
+            }
+          ]
+        },
+        "u": {
+          "$set": {
+            "image": {
+              "src": "/categories/quan-nam.jpg",
+              "alt": "Quần nam – quần jeans"
+            }
+          }
+        }
+      },
+      {
+        "q": {
+          "slug": "thoi-trang-nu",
+          "$or": [
+            {
+              "image": {
+                "$exists": false
+              }
+            },
+            {
+              "image": null
+            },
+            {
+              "image.src": {
+                "$in": [
+                  "",
+                  null
+                ]
+              }
+            }
+          ]
+        },
+        "u": {
+          "$set": {
+            "image": {
+              "src": "/categories/thoi-trang-nu.jpg",
+              "alt": "Thời trang nữ – đầm hoa"
+            }
+          }
+        }
+      }
+    ]
+  }
+]
