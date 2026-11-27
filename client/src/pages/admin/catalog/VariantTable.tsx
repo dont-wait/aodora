@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { adminCatalog, AdminApiError, type Product, type Variant } from '@/features/admin/catalog'
 import { STANDARD_SIZES, isStandardSize } from '@/features/catalog/sizes'
 import { Button, Card, DataTable, StatusBadge } from '../ui'
-import { inputClass, tdClass, thClass } from '../uiStyles'
+import { inputClass, tdClass, tdNumClass, thClass, thNumClass } from '../uiStyles'
 
 interface SharedProps {
   onSaved: () => Promise<void>
@@ -62,9 +62,9 @@ function VariantRow({ productId, variant, onSaved, onForbidden, onMessage }: Sha
       <td className={tdClass}><span className="font-mono text-xs">{variant.sku}</span></td>
       <td className={tdClass}><input className={`${inputClass} min-w-28`} aria-label={`Màu ${variant.sku}`} value={color} onChange={(event) => setColor(event.target.value)} /></td>
       <td className={tdClass}><SizeSelect label={`Cỡ ${variant.sku}`} value={size} onChange={setSize} /></td>
-      <td className={tdClass}>
+      <td className={tdNumClass}>
+        {soldOut && <StatusBadge tone="danger" className="mr-2">Hết hàng</StatusBadge>}
         <span className="font-semibold">{variant.stock}</span>
-        {soldOut && <StatusBadge tone="danger" className="ml-2">Hết hàng</StatusBadge>}
       </td>
       <td className={tdClass}>
         <div className="flex gap-2">
@@ -106,7 +106,7 @@ export default function VariantTable({ product, onSaved, onForbidden, onMessage 
       <DataTable label="SKU và tồn kho">
         <thead>
           <tr>
-            <th className={thClass}>SKU</th><th className={thClass}>Màu</th><th className={thClass}>Cỡ</th><th className={thClass}>Tồn</th>
+            <th className={thClass}>SKU</th><th className={thClass}>Màu</th><th className={thClass}>Cỡ</th><th className={thNumClass}>Tồn</th>
             <th className={thClass}>Điều chỉnh tồn</th><th className={thClass}>Hành động</th>
           </tr>
         </thead>

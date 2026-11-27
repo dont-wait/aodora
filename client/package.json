@@ -19,7 +19,8 @@
     "test:reviews": "node --experimental-strip-types --test tests/reviews.test.mjs",
     "test:cart": "node --experimental-strip-types --test tests/cart-selection.test.mjs",
     "test:address": "node --experimental-strip-types --test tests/address.test.mjs",
-    "test:sizes": "node --experimental-strip-types --test tests/sizes.test.mjs"
+    "test:sizes": "node --experimental-strip-types --test tests/sizes.test.mjs",
+    "test:dashboard": "node --experimental-strip-types --test tests/dashboard.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

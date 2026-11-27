@@ -6,11 +6,13 @@ import { ToastProvider, useToast } from '@/hooks/useToast'
 import { Button } from './ui'
 
 const NAV = [
+  { to: '/admin', label: 'Tổng quan', icon: 'dashboard', end: true },
   { to: '/admin/catalog', label: 'Sản phẩm', icon: 'checkroom' },
   { to: '/admin/categories', label: 'Danh mục', icon: 'category' },
   { to: '/admin/orders', label: 'Đơn hàng', icon: 'receipt_long' },
   { to: '/admin/tailoring', label: 'May đo', icon: 'straighten' },
   { to: '/admin/reviews', label: 'Đánh giá', icon: 'rate_review' },
+  { to: '/admin/import', label: 'Nhập dữ liệu', icon: 'upload_file' },
 ] as const
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -20,7 +22,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav aria-label="Điều hướng quản trị" className="flex flex-col">
       {NAV.map((item) => (
-        <NavLink key={item.to} to={item.to} className={linkClass} onClick={onNavigate}>
+        <NavLink key={item.to} to={item.to} end={'end' in item} className={linkClass} onClick={onNavigate}>
           <Icon name={item.icon} size={20} />
           {item.label}
         </NavLink>
@@ -48,7 +50,7 @@ function Shell() {
   const signOut = () => void logout().then(() => navigate('/dang-nhap')).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không thể đăng xuất.', 'error'))
 
   return (
-    <div className="min-h-screen bg-surface-container-low lg:flex">
+    <div className="admin-ui min-h-screen bg-surface-container-low lg:flex">
       <aside className="hidden lg:flex lg:flex-col w-60 shrink-0 bg-surface border-r border-outline-variant/60 sticky top-0 h-screen overflow-y-auto">
         <div className="px-5 py-6 border-b border-outline-variant/40">
           <p className="font-title-editorial text-xl uppercase text-primary font-bold">Aodora</p>

@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { orderLoginPath } from '@/features/orders/presentation'
 import type { AdminOrderFailure } from '@/features/admin/orderActions'
 import AdminOrderFrame from './AdminOrderFrame'
+import { Alert, Button, TableSkeleton } from './ui'
 
 export default function AdminOrderNotice({ result, next, retry, title = 'Quản trị đơn hàng' }: { result: AdminOrderFailure | null; next: string; retry: () => void; title?: string }) {
   if (result?.kind === 'unauthenticated') return <Navigate to={orderLoginPath(next)} replace />
@@ -9,18 +10,9 @@ export default function AdminOrderNotice({ result, next, retry, title = 'Quản 
   return (
     <AdminOrderFrame title={title}>
       {!result ? (
-        <p role="status">Đang tải và kiểm tra quyền quản trị...</p>
+        <TableSkeleton label="Đang tải và kiểm tra quyền quản trị" />
       ) : (
-        <section className="bg-surface p-6 space-y-4">
-          <p role="alert" className="text-error">
-            {result.message}
-          </p>
-          {result.kind === 'error' && (
-            <button type="button" className="bg-primary text-on-primary px-5 py-3" onClick={retry}>
-              Thử tải lại
-            </button>
-          )}
-        </section>
+        <Alert action={result.kind === 'error' ? <Button onClick={retry}>Thử tải lại</Button> : undefined}>{result.message}</Alert>
       )}
     </AdminOrderFrame>
   )

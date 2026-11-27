@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import ProductContentEditor from './ProductContentEditor'
 import CategoryForm from './catalog/CategoryForm'
 import ProductForm from './catalog/ProductForm'
@@ -7,7 +7,7 @@ import ProductList from './catalog/ProductList'
 import VariantBuilder from './catalog/VariantBuilder'
 import { builderRows, emptyBuilder, type BuilderState } from '@/features/admin/variantBuilder'
 import VariantTable from './catalog/VariantTable'
-import { Alert, Button, Card, PageHeader } from './ui'
+import { Alert, Button, Card, CardSkeleton, PageHeader } from './ui'
 import type { MetadataWrite } from '@/features/admin/content'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -23,6 +23,9 @@ const emptyProduct: ProductInput = {
 
 export default function AdminCatalogPage({ view }: { view: 'product' | 'category' }) {
   const { showToast } = useToast()
+  const [params, setParams] = useSearchParams()
+  const focusId = params.get('product') || ''
+  const [handledFocus, setHandledFocus] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [productPage, setProductPage] = useState(1)
@@ -71,6 +74,9 @@ export default function AdminCatalogPage({ view }: { view: 'product' | 'category
     setLoading(true)
     void load()
   }
+  useEffect(() => {
+    if (handledFocus) setParams({}, { replace: true })
+  }, [handledFocus, setParams])
   const onMessage = useCallback((message: string, kind: 'success' | 'error') => showToast(message, kind), [showToast])
   const onForbidden = useCallback(() => setAccessDenied(true), [])
   function fail(err: unknown, fallback: string) {
@@ -130,6 +136,18 @@ export default function AdminCatalogPage({ view }: { view: 'product' | 'category
     finally { setBusy(false) }
   }
 
+  // Deep link from the dashboard (?product=<id>): walk the pages until the product is found, select it, then clear the param.
+  if (view === 'product' && focusId && !loading && handledFocus !== focusId) {
+    if (products.some((row) => row.id === focusId)) {
+      setHandledFocus(focusId)
+      selectProduct(focusId)
+    } else if (productPage < totalPages) {
+      setLoading(true)
+      setProductPage(productPage + 1)
+    } else {
+      setHandledFocus(focusId)
+    }
+  }
   const chosen = products.find((row) => row.id === productId)
   if (accessDenied) return <Navigate to="/403" replace />
   const isProducts = view === 'product'
@@ -140,8 +158,8 @@ export default function AdminCatalogPage({ view }: { view: 'product' | 'category
         subtitle={isProducts ? 'Thông tin bán hàng, SKU và tồn kho' : 'Nhóm sản phẩm hiển thị trên cửa hàng'}
         actions={<Button variant="secondary" onClick={refresh}>Tải lại</Button>}
       />
-      {loading && <p role="status">Đang kiểm tra quyền admin và tải dữ liệu...</p>}
-      {!loading && loadError && <Alert>{loadError}</Alert>}
+      {loading && <div className="grid gap-6 lg:grid-cols-[20rem_1fr]"><CardSkeleton lines={8} label="Đang tải dữ liệu" /><CardSkeleton lines={10} label="Đang tải dữ liệu" /></div>}
+      {!loading && loadError && <Alert action={<Button variant="secondary" onClick={refresh}>Thử lại</Button>}>{loadError}</Alert>}
       {!loading && !isProducts && (
         <CategoryForm categories={categories} categoryId={categoryId} value={category} busy={busy} onSelect={selectCategory} onChange={setCategory} onSubmit={(e) => void submitCategory(e)} />
       )}

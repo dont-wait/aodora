@@ -1,0 +1,35 @@
+[
+  {
+    "createIndexes": "orders",
+    "indexes": [
+      {
+        "key": {
+          "created_at": -1
+        },
+        "name": "ix_orders_created_at"
+      }
+    ]
+  },
+  {
+    "createIndexes": "customers",
+    "indexes": [
+      {
+        "key": {
+          "created_at": 1
+        },
+        "name": "ix_customers_created_at"
+      }
+    ]
+  },
+  {
+    "createIndexes": "tailoring_requests",
+    "indexes": [
+      {
+        "key": {
+          "created_at": -1
+        },
+        "name": "ix_tailoring_requests_created_at"
+      }
+    ]
+  }
+]

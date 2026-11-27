@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import type { Category, CategoryInput } from '@/features/admin/catalog'
-import { Button, Card, EmptyState, Field } from '../ui'
+import { AutoTextarea, Button, Card, EmptyState, Field } from '../ui'
 import { inputClass } from '../uiStyles'
 
 interface Props {
@@ -39,7 +39,7 @@ export default function CategoryForm({ categories, categoryId, value, busy, onSe
             <Field label="Tên"><input className={inputClass} required value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} /></Field>
             <Field label="Slug"><input className={inputClass} required value={value.slug} onChange={(e) => onChange({ ...value, slug: e.target.value })} /></Field>
           </div>
-          <Field label="Mô tả"><textarea className={inputClass} rows={3} value={value.description} onChange={(e) => onChange({ ...value, description: e.target.value })} /></Field>
+          <Field label="Mô tả"><AutoTextarea value={value.description} onChange={(e) => onChange({ ...value, description: e.target.value })} /></Field>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Danh mục cha">
               <select className={inputClass} value={value.parent_id} onChange={(e) => onChange({ ...value, parent_id: e.target.value })}>
