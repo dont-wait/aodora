@@ -1,0 +1,126 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { formatReviewImages, parseReviewImages, reviewApi, ReviewApiError, reviewErrorMessage } from '../src/features/review/api.ts'
+import { ordersApi } from '../src/features/orders/api.ts'
+import { orderReviewable, readOrderStatusFilter } from '../src/features/orders/presentation.ts'
+import { adminReviewApiQuery, adminReviews, adminReviewSearch, loadAdminReviews, performAdminReviewAction, readAdminReviewFilters } from '../src/features/admin/reviews.ts'
+
+const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status })
+async function withFetch(fn, run) {
+  const old = globalThis.fetch
+  globalThis.fetch = fn
+  try {
+    await run()
+  } finally {
+    globalThis.fetch = old
+  }
+}
+const adminReview = (over = {}) => ({
+  id: 'r1', rating: 4, content: 'Đẹp', display_name: 'Khách A', images: [], verified_purchase: true,
+  created_at: '2026-11-27T00:00:00Z', updated_at: '2026-11-27T00:00:00Z', product_id: 'p1', product_name: 'Áo', product_slug: 'ao',
+  order_number: 'AD-1', hidden: false, ...over,
+})
+
+test('review images round-trip and reject lines without a description', () => {
+  const images = parseReviewImages(' https://cdn.example/a.jpg | Mặt trước \n\nhttps://cdn.example/b.jpg|Sau ')
+  assert.deepEqual(images, [{ src: 'https://cdn.example/a.jpg', alt: 'Mặt trước' }, { src: 'https://cdn.example/b.jpg', alt: 'Sau' }])
+  assert.deepEqual(parseReviewImages(formatReviewImages(images)), images)
+  assert.throws(() => parseReviewImages('https://cdn.example/a.jpg'), /URL \| mô tả/)
+  assert.throws(() => parseReviewImages('https://cdn.example/a.jpg |  '), /URL \| mô tả/)
+})
+
+test('review errors map to clear messages', async () => {
+  assert.match(reviewErrorMessage(new ReviewApiError(403, 'order_id', 'x', 'REVIEW_NOT_ELIGIBLE')), /đơn hàng đã nhận/)
+  assert.match(reviewErrorMessage(new ReviewApiError(401, '', 'x', 'AUTH_REQUIRED')), /đăng nhập/)
+  await withFetch(async () => response({ error: { code: 'INVALID_FIELD', field: 'rating', message: 'Điểm đánh giá phải từ 1 đến 5' } }, 400), async () => {
+    await assert.rejects(reviewApi.submit('p', { order_id: 'o', rating: 9, content: '', images: [] }), (error) => error instanceof ReviewApiError && error.field === 'rating')
+  })
+})
+
+test('admin review filters drop unknown, repeated and out-of-range values', () => {
+  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=9&page=0&page_size=500&visibility=x')), { rating: 0, visibility: '', page: 1, page_size: 100 })
+  assert.deepEqual(readAdminReviewFilters(new URLSearchParams('rating=3&rating=4&page=2&visibility=hidden')), { rating: 0, visibility: 'hidden', page: 2, page_size: 20 })
+  assert.equal(adminReviewSearch({ rating: 5, visibility: '', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&rating=5')
+  assert.equal(adminReviewSearch({ rating: 0, visibility: 'visible', page: 3, page_size: 50 }).toString(), 'page=3&page_size=50&visibility=visible')
+  assert.equal(adminReviewApiQuery({ rating: 0, visibility: 'hidden', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&hidden=true')
+  assert.equal(adminReviewApiQuery({ rating: 0, visibility: 'visible', page: 1, page_size: 20 }).toString(), 'page=1&page_size=20&hidden=false')
+})
+
+test('admin list validates payload and maps auth failures', async () => {
+  await withFetch(async (url) => {
+    assert.equal(String(url), '/api/v1/admin/reviews?page=1&page_size=20&rating=4')
+    return response({ data: [adminReview()], total: 1, page: 1, page_size: 20 })
+  }, async () => {
+    const result = await loadAdminReviews({ rating: 4, visibility: '', page: 1, page_size: 20 })
+    assert.equal(result.kind, 'ready')
+    assert.equal(result.page.data[0].order_number, 'AD-1')
+  })
+  await withFetch(async () => response({ data: [adminReview({ rating: 7 })], total: 1, page: 1, page_size: 20 }), async () => {
+    assert.equal((await loadAdminReviews({ rating: 0, visibility: '', page: 1, page_size: 20 })).kind, 'error')
+  })
+  for (const [status, kind] of [[401, 'unauthenticated'], [403, 'forbidden'], [503, 'error']]) {
+    await withFetch(async () => response({ error: { code: 'X', message: 'x' } }, status), async () => {
+      assert.equal((await loadAdminReviews({ rating: 0, visibility: '', page: 1, page_size: 20 })).kind, kind)
+    })
+  }
+})
+
+test('admin hide/show sends PATCH with a boolean body', async () => {
+  const calls = []
+  await withFetch(async (url, init) => {
+    calls.push([String(url), init.method, init.body])
+    return response({ data: { id: 'r1', hidden: true } })
+  }, async () => {
+    assert.equal((await performAdminReviewAction('r1', 'hide')).kind, 'done')
+    assert.equal((await performAdminReviewAction('r1', 'show')).kind, 'done')
+  })
+  assert.deepEqual(calls, [['/api/v1/admin/reviews/r1', 'PATCH', '{"hidden":true}'], ['/api/v1/admin/reviews/r1', 'PATCH', '{"hidden":false}']])
+})
+
+test('admin delete uses DELETE and reports a missing review', async () => {
+  const calls = []
+  await withFetch(async (url, init) => {
+    calls.push([String(url), init.method])
+    return response({ data: { id: 'r/1', deleted: true } })
+  }, async () => {
+    await adminReviews.remove('r/1')
+  })
+  assert.deepEqual(calls, [['/api/v1/admin/reviews/r%2F1', 'DELETE']])
+  await withFetch(async () => response({ error: { code: 'NOT_FOUND', message: 'x' } }, 404), async () => {
+    assert.equal((await performAdminReviewAction('r1', 'delete')).kind, 'not-found')
+  })
+})
+
+test('order status filter reads one known status and sends it to the API', async () => {
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=delivered')), 'delivered')
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=lost')), '')
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=pending&status=delivered')), '')
+  const urls = []
+  await withFetch(async (url) => {
+    urls.push(String(url))
+    return response({ data: [], total: 0, page: 1, page_size: 20 })
+  }, async () => {
+    await ordersApi.list(1, 20, 'delivered')
+    await ordersApi.list(2, 20)
+  })
+  assert.deepEqual(urls, ['/api/v1/orders?page=1&page_size=20&status=delivered', '/api/v1/orders?page=2&page_size=20'])
+})
+
+test('only delivered and paid orders invite a review', () => {
+  assert.equal(orderReviewable({ status: 'delivered', payment_status: 'paid' }), true)
+  assert.equal(orderReviewable({ status: 'delivered', payment_status: 'unpaid' }), false)
+  assert.equal(orderReviewable({ status: 'shipping', payment_status: 'paid' }), false)
+  assert.equal(orderReviewable({ status: 'cancelled', payment_status: 'refunded' }), false)
+})
+
+test('review status lookup sends every product id in one request', async () => {
+  const urls = []
+  await withFetch(async (url) => {
+    urls.push(String(url))
+    return response({ data: [{ product_id: 'a', slug: 'ao-a', reviewed: true }] })
+  }, async () => {
+    const items = await reviewApi.statuses(['a', 'b c'])
+    assert.equal(items[0].reviewed, true)
+  })
+  assert.deepEqual(urls, ['/api/v1/me/reviews/status?product_id=a&product_id=b+c'])
+})

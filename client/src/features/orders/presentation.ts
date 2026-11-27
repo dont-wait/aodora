@@ -8,6 +8,16 @@ const fulfillmentLabels: Record<string, string> = {
   delivered: 'Đã nhận áo',
   cancelled: 'Đã hủy',
 }
+/** Fulfillment statuses in lifecycle order, for filters. */
+export const orderFulfillmentStatuses = Object.keys(fulfillmentLabels)
+export const orderFulfillmentLabel = (status: string) => fulfillmentLabels[status] ?? 'Chưa xác định'
+/** Unknown or repeated `status` query values fall back to "all". */
+export function readOrderStatusFilter(params: URLSearchParams): string {
+  const values = params.getAll('status')
+  return values.length === 1 && orderFulfillmentStatuses.includes(values[0]) ? values[0] : ''
+}
+/** Delivered and fully paid: the customer is invited to review each product. */
+export const orderReviewable = (order: Pick<Order, 'status' | 'payment_status'>) => order.status === 'delivered' && order.payment_status === 'paid'
 const paymentLabels: Record<string, string> = { unpaid: 'Chưa thu tiền', paid: 'Đã thu đủ tiền', refunded: 'Đã hoàn tiền' }
 
 export function orderStatusLabels(order: Pick<Order, 'status' | 'payment_status'>) {

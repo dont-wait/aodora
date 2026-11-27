@@ -1,0 +1,56 @@
+[
+  {
+    "update": "products",
+    "updates": [
+      {
+        "q": {},
+        "u": {
+          "$set": {
+            "rating": 0,
+            "review_count": 0
+          }
+        },
+        "multi": true
+      }
+    ],
+    "bypassDocumentValidation": true
+  },
+  {
+    "aggregate": "reviews",
+    "pipeline": [
+      {
+        "$group": {
+          "_id": "$product_id",
+          "average": {
+            "$avg": "$rating"
+          },
+          "review_count": {
+            "$sum": 1
+          }
+        }
+      },
+      {
+        "$project": {
+          "_id": 1,
+          "rating": {
+            "$round": [
+              "$average",
+              2
+            ]
+          },
+          "review_count": 1
+        }
+      },
+      {
+        "$merge": {
+          "into": "products",
+          "on": "_id",
+          "whenMatched": "merge",
+          "whenNotMatched": "discard"
+        }
+      }
+    ],
+    "cursor": {},
+    "bypassDocumentValidation": true
+  }
+]

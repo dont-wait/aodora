@@ -33,6 +33,8 @@ curl localhost:8080/readyz
 make test
 ```
 
+MongoDB dev chạy dạng replica set một node (`aodora-dev-rs`) vì đặt hàng và review cần transaction; `make infra-up` tự khởi tạo replica set (`mongo-init`), chạy lại không ảnh hưởng dữ liệu. `MONGO_URI` giữ nguyên `localhost:27017`.
+
 `/healthz` chỉ xác nhận process đang sống. `/readyz` ping MongoDB và trả `503` khi database chưa sẵn sàng.
 
 Config được load từ `.env` ở project root nếu file tồn tại, sau đó đọc environment variables. Environment variables được ưu tiên; các key chính là `HTTP_ADDR`, `LOG_LEVEL`, `LOG_FORMAT`, `MONGO_URI`, `MONGO_DB`, `AUTH_SESSION_TTL`, `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`, `AUTH_ALLOWED_ORIGIN`.
@@ -159,3 +161,7 @@ Profile, address, measurement and wishlist contracts are documented at [docs/KR0
 ## Cart (KR-03)
 
 Guest and account cart contracts are documented at [docs/KR03_CART_API.md](docs/KR03_CART_API.md). Cart operations do not reserve inventory or create orders.
+
+## Reviews (KR-04 phase 1)
+
+Public review and authenticated post-delivery review contracts are documented at [docs/KR04_REVIEW_API.md](docs/KR04_REVIEW_API.md). Guest review and admin moderation are not enabled in this phase.

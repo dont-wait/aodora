@@ -524,10 +524,15 @@ func (s *Service) Get(ctx context.Context, viewer Viewer, id string) (*domain.Or
 	return nil, ErrNotFound
 }
 
-// List retrieves paginated orders for a customer.
-func (s *Service) List(ctx context.Context, customerID string, page, pageSize int64) ([]domain.Order, int64, int64, int64, error) {
+// List retrieves paginated orders for a customer; status "" means all.
+func (s *Service) List(ctx context.Context, customerID, status string, page, pageSize int64) ([]domain.Order, int64, int64, int64, error) {
 	if customerID == "" {
 		return nil, 0, 0, 0, ErrNotFound
+	}
+	switch status {
+	case "", domain.StatusPending, domain.StatusConfirmed, domain.StatusShipping, domain.StatusDelivered, domain.StatusCancelled:
+	default:
+		return nil, 0, 0, 0, domain.NewInvalidFieldError("status", "Trạng thái đơn không hợp lệ")
 	}
 	if page <= 0 {
 		page = 1
@@ -538,7 +543,7 @@ func (s *Service) List(ctx context.Context, customerID string, page, pageSize in
 		pageSize = 100
 	}
 
-	orders, total, err := s.store.ListByCustomer(ctx, customerID, page, pageSize)
+	orders, total, err := s.store.ListByCustomer(ctx, customerID, status, page, pageSize)
 	if err != nil {
 		return nil, 0, 0, 0, fmt.Errorf("%w: %w", ErrOrderUnavailable, err)
 	}

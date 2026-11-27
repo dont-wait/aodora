@@ -16,6 +16,8 @@
     "test:admin-orders": "node --experimental-strip-types --test tests/admin-orders.test.mjs",
     "test:tailoring": "node --experimental-strip-types --test tests/tailoring.test.mjs",
     "test:admin-tailoring": "node --experimental-strip-types --test tests/admin-tailoring.test.mjs",
+    "test:reviews": "node --experimental-strip-types --test tests/reviews.test.mjs",
+    "test:cart": "node --experimental-strip-types --test tests/cart-selection.test.mjs",
     "test:address": "node --experimental-strip-types --test tests/address.test.mjs"
   },
   "dependencies": {

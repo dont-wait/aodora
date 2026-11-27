@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { addSelectedProduct, registerCartAddHandler, type CartSelection } from '@/features/catalog/selection'
 import { useAuth } from '@/features/auth/useAuth'
-import { cartApi, type CartData } from './api'
+import { cartApi, type CartData, type CartLine } from './api'
+import { cartLineKey, readUnselected, selectedLines, selectedSubtotal, writeUnselected } from './selection'
 import { CartContext } from './context'
 import { subtractPurchased, verifyCheckoutIdentity } from '@/features/orders/checkout'
 import { consumeAccountPurchase } from '@/features/orders/cartCleanup'
@@ -47,6 +48,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [accountCart, setAccountCart] = useState<CartData>(emptyCart)
   const [loading, setLoading] = useState(() => readGuestSelections().length > 0)
   const [error, setError] = useState('')
+  const [unselected, setUnselected] = useState<Set<string>>(() => readUnselected())
 
   const refreshGuest = useCallback(async (items = guestSelections) => {
     if (!items.length) { setGuestCart(emptyCart); setLoading(false); return }
@@ -156,8 +158,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await consumeAccountPurchase(snapshot, cartApi, next => setAccountCart(normalizeCart(next)), checkIdentity)
   }, [refreshGuest])
 
+  const setSelected = useCallback((lines: Pick<CartLine, 'product_id' | 'sku'>[], selected: boolean) => {
+    setUnselected((current) => {
+      const next = new Set(current)
+      for (const line of lines) {
+        if (selected) next.delete(cartLineKey(line))
+        else next.add(cartLineKey(line))
+      }
+      writeUnselected(next)
+      return next
+    })
+  }, [])
+
   const cart = user ? accountCart : guestCart
   const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0)
-  const value = useMemo(() => ({ cart, loading, error, itemCount, add, update, remove, consumePurchased, refresh: user ? refreshAccount : () => refreshGuest() }), [cart, loading, error, itemCount, add, update, remove, consumePurchased, user, refreshAccount, refreshGuest])
+  const selectedItems = useMemo(() => selectedLines(cart.items, unselected), [cart.items, unselected])
+  const isSelected = useCallback((line: Pick<CartLine, 'product_id' | 'sku'>) => !unselected.has(cartLineKey(line)), [unselected])
+  const value = useMemo(
+    () => ({ cart, loading, error, itemCount, selectedItems, selectedSubtotal: selectedSubtotal(selectedItems), isSelected, setSelected, add, update, remove, consumePurchased, refresh: user ? refreshAccount : () => refreshGuest() }),
+    [cart, loading, error, itemCount, selectedItems, isSelected, setSelected, add, update, remove, consumePurchased, user, refreshAccount, refreshGuest],
+  )
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }

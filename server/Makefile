@@ -75,6 +75,7 @@ migrate-adopt: ## Adopt legacy (make migrate-adopt legacy_fingerprint=...)
 
 infra-up: ## Bật mongo + rustfs
 	docker compose up -d mongo rustfs
+	docker compose run --rm mongo-init
 	docker compose run --rm rustfs-init
 
 infra-down: ## Tắt toàn bộ docker compose

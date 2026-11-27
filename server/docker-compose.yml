@@ -1,6 +1,9 @@
 name: aodora
 
 services:
+  # Single-node replica set: orders and reviews need MongoDB transactions,
+  # which a standalone server rejects. The member is announced as
+  # localhost:27017 so host tools keep using the existing MONGO_URI.
   mongo:
     image: mongo:8.0
     environment:
@@ -10,11 +13,46 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    entrypoint: ["bash", "-ec"]
+    command:
+      - |
+        if [ ! -s /data/configdb/replica.key ]; then
+          umask 077
+          head -c 512 /dev/urandom | base64 > /data/configdb/replica.key
+        fi
+        chown mongodb:mongodb /data/configdb/replica.key
+        chmod 400 /data/configdb/replica.key
+        exec /usr/local/bin/docker-entrypoint.sh mongod --replSet aodora-dev-rs --bind_ip_all --keyFile /data/configdb/replica.key
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1 > /dev/null"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Idempotent: initiates the replica set once, then waits for a primary.
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-aodora}
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-aodora}
+    entrypoint: ["bash", "-ec"]
+    command:
+      - |
+        mongosh --quiet --host mongo --username "$$MONGO_ROOT_USERNAME" --password "$$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval '
+          try { rs.status(); } catch (error) {
+            if (error.code !== 94) throw error;
+            rs.initiate({_id: "aodora-dev-rs", members: [{_id: 0, host: "localhost:27017"}]});
+          }
+          for (let attempt = 0; attempt < 60; attempt++) {
+            if (db.hello().isWritablePrimary) quit(0);
+            sleep(500);
+          }
+          throw new Error("Replica set did not elect a primary");
+        '
 
   navicat:
     profiles: [tools]
@@ -125,6 +163,7 @@ volumes:
   mongo_data:
     # Preserve the existing Aodora MongoDB volume from the former "server" project.
     name: ${MONGO_DATA_VOLUME:-server_mongo_data}
+  mongo_config:
   rustfs_data:
   rustfs_logs:
   navicat_config:

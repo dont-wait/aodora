@@ -10,6 +10,7 @@ import PurchasePanel from './components/PurchasePanel'
 import InfoTabs from './components/InfoTabs'
 import ReviewsSection from './components/ReviewsSection'
 import AccessoriesSection from './components/AccessoriesSection'
+import RelatedProductsSection from './components/RelatedProductsSection'
 import SizeGuideModal from './components/SizeGuideModal'
 
 export default function ProductDetailPage() {
@@ -38,7 +39,8 @@ export default function ProductDetailPage() {
     </div>
     {product.data && <>
       <InfoTabs key={product.data.id} product={product.data} />
-      <ReviewsSection summary={product.data.reviews} />
+      <ReviewsSection product={product.data} />
+      <RelatedProductsSection key={product.data.id} product={product.data} />
       <AccessoriesSection accessories={product.data.accessories || []} />
       <SizeGuideModal open={sizeGuideOpen} sizes={product.data.sizes || []} onClose={() => setSizeGuideOpen(false)} />
     </>}

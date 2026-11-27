@@ -11,6 +11,7 @@ import AdminOrdersPage from '@/pages/admin/AdminOrdersPage'
 import AdminOrderDetailPage from '@/pages/admin/AdminOrderDetailPage'
 import AdminTailoringPage from '@/pages/admin/AdminTailoringPage'
 import AdminTailoringDetailPage from '@/pages/admin/AdminTailoringDetailPage'
+import AdminReviewsPage from '@/pages/admin/AdminReviewsPage'
 import ForbiddenPage from '@/pages/admin/ForbiddenPage'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="orders/:id" element={<AdminOrderDetailPage />} />
         <Route path="tailoring" element={<AdminTailoringPage />} />
         <Route path="tailoring/:id" element={<AdminTailoringDetailPage />} />
+        <Route path="reviews" element={<AdminReviewsPage />} />
         <Route path="*" element={<Navigate to="/403" replace />} />
       </Route>
       <Route element={<Layout />}>

@@ -67,7 +67,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState(initial.error)
   const [notice, setNotice] = useState('')
   const { user, loading: authLoading } = useAuth()
-  const { cart, loading: cartLoading, error: cartError, refresh, consumePurchased } = useCart()
+  const { cart, loading: cartLoading, error: cartError, refresh, consumePurchased, selectedItems: items, selectedSubtotal } = useCart()
   const customerId = user?.id ?? null
   const navigate = useNavigate()
   const work = useRef(false)
@@ -155,7 +155,7 @@ export default function CheckoutPage() {
   const body: CheckoutBody = {
     payment_method: payment,
     shipping_address: payment === 'cod' ? { ...address } : { recipient: address.recipient, phone: address.phone },
-    items: cart.items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity })),
+    items: items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity })),
     ...(note.trim() ? { note } : {}),
   }
   const bodyKey = JSON.stringify(body)
@@ -180,7 +180,7 @@ export default function CheckoutPage() {
   }, [])
   async function getQuote(event: FormEvent) {
     event.preventDefault()
-    if (work.current || attempt || blocked || !cart.items.length || cart.issues.length || cartError) return
+    if (work.current || attempt || blocked || !items.length || cartError) return
     work.current = true
     setBusy(true)
     setError('')
@@ -188,7 +188,7 @@ export default function CheckoutPage() {
     setAccepted(false)
     try {
       const checked = await cartApi.validate(
-        cart.items.map((item) => ({
+        items.map((item) => ({
           product_id: item.product_id,
           product_slug: item.product_slug,
           sku: item.sku,
@@ -200,14 +200,14 @@ export default function CheckoutPage() {
       )
       if (checked.issues.length) throw new OrderApiError(409, 'OUT_OF_STOCK', 'items', 'Một số dòng áo không còn đủ tồn kho. Vui lòng kiểm tra lại giỏ hàng.')
       const stockChanges = checked.items.flatMap((item) => {
-        const old = cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
+        const old = items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
         return old && old.stock !== item.stock ? [`${item.name || 'Sản phẩm áo dài'}: chỉ còn ${item.stock} sản phẩm.`] : []
       })
       const next = await ordersApi.quote(body)
       const baseline = previousQuote.current ?? {
         ...next,
-        subtotal: String(cart.subtotal),
-        items: cart.items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, unit_price: String(item.unit_price) })),
+        subtotal: String(selectedSubtotal),
+        items: items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, unit_price: String(item.unit_price) })),
       }
       setChanges([...quoteDifferences(baseline, next), ...stockChanges])
       previousQuote.current = next
@@ -228,7 +228,7 @@ export default function CheckoutPage() {
   }
   async function sendOrder() {
     if (work.current || blocked || !identityMatches) return
-    if (!attempt && (!quoteCurrent || !accepted || !cart.items.length || cart.issues.length || cartError)) return
+    if (!attempt && (!quoteCurrent || !accepted || !items.length || cartError)) return
     if (!attempt && quote && Date.parse(quote.expires_at) <= Date.now()) {
       setExpired(true)
       setAccepted(false)
@@ -243,7 +243,7 @@ export default function CheckoutPage() {
       if (!pending) {
         pending = makeAttempt(
           { ...body, quote_token: quote!.quote_token },
-          cart.items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, name: item.name })),
+          items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, name: item.name })),
           customerId,
         )
         try {
@@ -445,9 +445,17 @@ export default function CheckoutPage() {
                 />
               </label>
               {cartLoading && <p role="status">Đang kiểm tra giỏ hàng...</p>}
-              {(cartError || cart.issues.length > 0) && (
+              {cartError && (
                 <div role="alert" className="space-y-2 text-error">
-                  <p>{cartError || 'Một số lựa chọn trong giỏ cần được kiểm tra lại.'}</p>
+                  <p>{cartError}</p>
+                  <Link to="/gio-hang" className="underline">
+                    Kiểm tra giỏ hàng
+                  </Link>
+                </div>
+              )}
+              {!cartError && cart.issues.length > 0 && (
+                <div className="space-y-2 text-on-surface-variant border border-outline-variant p-4">
+                  <p>Các dòng sau cần kiểm tra lại và không được đưa vào đơn này:</p>
                   {cart.issues.map((item) => (
                     <p key={`${item.product_id}:${item.sku}`}>
                       {item.name || 'Sản phẩm trong giỏ'}: {item.issue_detail || 'Giá hoặc tồn kho đã thay đổi.'}
@@ -458,15 +466,15 @@ export default function CheckoutPage() {
                   </Link>
                 </div>
               )}
-              {!cart.items.length && !cartLoading && (
+              {!items.length && !cartLoading && (
                 <p>
-                  Giỏ hàng chưa có áo sẵn sàng đặt.{' '}
+                  {cart.items.length ? 'Bạn chưa chọn món nào để đặt mua.' : 'Giỏ hàng chưa có áo sẵn sàng đặt.'}{' '}
                   <Link className="underline" to="/gio-hang">
                     Xem giỏ hàng
                   </Link>
                 </p>
               )}
-              <button type="submit" className={buttonClass} disabled={blocked || !cart.items.length || !!cart.issues.length || !!cartError}>
+              <button type="submit" className={buttonClass} disabled={blocked || !items.length || !!cartError}>
                 {busy ? 'Đang tính tổng tiền...' : 'Tính tổng tiền'}
               </button>
             </fieldset>
@@ -528,7 +536,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   className={`${buttonClass} w-full`}
-                  disabled={blocked || !quoteCurrent || !accepted || !!cart.issues.length || !!cartError}
+                  disabled={blocked || !quoteCurrent || !accepted || !!cartError}
                   onClick={() => void sendOrder()}
                 >
                   {busy ? 'Đang gửi đơn...' : 'Xác nhận đặt mua'}
@@ -537,7 +545,7 @@ export default function CheckoutPage() {
             ) : (
               <>
                 <ul className="divide-y divide-outline-variant">
-                  {cart.items.map((item) => (
+                  {items.map((item) => (
                     <li className="py-3 flex justify-between gap-4" key={`${item.product_id}:${item.sku}`}>
                       <div className="min-w-0">
                         <p className="font-semibold">{item.name || 'Sản phẩm áo dài'}</p>
@@ -551,8 +559,16 @@ export default function CheckoutPage() {
                 </ul>
                 <div className="flex justify-between gap-4 border-t border-outline-variant pt-4">
                   <span>Tạm tính</span>
-                  <strong className="text-primary">{formatOrderMoney(String(cart.subtotal))}</strong>
+                  <strong className="text-primary">{formatOrderMoney(String(selectedSubtotal))}</strong>
                 </div>
+                {items.length > 0 && items.length < cart.items.length && (
+                  <p className="text-sm text-on-surface-variant">
+                    Đặt {items.length}/{cart.items.length} dòng trong giỏ; các món còn lại vẫn được giữ.{' '}
+                    <Link to="/gio-hang" className="underline">
+                      Đổi lựa chọn
+                    </Link>
+                  </p>
+                )}
                 <p>Phí giao và tổng tiền được chốt ở bước “Tính tổng tiền”.</p>
               </>
             )}

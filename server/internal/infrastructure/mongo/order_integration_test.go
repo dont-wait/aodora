@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"sync"
@@ -1323,17 +1324,17 @@ func TestOrderQueriesAndRecoveryScenarios(t *testing.T) {
 			t.Fatalf("seed order B: %v", err)
 		}
 
-		p1, total1, _, _, err := svc.List(ctx, custA, 1, 2)
+		p1, total1, _, _, err := svc.List(ctx, custA, "", 1, 2)
 		if err != nil || total1 != 5 || len(p1) != 2 {
 			t.Fatalf("page 1 failed: err=%v, total=%d, len=%d", err, total1, len(p1))
 		}
 
-		p2, total2, _, _, err := svc.List(ctx, custA, 2, 2)
+		p2, total2, _, _, err := svc.List(ctx, custA, "", 2, 2)
 		if err != nil || total2 != 5 || len(p2) != 2 {
 			t.Fatalf("page 2 failed: err=%v, total=%d, len=%d", err, total2, len(p2))
 		}
 
-		p3, total3, _, _, err := svc.List(ctx, custA, 3, 2)
+		p3, total3, _, _, err := svc.List(ctx, custA, "", 3, 2)
 		if err != nil || total3 != 5 || len(p3) != 1 {
 			t.Fatalf("page 3 failed: err=%v, total=%d, len=%d", err, total3, len(p3))
 		}
@@ -1475,9 +1476,7 @@ func TestMigrationOrderNumberUnique(t *testing.T) {
 	}
 	files := os.DirFS(migrationsPath)
 
-	if err := migration.Run(targetURI, files, "down"); err != nil {
-		t.Fatalf("down migration: %v", err)
-	}
+	downThroughMigration(t, targetURI, files, "order_number_unique")
 
 	pID := bson.NewObjectID()
 	legacy1 := bson.M{
@@ -1652,9 +1651,7 @@ func TestMigrationOrderNumberUnique(t *testing.T) {
 		t.Fatalf("expected duplicate key error on inserting duplicate order_number, got nil")
 	}
 
-	if err := migration.Run(targetURI, files, "down"); err != nil {
-		t.Fatalf("down migration: %v", err)
-	}
+	downThroughMigration(t, targetURI, files, "order_number_unique")
 
 	if _, err := db.Collection("orders").InsertOne(ctx, orderWithNum2); err != nil {
 		t.Fatalf("inserting duplicate after index dropped should succeed: %v", err)
@@ -1664,6 +1661,28 @@ func TestMigrationOrderNumberUnique(t *testing.T) {
 	if err := migration.Run(targetURI, files, "up"); err != nil {
 		t.Fatalf("re-applying up migration after cleanup: %v", err)
 	}
+}
+
+// downThroughMigration rolls back every migration applied after name, then
+// name itself, so later migrations do not change which one this test reverts.
+func downThroughMigration(t *testing.T, targetURI string, files fs.FS, name string) {
+	t.Helper()
+	all, err := migration.Load(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, m := range all {
+		if m.Name != name {
+			continue
+		}
+		for range all[i:] {
+			if err := migration.Run(targetURI, files, "down"); err != nil {
+				t.Fatalf("down migration: %v", err)
+			}
+		}
+		return
+	}
+	t.Fatalf("migration %s not found", name)
 }
 
 func oidMust(hex string) bson.ObjectID {

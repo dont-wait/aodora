@@ -107,13 +107,13 @@ Migration `order_checkout` (UUID) cho `customer_id` thiếu/null với guest, th
 
 ### `reviews`
 
-Map review card: `customer_id`, `product_id`, `rating`, `content`, `display_name`, `initials`, `location`, `meta`, `purchase_mode` (`ready`/`custom`), `purchase_size`, `verified_purchase`, `images[]` (`src`, `alt`), `created_at`, `updated_at`. Mỗi khách chỉ có một review trên một sản phẩm theo unique index.
+Map review card: `customer_id`, `product_id`, `rating`, `content`, `display_name`, `initials`, `location`, `meta`, `purchase_mode` (`ready`/`custom`), `purchase_size`, `verified_purchase`, `images[]` (`src`, `alt`), `order_id` (đơn đã giao dùng để xác minh), `created_at`, `updated_at`. Chỉ khách có tài khoản mới tạo review (`customer_id` bắt buộc); khách vãng lai chỉ xem. Mỗi khách chỉ có một review trên một sản phẩm theo unique index. `products.rating`/`review_count` được tính lại từ `reviews` sau mỗi lần ghi, xem [KR04_REVIEW_API.md](KR04_REVIEW_API.md).
 
 ## Index và quan hệ
 
 - Unique: category slug, product slug, customer email, một cart/khách, một review/khách/sản phẩm, `uq_orders_order_number` (partial chuỗi trên `orders.order_number`), `uq_orders_checkout_scope_request` (partial trên `orders.checkout.(scope, request_id)`).
 - Tìm kiếm/sắp xếp: product theo category và trạng thái, product text search, category theo parent, orders theo khách/trạng thái và thời gian, reviews theo sản phẩm, tailoring requests theo số điện thoại/trạng thái/thời gian.
-- Quan hệ tham chiếu: `products.category_id → categories._id`; `orders.customer_id`, `carts.customer_id`, `reviews.customer_id`, `tailoring_requests.customer_id → customers._id`; `reviews.product_id`, `orders.items[].product_id`, `carts.items[].product_id`, `tailoring_requests.product_id → products._id`.
+- Quan hệ tham chiếu: `products.category_id → categories._id`; `orders.customer_id`, `carts.customer_id`, `reviews.customer_id`, `tailoring_requests.customer_id → customers._id`; `reviews.order_id → orders._id`; `reviews.product_id`, `orders.items[].product_id`, `carts.items[].product_id`, `tailoring_requests.product_id → products._id`.
 - MongoDB không enforce foreign keys. Application cần kiểm tra tham chiếu, tồn kho theo variant và tổng tiền trước khi ghi đơn.
 
 ## Kết nối local

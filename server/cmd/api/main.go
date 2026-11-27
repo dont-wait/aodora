@@ -16,6 +16,7 @@ import (
 	customerapp "github.com/your-org/aodora/server/internal/application/customer"
 	"github.com/your-org/aodora/server/internal/application/health"
 	orderapp "github.com/your-org/aodora/server/internal/application/order"
+	reviewapp "github.com/your-org/aodora/server/internal/application/review"
 	tailoringapp "github.com/your-org/aodora/server/internal/application/tailoring"
 	"github.com/your-org/aodora/server/internal/config"
 	domainorder "github.com/your-org/aodora/server/internal/domain/order"
@@ -84,6 +85,7 @@ func main() {
 	orderRepo := catalogMongo.NewOrderRepository(db.Client, db.DB)
 	orderAdminService := orderapp.NewAdminService(orderRepo)
 	orderService := orderapp.NewService(orderRepo, orderRepo, quoteSigner, cfg.Order.QuoteTTL, cfg.Order.CODShippingFee, nil, nil)
+	reviewService := reviewapp.NewService(catalogMongo.NewReviewRepository(db.DB), orderService)
 
 	tailoringRepo := catalogMongo.NewTailoringRepository(db.DB)
 	tailoringService := tailoringapp.NewService(tailoringRepo)
@@ -103,6 +105,8 @@ func main() {
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithOrders(orderService, authGuard, *log),
+			httpapi.WithReviews(reviewService, authGuard, catalogService, orderService, *log),
+			httpapi.WithAdminReviews(reviewService, authGuard, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithTailoring(tailoringService, authGuard, *log),
 			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
