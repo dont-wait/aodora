@@ -10,9 +10,7 @@ import (
 )
 
 type fakeRepository struct {
-	upserts      *[]Input
-	guestUpserts *[]string
-	guestInputs  *[]GuestInput
+	upserts *[]Input
 }
 
 func (fakeRepository) List(context.Context, string, int64, int64) (Page, error) { return Page{}, nil }
@@ -22,14 +20,6 @@ func (fakeRepository) Own(context.Context, string, string) (*OwnReview, error) {
 func (r fakeRepository) Upsert(_ context.Context, _, _ string, input Input) (OwnReview, error) {
 	if r.upserts != nil {
 		*r.upserts = append(*r.upserts, input)
-	}
-	return OwnReview{}, nil
-}
-func (fakeRepository) GuestReviews(context.Context, string) ([]OwnReview, error) { return nil, nil }
-func (r fakeRepository) GuestUpsert(_ context.Context, orderID, productID, name string, input GuestInput) (OwnReview, error) {
-	if r.guestUpserts != nil {
-		*r.guestUpserts = append(*r.guestUpserts, orderID+"|"+productID+"|"+name)
-		*r.guestInputs = append(*r.guestInputs, input)
 	}
 	return OwnReview{}, nil
 }
@@ -52,18 +42,11 @@ func (o fakeOrders) order(viewer apporder.Viewer, id string) *domainorder.Order 
 	items := []domainorder.OrderItem{{ProductID: "p1"}}
 	switch {
 	case id == "guest-order" && viewer.GuestHash == "guest-a":
-		return &domainorder.Order{ID: id, Status: status, GuestAccessHash: "guest-a", Items: items, ShippingAddress: domainorder.NormalizedAddress{Recipient: " Nguyễn An "}}
+		return &domainorder.Order{ID: id, Status: status, GuestAccessHash: "guest-a", Items: items}
 	case id == "account-order" && viewer.CustomerID == "cust-a":
 		return &domainorder.Order{ID: id, Status: status, CustomerID: "cust-a", Items: items}
 	}
 	return nil
-}
-
-func (o fakeOrders) Get(_ context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error) {
-	if order := o.order(viewer, id); order != nil {
-		return order, nil
-	}
-	return nil, apporder.ErrNotFound
 }
 
 func (o fakeOrders) VerifiedPurchase(_ context.Context, viewer apporder.Viewer, id, productID string) (bool, error) {
@@ -119,10 +102,6 @@ func TestRejectsInvalidRatingAndImages(t *testing.T) {
 		if !errors.As(err, &invalid) || invalid.Field != "rating" {
 			t.Fatalf("rating %d error = %v", rating, err)
 		}
-		_, err = service.SubmitGuest(context.Background(), "guest-a", "guest-order", "p1", GuestInput{Rating: rating})
-		if !errors.As(err, &invalid) || invalid.Field != "rating" {
-			t.Fatalf("guest rating %d error = %v", rating, err)
-		}
 	}
 	for _, images := range [][]Image{
 		make([]Image, 6),
@@ -134,54 +113,6 @@ func TestRejectsInvalidRatingAndImages(t *testing.T) {
 		if !errors.As(err, &invalid) || invalid.Field != "images" {
 			t.Fatalf("images %v error = %v", images, err)
 		}
-	}
-}
-
-func TestSubmitGuestUsesOrderTokenAndRecipientName(t *testing.T) {
-	var keys []string
-	var inputs []GuestInput
-	service := NewService(fakeRepository{guestUpserts: &keys, guestInputs: &inputs}, fakeOrders{})
-	if _, err := service.SubmitGuest(context.Background(), "guest-a", "guest-order", "p1", GuestInput{Rating: 5}); err != nil {
-		t.Fatal(err)
-	}
-	if len(keys) != 1 || keys[0] != "guest-order|p1|Nguyễn An" || inputs[0].Images == nil {
-		t.Fatalf("guest upsert = %v %+v", keys, inputs)
-	}
-}
-
-func TestSubmitGuestRejectsWrongTokenUndeliveredAndForeignProduct(t *testing.T) {
-	var keys []string
-	var inputs []GuestInput
-	repo := fakeRepository{guestUpserts: &keys, guestInputs: &inputs}
-	ctx := context.Background()
-	if _, err := NewService(repo, fakeOrders{}).SubmitGuest(ctx, "guest-b", "guest-order", "p1", GuestInput{Rating: 5}); !errors.Is(err, ErrOrderAccess) {
-		t.Fatalf("wrong token error = %v", err)
-	}
-	if _, err := NewService(repo, fakeOrders{}).SubmitGuest(ctx, "", "guest-order", "p1", GuestInput{Rating: 5}); !errors.Is(err, ErrOrderAccess) {
-		t.Fatalf("missing token error = %v", err)
-	}
-	// An account order cannot be reviewed through the guest route.
-	if _, err := NewService(repo, fakeOrders{}).SubmitGuest(ctx, "guest-a", "account-order", "p1", GuestInput{Rating: 5}); !errors.Is(err, ErrOrderAccess) {
-		t.Fatalf("account order via guest error = %v", err)
-	}
-	if _, err := NewService(repo, fakeOrders{status: domainorder.StatusPending}).SubmitGuest(ctx, "guest-a", "guest-order", "p1", GuestInput{Rating: 5}); !errors.Is(err, ErrNotEligible) {
-		t.Fatalf("undelivered error = %v", err)
-	}
-	if _, err := NewService(repo, fakeOrders{}).SubmitGuest(ctx, "guest-a", "guest-order", "p2", GuestInput{Rating: 5}); !errors.Is(err, ErrNotEligible) {
-		t.Fatalf("foreign product error = %v", err)
-	}
-	if len(keys) != 0 {
-		t.Fatalf("rejected guest submissions wrote %v", keys)
-	}
-}
-
-func TestGuestReviewsRequireOrderAccess(t *testing.T) {
-	service := NewService(fakeRepository{}, fakeOrders{})
-	if _, err := service.GuestReviews(context.Background(), "guest-b", "guest-order"); !errors.Is(err, ErrOrderAccess) {
-		t.Fatalf("error = %v", err)
-	}
-	if _, err := service.GuestReviews(context.Background(), "guest-a", "guest-order"); err != nil {
-		t.Fatal(err)
 	}
 }
 

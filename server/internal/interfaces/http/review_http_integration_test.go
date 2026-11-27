@@ -18,7 +18,6 @@ import (
 	catalogapp "github.com/your-org/aodora/server/internal/application/catalog"
 	apporder "github.com/your-org/aodora/server/internal/application/order"
 	reviewapp "github.com/your-org/aodora/server/internal/application/review"
-	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 	mongorepo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
 	"github.com/your-org/aodora/server/internal/logger"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -133,12 +132,6 @@ func TestReviewHTTPAcceptanceIntegration(t *testing.T) {
 	deliveredB := seedReviewOrder(t, db, &idB, "", "delivered", "", product)
 	guestToken, guestHashHex := generateIntegrationGuestToken()
 	guestOrder := seedReviewOrder(t, db, nil, guestHashHex, "delivered", "Trần Bình", product)
-	pendingGuestToken := strings.Repeat("A", 42) + "E" // 32 zero-ish bytes, canonical base64url
-	pendingGuestHash, _, err := domainorder.ValidateGuestAccessToken(pendingGuestToken)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pendingGuest := seedReviewOrder(t, db, nil, pendingGuestHash, "pending", "Lê Chi", product)
 
 	put := func(cookie *http.Cookie, order bson.ObjectID, rating int, status int) *httptest.ResponseRecorder {
 		t.Helper()
@@ -305,33 +298,20 @@ func TestReviewHTTPAcceptanceIntegration(t *testing.T) {
 		assertSummary(4.5, 2)
 	})
 
-	guestPath := "/api/v1/guest-orders/" + guestOrder.Hex() + "/reviews"
-	guestHeader := map[string]string{"X-Order-Access-Token": guestToken}
-	t.Run("guest with the order token reviews the product in that order", func(t *testing.T) {
-		call("PUT", guestPath+"/"+product.Hex(), `{"rating":3,"content":"Khách vãng lai","images":[]}`, nil, nil, http.StatusBadRequest)
-		call("PUT", guestPath+"/"+product.Hex(), `{"rating":3}`, nil, map[string]string{"X-Order-Access-Token": pendingGuestToken}, http.StatusNotFound)
-		call("PUT", guestPath+"/"+other.Hex(), `{"rating":3}`, nil, guestHeader, http.StatusForbidden)
-		call("PUT", "/api/v1/guest-orders/"+deliveredA.Hex()+"/reviews/"+product.Hex(), `{"rating":3}`, nil, guestHeader, http.StatusNotFound)
-		call("PUT", "/api/v1/guest-orders/"+pendingGuest.Hex()+"/reviews/"+product.Hex(), `{"rating":3}`, nil, map[string]string{"X-Order-Access-Token": pendingGuestToken}, http.StatusForbidden)
-		call("PUT", guestPath+"/"+product.Hex(), `{"rating":6}`, nil, guestHeader, http.StatusBadRequest)
+	t.Run("guests without an account can read but not write reviews", func(t *testing.T) {
+		guestHeader := map[string]string{"X-Order-Access-Token": guestToken}
+		body := fmt.Sprintf(`{"order_id":%q,"rating":5}`, guestOrder.Hex())
+		// Even with the delivered order's access token, writing needs a session.
+		call("PUT", "/api/v1/me/reviews/"+product.Hex(), body, nil, guestHeader, http.StatusUnauthorized)
+		call("GET", "/api/v1/me/reviews/eligible-orders?product_id="+product.Hex(), "", nil, guestHeader, http.StatusUnauthorized)
+		call("PUT", "/api/v1/guest-orders/"+guestOrder.Hex()+"/reviews/"+product.Hex(), `{"rating":5}`, nil, guestHeader, http.StatusNotFound)
+		// A signed-in account cannot claim a guest order either.
+		call("PUT", "/api/v1/me/reviews/"+product.Hex(), body, cookieA, nil, http.StatusForbidden)
+		if n, _ := db.Collection("reviews").CountDocuments(ctx, bson.M{"order_id": guestOrder}); n != 0 {
+			t.Fatalf("guest order has %d reviews", n)
+		}
+		// assertSummary reads the public list and product detail without a session.
 		assertSummary(4.5, 2)
-
-		w := call("PUT", guestPath+"/"+product.Hex(), `{"rating":3,"content":"Khách vãng lai"}`, nil, guestHeader, http.StatusOK)
-		if !strings.Contains(w.Body.String(), `"display_name":"Trần Bình"`) {
-			t.Fatalf("guest review display name: %s", w.Body.String())
-		}
-		assertSummary(4, 3)
-		call("PUT", guestPath+"/"+product.Hex(), `{"rating":6}`, nil, guestHeader, http.StatusBadRequest)
-		call("PUT", guestPath+"/"+product.Hex(), `{"rating":5,"content":"Sửa lại"}`, nil, guestHeader, http.StatusOK)
-		if n, _ := db.Collection("reviews").CountDocuments(ctx, bson.M{"order_id": guestOrder}); n != 1 {
-			t.Fatalf("guest order has %d reviews, want 1", n)
-		}
-		assertSummary(4.67, 3)
-		w = call("GET", guestPath, "", nil, guestHeader, http.StatusOK)
-		if !strings.Contains(w.Body.String(), product.Hex()) || !strings.Contains(w.Body.String(), "Sửa lại") {
-			t.Fatalf("guest reviews: %s", w.Body.String())
-		}
-		call("GET", guestPath, "", nil, map[string]string{"X-Order-Access-Token": pendingGuestToken}, http.StatusNotFound)
 	})
 
 	t.Run("admin lists and deletes reviews; aggregate follows the public list", func(t *testing.T) {
@@ -346,35 +326,29 @@ func TestReviewHTTPAcceptanceIntegration(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
 			t.Fatal(err)
 		}
-		if page.Total != 3 || len(page.Data) != 3 {
+		if page.Total != 2 || len(page.Data) != 2 {
 			t.Fatalf("admin list = %+v", page)
 		}
-		for _, secret := range []string{"0900000009", "guest_access_hash", guestHashHex, "email"} {
+		for _, secret := range []string{"0900000009", "guest_access_hash", guestHashHex, "email", "customer_id"} {
 			if strings.Contains(w.Body.String(), secret) {
 				t.Fatalf("admin list leaked %q", secret)
 			}
 		}
-		var guestReview reviewapp.AdminReview
 		for _, item := range page.Data {
-			if item.Source == reviewapp.SourceGuest {
-				guestReview = item
-			}
 			if item.ProductName != "Áo review HTTP" || item.OrderNumber == "" {
 				t.Fatalf("admin item missing context: %+v", item)
 			}
 		}
-		if guestReview.ID == "" {
-			t.Fatal("guest review not marked as guest")
-		}
 		w = call("GET", "/api/v1/admin/reviews?rating=5", "", adminCookie, nil, http.StatusOK)
-		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || page.Total != 2 {
-			t.Fatalf("rating filter total = %d (%v)", page.Total, err)
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || page.Total != 1 || page.Data[0].Rating != 5 {
+			t.Fatalf("rating filter = %+v (%v)", page, err)
 		}
+		target := page.Data[0].ID
 
-		call("DELETE", "/api/v1/admin/reviews/"+guestReview.ID, "", cookieA, nil, http.StatusForbidden)
-		call("DELETE", "/api/v1/admin/reviews/"+guestReview.ID, "", adminCookie, nil, http.StatusOK)
-		assertSummary(4.5, 2)
-		call("DELETE", "/api/v1/admin/reviews/"+guestReview.ID, "", adminCookie, nil, http.StatusNotFound)
+		call("DELETE", "/api/v1/admin/reviews/"+target, "", cookieA, nil, http.StatusForbidden)
+		call("DELETE", "/api/v1/admin/reviews/"+target, "", adminCookie, nil, http.StatusOK)
+		assertSummary(4, 1)
+		call("DELETE", "/api/v1/admin/reviews/"+target, "", adminCookie, nil, http.StatusNotFound)
 		call("DELETE", "/api/v1/admin/reviews/not-an-id", "", adminCookie, nil, http.StatusNotFound)
 
 		// Deleting every review returns the aggregate to 0/0.

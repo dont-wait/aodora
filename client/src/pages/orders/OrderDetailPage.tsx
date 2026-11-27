@@ -2,7 +2,6 @@ import { Link, useParams } from 'react-router-dom'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import OrderReadNotice from '@/features/orders/OrderReadNotice'
 import { useOrderDetail } from '@/features/orders/useOrderRead'
-import GuestOrderReviews from '@/features/review/GuestOrderReviews'
 import OrderSummary from '@/pages/checkout/OrderSummary'
 
 export default function OrderDetailPage() {
@@ -28,7 +27,6 @@ export default function OrderDetailPage() {
         <p className="text-on-surface-variant">Thông tin được tải từ cửa hàng. Trạng thái nhận áo và thanh toán được cập nhật độc lập.</p>
       </header>
       <OrderSummary order={order} />
-      {result.guest && <GuestOrderReviews order={order} />}
       {result.guest && (
         <p className="border border-outline-variant p-4 text-sm">
           Quyền xem đơn nằm trên trình duyệt này. Xóa dữ liệu trình duyệt hoặc đổi thiết bị có thể khiến bạn không xem lại được đơn.

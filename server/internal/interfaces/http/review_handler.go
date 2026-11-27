@@ -36,8 +36,6 @@ type appService interface {
 	List(context.Context, string, int64, int64) (app.Page, error)
 	Own(context.Context, string, string) (*app.OwnReview, error)
 	Submit(context.Context, string, string, app.Input) (app.OwnReview, error)
-	GuestReviews(context.Context, string, string) ([]app.OwnReview, error)
-	SubmitGuest(context.Context, string, string, string, app.GuestInput) (app.OwnReview, error)
 }
 
 // AdminReviewService exposes only the moderation operations.
@@ -56,10 +54,6 @@ func WithReviews(service appService, guard *AuthGuard, catalog reviewCatalog, or
 		mux.HandleFunc("GET /api/v1/me/reviews", h.protected(h.own))
 		mux.HandleFunc("GET /api/v1/me/reviews/eligible-orders", h.protected(h.eligibleOrders))
 		mux.HandleFunc("PUT /api/v1/me/reviews/{product_id}", h.protected(h.submit))
-		// Guest reviews: the per-order access token from DW-03 is the only credential.
-		mux.HandleFunc("OPTIONS /api/v1/guest-orders/{path...}", h.guestPreflight)
-		mux.HandleFunc("GET /api/v1/guest-orders/{order_id}/reviews", h.guest(h.guestReviews))
-		mux.HandleFunc("PUT /api/v1/guest-orders/{order_id}/reviews/{product_id}", h.guest(h.guestSubmit))
 	}
 }
 
@@ -77,33 +71,6 @@ func WithAdminReviews(service AdminReviewService, guard *AuthGuard, log zerolog.
 func (h reviewHandler) protected(next http.HandlerFunc) http.HandlerFunc {
 	origin := authHandler{guard: h.guard}
 	return origin.withOrigin(h.guard.Require(next))
-}
-
-func (h reviewHandler) guestPreflight(w http.ResponseWriter, r *http.Request) {
-	h.guard.handlePreflight(w, r, []string{"x-order-access-token"}, "Content-Type, Accept, X-Order-Access-Token")
-}
-
-type guestHashKey struct{}
-
-func (h reviewHandler) guest(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		if !h.guard.cors(w, r) {
-			respondError(w, http.StatusForbidden, "ORIGIN_FORBIDDEN", "", "Nguồn truy cập không được cấp phép")
-			return
-		}
-		hash, _, err := domainorder.ValidateGuestAccessToken(r.Header.Get("X-Order-Access-Token"))
-		if err != nil {
-			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "X-Order-Access-Token", "Mã truy cập khách không hợp lệ")
-			return
-		}
-		next(w, r.WithContext(context.WithValue(r.Context(), guestHashKey{}, hash)))
-	}
-}
-
-func guestHash(r *http.Request) string {
-	hash, _ := r.Context().Value(guestHashKey{}).(string)
-	return hash
 }
 
 func (h reviewHandler) public(w http.ResponseWriter, r *http.Request) {
@@ -194,20 +161,6 @@ func (h reviewHandler) submit(w http.ResponseWriter, r *http.Request) {
 	}
 	user, _ := h.guard.Identity(r)
 	data, err := h.service.Submit(r.Context(), user.ID, r.PathValue("product_id"), input)
-	respondReview(w, h.log, data, err)
-}
-
-func (h reviewHandler) guestReviews(w http.ResponseWriter, r *http.Request) {
-	data, err := h.service.GuestReviews(r.Context(), guestHash(r), r.PathValue("order_id"))
-	respondReview(w, h.log, data, err)
-}
-
-func (h reviewHandler) guestSubmit(w http.ResponseWriter, r *http.Request) {
-	var input app.GuestInput
-	if !decodeReviewJSON(w, r, &input) {
-		return
-	}
-	data, err := h.service.SubmitGuest(r.Context(), guestHash(r), r.PathValue("order_id"), r.PathValue("product_id"), input)
 	respondReview(w, h.log, data, err)
 }
 
@@ -320,8 +273,6 @@ func respondReview(w http.ResponseWriter, log zerolog.Logger, data any, err erro
 			respondError(w, http.StatusBadRequest, "INVALID_FIELD", invalid.Field, invalid.Message)
 		case errors.Is(err, app.ErrNotEligible):
 			respondError(w, http.StatusForbidden, "REVIEW_NOT_ELIGIBLE", "order_id", "Bạn chỉ có thể đánh giá sản phẩm trong đơn đã nhận")
-		case errors.Is(err, app.ErrOrderAccess):
-			respondError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "order_id", "Không tìm thấy đơn hàng với mã truy cập này")
 		case errors.Is(err, app.ErrNotFound):
 			respondError(w, http.StatusNotFound, "NOT_FOUND", "", "Không tìm thấy đánh giá")
 		case errors.Is(err, app.ErrProduct):

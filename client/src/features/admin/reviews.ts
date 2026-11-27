@@ -12,7 +12,6 @@ export type AdminReview = {
   product_id: string
   product_name: string
   product_slug: string
-  source: 'account' | 'guest'
   order_number?: string
 }
 export type AdminReviewPage = { data: AdminReview[]; total: number; page: number; page_size: number }
@@ -63,8 +62,7 @@ function review(raw: unknown): AdminReview {
   const data = raw as AdminReview
   if (
     !data || typeof data.id !== 'string' || !Number.isInteger(data.rating) || data.rating < 1 || data.rating > 5 ||
-    typeof data.display_name !== 'string' || typeof data.product_id !== 'string' || !Array.isArray(data.images) ||
-    (data.source !== 'account' && data.source !== 'guest')
+    typeof data.display_name !== 'string' || typeof data.product_id !== 'string' || !Array.isArray(data.images)
   )
     invalid()
   return data
@@ -115,4 +113,3 @@ export async function deleteAdminReview(id: string): Promise<AdminReviewDeleteRe
 }
 export const deleteReviewConfirmation =
   'Xóa vĩnh viễn đánh giá này khỏi trang sản phẩm? Điểm trung bình và số lượt đánh giá được tính lại ngay. Không thể hoàn tác.'
-export const reviewSourceLabel = (source: AdminReview['source']) => (source === 'guest' ? 'Khách vãng lai' : 'Khách tài khoản')

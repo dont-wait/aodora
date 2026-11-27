@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import StarRating from '@/components/ui/StarRating'
 import { useAuth } from '@/features/auth/useAuth'
-import { adminReviewSearch, deleteAdminReview, deleteReviewConfirmation, loadAdminReviews, readAdminReviewFilters, reviewSourceLabel } from '@/features/admin/reviews'
+import { adminReviewSearch, deleteAdminReview, deleteReviewConfirmation, loadAdminReviews, readAdminReviewFilters } from '@/features/admin/reviews'
 import { formatOrderDate, orderLoginPath } from '@/features/orders/presentation'
 import { orderPageCount } from '@/features/orders/read'
 import { useOrderRead } from '@/features/orders/useOrderRead'
@@ -98,8 +98,6 @@ export default function AdminReviewsPage() {
                 </ul>
               )}
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                <dt className="text-on-surface-variant">Người gửi</dt>
-                <dd>{reviewSourceLabel(item.source)}</dd>
                 <dt className="text-on-surface-variant">Đơn hàng</dt>
                 <dd>{item.order_number || 'Không có'}</dd>
                 <dt className="text-on-surface-variant">Ngày gửi</dt>

@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const guestDisplayFallback = "Khách hàng AN SOIE"
+const displayFallback = "Khách hàng AN SOIE"
 
 type ReviewRepository struct {
 	client    *driver.Client
@@ -107,43 +107,6 @@ func (r *ReviewRepository) Upsert(ctx context.Context, customerID, productID str
 	return r.upsert(ctx, filter, productOID, orderOID, displayOrFallback(customer.FullName), input.Rating, input.Content, input.Images)
 }
 
-func (r *ReviewRepository) GuestReviews(ctx context.Context, orderID string) ([]app.OwnReview, error) {
-	orderOID, err := bson.ObjectIDFromHex(orderID)
-	if err != nil {
-		return nil, app.ErrOrderAccess
-	}
-	cur, err := r.reviews.Find(ctx, guestFilter(orderOID), options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}, {Key: "_id", Value: 1}}))
-	if err != nil {
-		return nil, fmt.Errorf("list guest reviews: %w", err)
-	}
-	defer cur.Close(ctx)
-	items := make([]app.OwnReview, 0)
-	for cur.Next(ctx) {
-		var row bson.M
-		if err := cur.Decode(&row); err != nil {
-			return nil, err
-		}
-		items = append(items, ownReview(row))
-	}
-	return items, cur.Err()
-}
-
-// GuestUpsert keeps one review per guest order and product
-// (uq_reviews_order_product). Guest reviews never carry customer_id.
-func (r *ReviewRepository) GuestUpsert(ctx context.Context, orderID, productID, displayName string, input app.GuestInput) (app.OwnReview, error) {
-	orderOID, err := bson.ObjectIDFromHex(orderID)
-	if err != nil {
-		return app.OwnReview{}, app.ErrOrderAccess
-	}
-	productOID, err := r.visibleProductID(ctx, productID)
-	if err != nil {
-		return app.OwnReview{}, err
-	}
-	filter := guestFilter(orderOID)
-	filter["product_id"] = productOID
-	return r.upsert(ctx, filter, productOID, orderOID, displayOrFallback(displayName), input.Rating, input.Content, input.Images)
-}
-
 func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter) (app.AdminPage, error) {
 	match := bson.M{}
 	if filter.ProductID != "" {
@@ -181,10 +144,7 @@ func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter
 		if err := cur.Decode(&row); err != nil {
 			return app.AdminPage{}, err
 		}
-		item := app.AdminReview{PublicReview: publicReview(row), ProductID: asID(row["product_id"]), Source: app.SourceAccount, UpdatedAt: asTime(row["updated_at"]).UTC().Format(time.RFC3339)}
-		if _, ok := row["customer_id"].(bson.ObjectID); !ok {
-			item.Source = app.SourceGuest
-		}
+		item := app.AdminReview{PublicReview: publicReview(row), ProductID: asID(row["product_id"]), UpdatedAt: asTime(row["updated_at"]).UTC().Format(time.RFC3339)}
 		if products := asSlice(row["product"]); len(products) > 0 {
 			product := asMap(products[0])
 			item.ProductName, item.ProductSlug = asString(product["name"]), asString(product["slug"])
@@ -317,19 +277,15 @@ func (r *ReviewRepository) visibleProductID(ctx context.Context, productID strin
 	return productOID, nil
 }
 
-func guestFilter(orderOID bson.ObjectID) bson.M {
-	return bson.M{"order_id": orderOID, "customer_id": bson.M{"$exists": false}}
-}
-
 func displayOrFallback(name string) string {
 	if name == "" {
-		return guestDisplayFallback
+		return displayFallback
 	}
 	return name
 }
 
 func ownReview(row bson.M) app.OwnReview {
-	return app.OwnReview{PublicReview: publicReview(row), ProductID: asID(row["product_id"]), OrderID: asID(row["order_id"])}
+	return app.OwnReview{PublicReview: publicReview(row), OrderID: asID(row["order_id"])}
 }
 
 func publicReview(row bson.M) app.PublicReview {

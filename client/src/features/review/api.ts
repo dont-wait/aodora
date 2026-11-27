@@ -10,7 +10,6 @@ export type OwnReview = {
   images: ReviewImage[]
   verified_purchase: boolean
   created_at: string
-  product_id: string
   order_id: string
 }
 
@@ -26,8 +25,8 @@ export class ReviewApiError extends Error {
 
 const baseUrl = (import.meta.env?.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
-async function request<T>(path: string, method = 'GET', input?: unknown, headers: Record<string, string> = {}): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, { method, credentials: 'include', headers: { Accept: 'application/json', ...(input === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers }, body: input === undefined ? undefined : JSON.stringify(input) })
+async function request<T>(path: string, method = 'GET', input?: unknown): Promise<T> {
+  const response = await fetch(`${baseUrl}${path}`, { method, credentials: 'include', headers: { Accept: 'application/json', ...(input === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: input === undefined ? undefined : JSON.stringify(input) })
   const body = await response.json().catch(() => null) as { data?: T; error?: { code?: string; field?: string; message?: string } } | null
   if (!response.ok) throw new ReviewApiError(response.status, body?.error?.field || '', body?.error?.message || 'Không thể xử lý đánh giá', body?.error?.code || '')
   return body?.data as T
@@ -53,19 +52,8 @@ export const reviewApi = {
   submit: (productId: string, input: ReviewBody & { order_id: string }) => request<OwnReview>(`/api/v1/me/reviews/${encodeURIComponent(productId)}`, 'PUT', input),
 }
 
-// Guest reviews use the per-order access token saved at checkout. It is sent
-// only as a header, never in the URL.
-const guestPath = (orderId: string) => `/api/v1/guest-orders/${encodeURIComponent(orderId)}/reviews`
-export const guestReviewApi = {
-  list: (orderId: string, token: string) => request<OwnReview[]>(guestPath(orderId), 'GET', undefined, { 'X-Order-Access-Token': token }),
-  submit: (orderId: string, productId: string, token: string, input: ReviewBody) =>
-    request<OwnReview>(`${guestPath(orderId)}/${encodeURIComponent(productId)}`, 'PUT', input, { 'X-Order-Access-Token': token }),
-}
-
 export function reviewErrorMessage(error: unknown): string {
-  if (error instanceof ReviewApiError) {
-    if (error.status === 403) return 'Bạn chỉ có thể đánh giá sản phẩm trong đơn hàng đã nhận.'
-    if (error.code === 'ORDER_NOT_FOUND') return 'Trình duyệt này không còn quyền truy cập đơn hàng.'
-  }
+  if (error instanceof ReviewApiError && error.status === 401) return 'Vui lòng đăng nhập để đánh giá.'
+  if (error instanceof ReviewApiError && error.status === 403) return 'Bạn chỉ có thể đánh giá sản phẩm trong đơn hàng đã nhận.'
   return error instanceof Error ? error.message : 'Không thể lưu đánh giá'
 }

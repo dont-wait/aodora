@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { formatReviewImages, guestReviewApi, parseReviewImages, ReviewApiError, reviewErrorMessage } from '../src/features/review/api.ts'
+import { formatReviewImages, parseReviewImages, reviewApi, ReviewApiError, reviewErrorMessage } from '../src/features/review/api.ts'
 import { adminReviews, adminReviewSearch, deleteAdminReview, loadAdminReviews, readAdminReviewFilters } from '../src/features/admin/reviews.ts'
 
 const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status })
@@ -16,7 +16,7 @@ async function withFetch(fn, run) {
 const adminReview = (over = {}) => ({
   id: 'r1', rating: 4, content: 'Đẹp', display_name: 'Khách A', images: [], verified_purchase: true,
   created_at: '2026-11-27T00:00:00Z', updated_at: '2026-11-27T00:00:00Z', product_id: 'p1', product_name: 'Áo', product_slug: 'ao',
-  source: 'guest', order_number: 'AD-1', ...over,
+  order_number: 'AD-1', ...over,
 })
 
 test('review images round-trip and reject lines without a description', () => {
@@ -27,30 +27,11 @@ test('review images round-trip and reject lines without a description', () => {
   assert.throws(() => parseReviewImages('https://cdn.example/a.jpg |  '), /URL \| mô tả/)
 })
 
-test('guest review calls send the order token only as a header', async () => {
-  const calls = []
-  await withFetch(async (url, init) => {
-    calls.push({ url: String(url), init })
-    return response({ data: init.method === 'PUT' ? { id: 'r1', product_id: 'p 1' } : [] })
-  }, async () => {
-    await guestReviewApi.list('o/1', 'tok')
-    await guestReviewApi.submit('o/1', 'p 1', 'tok', { rating: 5, content: 'x', images: [] })
-  })
-  assert.equal(calls[0].url, '/api/v1/guest-orders/o%2F1/reviews')
-  assert.equal(calls[1].url, '/api/v1/guest-orders/o%2F1/reviews/p%201')
-  for (const call of calls) {
-    assert.equal(call.init.headers['X-Order-Access-Token'], 'tok')
-    assert.ok(!call.url.includes('tok'))
-  }
-  assert.equal(calls[1].init.method, 'PUT')
-  assert.deepEqual(JSON.parse(calls[1].init.body), { rating: 5, content: 'x', images: [] })
-})
-
 test('review errors map to clear messages', async () => {
   assert.match(reviewErrorMessage(new ReviewApiError(403, 'order_id', 'x', 'REVIEW_NOT_ELIGIBLE')), /đơn hàng đã nhận/)
-  assert.match(reviewErrorMessage(new ReviewApiError(404, 'order_id', 'x', 'ORDER_NOT_FOUND')), /không còn quyền/)
+  assert.match(reviewErrorMessage(new ReviewApiError(401, '', 'x', 'AUTH_REQUIRED')), /đăng nhập/)
   await withFetch(async () => response({ error: { code: 'INVALID_FIELD', field: 'rating', message: 'Điểm đánh giá phải từ 1 đến 5' } }, 400), async () => {
-    await assert.rejects(guestReviewApi.submit('o', 'p', 'tok', { rating: 9, content: '', images: [] }), (error) => error instanceof ReviewApiError && error.field === 'rating')
+    await assert.rejects(reviewApi.submit('p', { order_id: 'o', rating: 9, content: '', images: [] }), (error) => error instanceof ReviewApiError && error.field === 'rating')
   })
 })
 
@@ -68,7 +49,7 @@ test('admin list validates payload and maps auth failures', async () => {
   }, async () => {
     const result = await loadAdminReviews({ rating: 4, page: 1, page_size: 20 })
     assert.equal(result.kind, 'ready')
-    assert.equal(result.page.data[0].source, 'guest')
+    assert.equal(result.page.data[0].order_number, 'AD-1')
   })
   await withFetch(async () => response({ data: [adminReview({ rating: 7 })], total: 1, page: 1, page_size: 20 }), async () => {
     assert.equal((await loadAdminReviews({ rating: 0, page: 1, page_size: 20 })).kind, 'error')
