@@ -35,7 +35,7 @@ export function adminTailoringConfirmation(t: AdminTailoring, action: TailoringA
   }
 }
 export const confirmMeasurementsText =
-  'Xác nhận số đo sẽ khóa chỉnh sửa số đo trực tiếp (hiện chưa có luồng mở lại) và cho phép tạo đơn may đo. Không có thao tác tự động: chỉ xác nhận sau khi đã kiểm tra lại với khách.'
+  'Xác nhận số đo sẽ khóa chỉnh sửa số đo trực tiếp và cho phép tạo đơn may đo. Không có thao tác tự động: chỉ xác nhận sau khi đã kiểm tra lại với khách.'
 export const confirmMeasurementsCheckbox = 'Tôi đã kiểm tra lại số đo với khách'
 
 export type TailoringFailure = { kind: 'unauthenticated' | 'forbidden' | 'not-found' | 'error'; message: string }
