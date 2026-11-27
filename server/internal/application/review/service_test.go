@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	apporder "github.com/your-org/aodora/server/internal/application/order"
@@ -22,6 +23,13 @@ func (r fakeRepository) Upsert(_ context.Context, _, _ string, input Input) (Own
 		*r.upserts = append(*r.upserts, input)
 	}
 	return OwnReview{}, nil
+}
+func (fakeRepository) Statuses(_ context.Context, _ string, ids []string) ([]ProductReviewStatus, error) {
+	out := make([]ProductReviewStatus, len(ids))
+	for i, id := range ids {
+		out[i] = ProductReviewStatus{ProductID: id}
+	}
+	return out, nil
 }
 func (fakeRepository) AdminList(_ context.Context, f AdminFilter) (AdminPage, error) {
 	return AdminPage{Page: f.Page, Size: f.Size}, nil
@@ -125,5 +133,24 @@ func TestAdminListValidatesAndClampsFilter(t *testing.T) {
 	page, err := service.AdminList(context.Background(), AdminFilter{Page: 0, Size: 500})
 	if err != nil || page.Page != 1 || page.Size != 100 {
 		t.Fatalf("page = %+v err = %v", page, err)
+	}
+}
+
+func TestStatusesDedupesAndBoundsInput(t *testing.T) {
+	service := NewService(fakeRepository{}, fakeOrders{})
+	got, err := service.Statuses(context.Background(), "cust-a", []string{"p1", " p1 ", "", "p2"})
+	if err != nil || len(got) != 2 || got[0].ProductID != "p1" || got[1].ProductID != "p2" {
+		t.Fatalf("statuses = %+v err = %v", got, err)
+	}
+	if got, err := service.Statuses(context.Background(), "cust-a", nil); err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("empty statuses = %#v err = %v", got, err)
+	}
+	many := make([]string, MaxStatusProducts+1)
+	for i := range many {
+		many[i] = fmt.Sprintf("p%d", i)
+	}
+	var invalid Invalid
+	if _, err := service.Statuses(context.Background(), "cust-a", many); !errors.As(err, &invalid) {
+		t.Fatalf("too many ids error = %v", err)
 	}
 }

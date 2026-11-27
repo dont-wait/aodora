@@ -13,6 +13,7 @@ export type OwnReview = {
   order_id: string
 }
 
+export type ProductReviewStatus = { product_id: string; slug: string; reviewed: boolean }
 export type EligibleOrder = { id: string; order_number: string; created_at: string }
 export type ReviewBody = { rating: number; content: string; images: ReviewImage[] }
 
@@ -49,6 +50,10 @@ export const reviewApi = {
   list: (slug: string, page = 1) => request<CatalogReviewPage>(`/api/v1/products/${encodeURIComponent(slug)}/reviews?page=${page}&page_size=6`),
   own: (productId: string) => request<OwnReview | null>(`/api/v1/me/reviews?product_id=${encodeURIComponent(productId)}`),
   eligibleOrders: (productId: string) => request<EligibleOrder[]>(`/api/v1/me/reviews/eligible-orders?product_id=${encodeURIComponent(productId)}`),
+  statuses: (productIds: string[]) => {
+    const query = new URLSearchParams(productIds.map((id) => ['product_id', id]))
+    return request<ProductReviewStatus[]>(`/api/v1/me/reviews/status?${query}`)
+  },
   submit: (productId: string, input: ReviewBody & { order_id: string }) => request<OwnReview>(`/api/v1/me/reviews/${encodeURIComponent(productId)}`, 'PUT', input),
 }
 

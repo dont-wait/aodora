@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { formatReviewImages, parseReviewImages, reviewApi, ReviewApiError, reviewErrorMessage } from '../src/features/review/api.ts'
+import { ordersApi } from '../src/features/orders/api.ts'
+import { orderReviewable, readOrderStatusFilter } from '../src/features/orders/presentation.ts'
 import { adminReviews, adminReviewSearch, deleteAdminReview, loadAdminReviews, readAdminReviewFilters } from '../src/features/admin/reviews.ts'
 
 const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status })
@@ -73,4 +75,38 @@ test('admin delete uses DELETE and reports a missing review', async () => {
   await withFetch(async () => response({ error: { code: 'NOT_FOUND', message: 'x' } }, 404), async () => {
     assert.equal((await deleteAdminReview('r1')).kind, 'not-found')
   })
+})
+
+test('order status filter reads one known status and sends it to the API', async () => {
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=delivered')), 'delivered')
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=lost')), '')
+  assert.equal(readOrderStatusFilter(new URLSearchParams('status=pending&status=delivered')), '')
+  const urls = []
+  await withFetch(async (url) => {
+    urls.push(String(url))
+    return response({ data: [], total: 0, page: 1, page_size: 20 })
+  }, async () => {
+    await ordersApi.list(1, 20, 'delivered')
+    await ordersApi.list(2, 20)
+  })
+  assert.deepEqual(urls, ['/api/v1/orders?page=1&page_size=20&status=delivered', '/api/v1/orders?page=2&page_size=20'])
+})
+
+test('only delivered and paid orders invite a review', () => {
+  assert.equal(orderReviewable({ status: 'delivered', payment_status: 'paid' }), true)
+  assert.equal(orderReviewable({ status: 'delivered', payment_status: 'unpaid' }), false)
+  assert.equal(orderReviewable({ status: 'shipping', payment_status: 'paid' }), false)
+  assert.equal(orderReviewable({ status: 'cancelled', payment_status: 'refunded' }), false)
+})
+
+test('review status lookup sends every product id in one request', async () => {
+  const urls = []
+  await withFetch(async (url) => {
+    urls.push(String(url))
+    return response({ data: [{ product_id: 'a', slug: 'ao-a', reviewed: true }] })
+  }, async () => {
+    const items = await reviewApi.statuses(['a', 'b c'])
+    assert.equal(items[0].reviewed, true)
+  })
+  assert.deepEqual(urls, ['/api/v1/me/reviews/status?product_id=a&product_id=b+c'])
 })

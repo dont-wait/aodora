@@ -85,8 +85,10 @@ export const ordersApi = {
   get: async (id: string, credential: OrderCredential) => orderData((await request(`/${encodeURIComponent(id)}`, 'GET', undefined, credential)).data),
   attempt: async (attempt: CheckoutAttempt) =>
     orderData((await request(`/attempts/${encodeURIComponent(attempt.request_id)}`, 'GET', undefined, attempt.credential)).data),
-  list: async (page = 1, pageSize = 20): Promise<OrderPage> => {
-    const payload = await request(`?page=${page}&page_size=${pageSize}`)
+  list: async (page = 1, pageSize = 20, status = ''): Promise<OrderPage> => {
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (status) query.set('status', status)
+    const payload = await request(`?${query}`)
     return { data: (payload.data as unknown[]).map(orderData), total: count(payload.total), page: count(payload.page), page_size: count(payload.page_size) }
   },
 }

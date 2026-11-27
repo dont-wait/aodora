@@ -196,7 +196,8 @@ X-Order-Access-Token: <43 ký tự base64url của 32 byte ngẫu nhiên>
 - Tham số query:
   - `page`: Số nguyên trong khoảng `1..100000` (mặc định `1`). Nếu không phải số nguyên hoặc ngoài khoảng `1..100000` ⇒ trả `400 INVALID_FIELD` với `field: "page"`.
   - `page_size`: Số nguyên `≥ 1` (mặc định `20`). Nếu không phải số nguyên `≥ 1` ⇒ trả `400 INVALID_FIELD` với `field: "page_size"`. Nếu `page_size > 100`, server không từ chối mà tự động kẹp (clamp) về `100`.
-  - Tham số query lạ ngoài `page` và `page_size` ⇒ trả `400 INVALID_FIELD` với `field: "query"`.
+  - `status` (tùy chọn): `pending`, `confirmed`, `shipping`, `delivered` hoặc `cancelled`; bỏ trống là tất cả. Giá trị khác ⇒ `400 INVALID_FIELD` với `field: "status"`. `total` tính sau khi lọc.
+  - Tham số query lạ ngoài `page`, `page_size`, `status`, hoặc lặp một tham số ⇒ trả `400 INVALID_FIELD` với `field: "query"`.
 
 **Response (`200 OK`):**
 ```json

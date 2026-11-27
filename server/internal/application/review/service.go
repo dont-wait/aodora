@@ -70,6 +70,17 @@ type AdminReview struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+// ProductReviewStatus tells the order list where to send a customer to
+// review a product. Slug is empty when the product is no longer public.
+type ProductReviewStatus struct {
+	ProductID string `json:"product_id"`
+	Slug      string `json:"slug"`
+	Reviewed  bool   `json:"reviewed"`
+}
+
+// MaxStatusProducts bounds one status lookup (a page of orders).
+const MaxStatusProducts = 200
+
 type AdminFilter struct {
 	ProductID string
 	Rating    int64
@@ -90,6 +101,7 @@ type Repository interface {
 	List(context.Context, string, int64, int64) (Page, error)
 	Own(context.Context, string, string) (*OwnReview, error)
 	Upsert(context.Context, string, string, Input) (OwnReview, error)
+	Statuses(context.Context, string, []string) ([]ProductReviewStatus, error)
 	AdminList(context.Context, AdminFilter) (AdminPage, error)
 	Delete(context.Context, string) error
 }
@@ -143,6 +155,28 @@ func (s *Service) Submit(ctx context.Context, customerID, productID string, inpu
 		return OwnReview{}, ErrNotEligible
 	}
 	return s.repo.Upsert(ctx, customerID, productID, input)
+}
+
+// Statuses reports, for the session customer, whether each product is
+// already reviewed and its public slug. Duplicate IDs are collapsed.
+func (s *Service) Statuses(ctx context.Context, customerID string, productIDs []string) ([]ProductReviewStatus, error) {
+	seen := map[string]bool{}
+	unique := make([]string, 0, len(productIDs))
+	for _, id := range productIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return []ProductReviewStatus{}, nil
+	}
+	if len(unique) > MaxStatusProducts {
+		return nil, Invalid{Field: "product_id", Message: "Quá nhiều sản phẩm trong một lần kiểm tra"}
+	}
+	return s.repo.Statuses(ctx, customerID, unique)
 }
 
 func (s *Service) AdminList(ctx context.Context, filter AdminFilter) (AdminPage, error) {

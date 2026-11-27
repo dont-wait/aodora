@@ -26,7 +26,7 @@ type stubOrderService struct {
 	quoteFunc   func(ctx context.Context, input domainorder.CheckoutInput) (*apporder.QuoteResult, error)
 	createFunc  func(ctx context.Context, principal apporder.Principal, requestID string, input domainorder.CheckoutInput) (domainorder.Order, bool, error)
 	getFunc     func(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
-	listFunc    func(ctx context.Context, customerID string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
+	listFunc    func(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
 	attemptFunc func(ctx context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error)
 
 	lastPrincipal apporder.Principal
@@ -65,10 +65,10 @@ func (s *stubOrderService) Get(ctx context.Context, viewer apporder.Viewer, id s
 	return nil, nil
 }
 
-func (s *stubOrderService) List(ctx context.Context, customerID string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error) {
+func (s *stubOrderService) List(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error) {
 	s.called = true
 	if s.listFunc != nil {
-		return s.listFunc(ctx, customerID, page, pageSize)
+		return s.listFunc(ctx, customerID, status, page, pageSize)
 	}
 	return nil, 0, page, pageSize, nil
 }
@@ -607,6 +607,7 @@ func TestViewerAuthorizationAndQueryConstraints(t *testing.T) {
 	validToken, fixtureHash := createGuestTokenFixture()
 	orderSample := sampleOrder("690000000000000000000010", "AD-261116-TEST0001")
 
+	var lastStatus string
 	service := &stubOrderService{
 		getFunc: func(_ context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error) {
 			if id == orderSample.ID {
@@ -617,7 +618,8 @@ func TestViewerAuthorizationAndQueryConstraints(t *testing.T) {
 		attemptFunc: func(_ context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error) {
 			return &orderSample, nil
 		},
-		listFunc: func(_ context.Context, customerID string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error) {
+		listFunc: func(_ context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error) {
+			lastStatus = status
 			return []domainorder.Order{orderSample}, 1, page, pageSize, nil
 		},
 	}
@@ -694,6 +696,7 @@ func TestViewerAuthorizationAndQueryConstraints(t *testing.T) {
 		"?page_size=0",
 		"?page_size=-5",
 		"?page_size=xyz",
+		"?status=pending&status=delivered",
 	}
 	for _, bq := range badQueries {
 		reqBQ := httptest.NewRequest(http.MethodGet, "/api/v1/orders"+bq, nil)
@@ -703,6 +706,15 @@ func TestViewerAuthorizationAndQueryConstraints(t *testing.T) {
 		if wBQ.Code != http.StatusBadRequest {
 			t.Fatalf("query %s: expected 400, got %d", bq, wBQ.Code)
 		}
+	}
+
+	// 6. status is passed through to the service (which validates the value).
+	reqStatus := httptest.NewRequest(http.MethodGet, "/api/v1/orders?status=delivered&page=1", nil)
+	reqStatus.AddCookie(&http.Cookie{Name: "session", Value: adminSession})
+	wStatus := httptest.NewRecorder()
+	router.ServeHTTP(wStatus, reqStatus)
+	if wStatus.Code != http.StatusOK || lastStatus != "delivered" {
+		t.Fatalf("status filter: code=%d status=%q", wStatus.Code, lastStatus)
 	}
 }
 

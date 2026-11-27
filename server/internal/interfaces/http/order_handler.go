@@ -22,7 +22,7 @@ type OrderService interface {
 	Quote(ctx context.Context, input domainorder.CheckoutInput) (*apporder.QuoteResult, error)
 	Create(ctx context.Context, principal apporder.Principal, requestID string, input domainorder.CheckoutInput) (domainorder.Order, bool, error)
 	Get(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
-	List(ctx context.Context, customerID string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
+	List(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
 	Attempt(ctx context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error)
 }
 
@@ -443,8 +443,8 @@ func (h orderHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	for k := range query {
-		if k != "page" && k != "page_size" {
+	for k, values := range query {
+		if (k != "page" && k != "page_size" && k != "status") || len(values) != 1 {
 			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "query", "Tham số truy vấn không hợp lệ")
 			return
 		}
@@ -468,7 +468,7 @@ func (h orderHandler) list(w http.ResponseWriter, r *http.Request) {
 		pageSize = ps
 	}
 
-	orders, total, p, ps, err := h.service.List(r.Context(), auth.User.ID, page, pageSize)
+	orders, total, p, ps, err := h.service.List(r.Context(), auth.User.ID, query.Get("status"), page, pageSize)
 	if err != nil {
 		h.respondError(w, err)
 		return

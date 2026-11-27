@@ -47,5 +47,5 @@ type Store interface {
 	RunCheckout(ctx context.Context, fn func(ctx context.Context, tx CheckoutTx) error) error
 	FindByAttempt(ctx context.Context, scope, requestID string) (*domain.Order, error)
 	FindByID(ctx context.Context, id string) (*domain.Order, error)
-	ListByCustomer(ctx context.Context, customerID string, page, pageSize int64) ([]domain.Order, int64, error)
+	ListByCustomer(ctx context.Context, customerID, status string, page, pageSize int64) ([]domain.Order, int64, error)
 }

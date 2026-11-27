@@ -3,9 +3,9 @@ import type { OrderPage } from './types.ts'
 
 export type OrderListState = { kind: 'ready'; page: OrderPage } | { kind: 'unauthenticated' | 'error' }
 
-export async function loadMyOrders(page: number, pageSize: number): Promise<OrderListState> {
+export async function loadMyOrders(page: number, pageSize: number, status = ''): Promise<OrderListState> {
   try {
-    return { kind: 'ready', page: await ordersApi.list(page, pageSize) }
+    return { kind: 'ready', page: await ordersApi.list(page, pageSize, status) }
   } catch (error) {
     if (error instanceof OrderApiError && error.status === 401) return { kind: 'unauthenticated' }
     return { kind: 'error' }

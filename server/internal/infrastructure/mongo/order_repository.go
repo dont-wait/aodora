@@ -574,12 +574,15 @@ func (r *OrderRepository) FindByID(ctx context.Context, id string) (*domainorder
 	return &order, nil
 }
 
-func (r *OrderRepository) ListByCustomer(ctx context.Context, customerID string, page, pageSize int64) ([]domainorder.Order, int64, error) {
+func (r *OrderRepository) ListByCustomer(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, error) {
 	custOID, err := oid(customerID)
 	if err != nil {
 		return nil, 0, nil
 	}
 	filter := bson.M{"customer_id": custOID}
+	if status != "" {
+		filter["status"] = status
+	}
 	total, err := r.orders.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err

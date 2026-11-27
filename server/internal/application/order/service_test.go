@@ -218,12 +218,12 @@ func (s *fakeStore) FindByID(ctx context.Context, id string) (*domain.Order, err
 	return nil, nil
 }
 
-func (s *fakeStore) ListByCustomer(ctx context.Context, customerID string, page, pageSize int64) ([]domain.Order, int64, error) {
+func (s *fakeStore) ListByCustomer(ctx context.Context, customerID, status string, page, pageSize int64) ([]domain.Order, int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var all []domain.Order
 	for _, o := range s.ordersByID {
-		if o.CustomerID == customerID {
+		if o.CustomerID == customerID && (status == "" || o.Status == status) {
 			all = append(all, o)
 		}
 	}
@@ -842,7 +842,7 @@ func TestGetListAttemptVerifiedPurchase(t *testing.T) {
 	}
 
 	// 2. List clamping
-	orders, total, page, pageSize, err := svc.List(ctx, "680000000000000000000002", 0, 0)
+	orders, total, page, pageSize, err := svc.List(ctx, "680000000000000000000002", "", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -850,7 +850,19 @@ func TestGetListAttemptVerifiedPurchase(t *testing.T) {
 		t.Errorf("unexpected list defaults: page=%d, pageSize=%d, total=%d", page, pageSize, total)
 	}
 
-	_, _, _, pageSizeClamp, err := svc.List(ctx, "680000000000000000000002", 1, 150)
+	// Status filter: the customer's only order is delivered.
+	if orders, total, _, _, err := svc.List(ctx, "680000000000000000000002", domain.StatusDelivered, 1, 20); err != nil || total != 1 || len(orders) != 1 {
+		t.Errorf("delivered filter: total=%d len=%d err=%v", total, len(orders), err)
+	}
+	if orders, total, _, _, err := svc.List(ctx, "680000000000000000000002", domain.StatusPending, 1, 20); err != nil || total != 0 || len(orders) != 0 {
+		t.Errorf("pending filter: total=%d len=%d err=%v", total, len(orders), err)
+	}
+	var invalidStatus *domain.InvalidFieldError
+	if _, _, _, _, err := svc.List(ctx, "680000000000000000000002", "lost", 1, 20); !errors.As(err, &invalidStatus) || invalidStatus.Field != "status" {
+		t.Errorf("unknown status error = %v", err)
+	}
+
+	_, _, _, pageSizeClamp, err := svc.List(ctx, "680000000000000000000002", "", 1, 150)
 	if err != nil {
 		t.Fatal(err)
 	}

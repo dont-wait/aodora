@@ -21,7 +21,7 @@ type reviewCatalog interface {
 }
 
 type reviewOrders interface {
-	List(context.Context, string, int64, int64) ([]domainorder.Order, int64, int64, int64, error)
+	List(context.Context, string, string, int64, int64) ([]domainorder.Order, int64, int64, int64, error)
 }
 
 type reviewHandler struct {
@@ -36,6 +36,7 @@ type appService interface {
 	List(context.Context, string, int64, int64) (app.Page, error)
 	Own(context.Context, string, string) (*app.OwnReview, error)
 	Submit(context.Context, string, string, app.Input) (app.OwnReview, error)
+	Statuses(context.Context, string, []string) ([]app.ProductReviewStatus, error)
 }
 
 // AdminReviewService exposes only the moderation operations.
@@ -53,6 +54,7 @@ func WithReviews(service appService, guard *AuthGuard, catalog reviewCatalog, or
 		mux.HandleFunc("OPTIONS /api/v1/me/reviews/{path...}", origin.preflight)
 		mux.HandleFunc("GET /api/v1/me/reviews", h.protected(h.own))
 		mux.HandleFunc("GET /api/v1/me/reviews/eligible-orders", h.protected(h.eligibleOrders))
+		mux.HandleFunc("GET /api/v1/me/reviews/status", h.protected(h.statuses))
 		mux.HandleFunc("PUT /api/v1/me/reviews/{product_id}", h.protected(h.submit))
 	}
 }
@@ -125,7 +127,7 @@ func (h reviewHandler) eligibleOrders(w http.ResponseWriter, r *http.Request) {
 	user, _ := h.guard.Identity(r)
 	result := make([]eligibleOrder, 0)
 	for page := int64(1); page <= eligibleOrderPageLimit; page++ {
-		orders, total, _, size, err := h.orders.List(r.Context(), user.ID, page, 100)
+		orders, total, _, size, err := h.orders.List(r.Context(), user.ID, domainorder.StatusDelivered, page, 100)
 		if err != nil {
 			respondReview(w, h.log, nil, err)
 			return
@@ -152,6 +154,20 @@ func deliveredWithProduct(orders []domainorder.Order, productID string) []eligib
 		}
 	}
 	return result
+}
+
+// statuses: GET /api/v1/me/reviews/status?product_id=a&product_id=b
+func (h reviewHandler) statuses(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	for key := range query {
+		if key != "product_id" {
+			respondError(w, http.StatusBadRequest, "INVALID_FIELD", "query", "Tham số truy vấn không được hỗ trợ")
+			return
+		}
+	}
+	user, _ := h.guard.Identity(r)
+	data, err := h.service.Statuses(r.Context(), user.ID, query["product_id"])
+	respondReview(w, h.log, data, err)
 }
 
 func (h reviewHandler) submit(w http.ResponseWriter, r *http.Request) {

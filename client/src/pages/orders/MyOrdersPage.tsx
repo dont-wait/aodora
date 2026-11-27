@@ -5,9 +5,13 @@ import { useAuth } from '@/features/auth/useAuth'
 import OrderReadNotice from '@/features/orders/OrderReadNotice'
 import OrderStatusLabels from '@/features/orders/OrderStatusLabels'
 import { formatOrderMoney } from '@/features/orders/money'
-import { formatOrderDate, orderLoginPath } from '@/features/orders/presentation'
+import { formatOrderDate, orderFulfillmentLabel, orderFulfillmentStatuses, orderLoginPath, readOrderStatusFilter } from '@/features/orders/presentation'
 import { loadMyOrders, orderPageCount, readOrdersPage } from '@/features/orders/read'
 import { useOrderRead } from '@/features/orders/useOrderRead'
+import OrderReviewButtons, { useOrderReviewStatuses } from '@/features/review/OrderReviewButtons'
+import type { Order } from '@/features/orders/types'
+
+const noOrders: Order[] = []
 
 export default function MyOrdersPage() {
   const { user, loading, error } = useAuth()
@@ -15,10 +19,12 @@ export default function MyOrdersPage() {
   const location = useLocation()
   const [revision, setRevision] = useState(0)
   const page = readOrdersPage(params.get('page'))
+  const status = readOrderStatusFilter(params)
   const pageSize = 20
-  const scope = JSON.stringify([user?.id, page, pageSize, revision])
-  const load = useCallback(() => loadMyOrders(page, pageSize), [page, pageSize])
+  const scope = JSON.stringify([user?.id, status, page, pageSize, revision])
+  const load = useCallback(() => loadMyOrders(page, pageSize, status), [page, pageSize, status])
   const result = useOrderRead(scope, !!user && !loading && !error, load)
+  const reviewStatuses = useOrderReviewStatuses(result?.kind === 'ready' ? result.page.data : noOrders)
   const next = location.pathname + location.search
   if (result?.kind === 'unauthenticated') return <Navigate to={orderLoginPath(next)} replace />
   if (!result || result.kind !== 'ready')
@@ -34,7 +40,10 @@ export default function MyOrdersPage() {
   const data = result.page
   const pages = orderPageCount(data)
   function goToPage(value: number) {
-    setParams({ page: String(value) })
+    setParams(status ? { status, page: String(value) } : { page: String(value) })
+  }
+  function changeStatus(value: string) {
+    setParams(value ? { status: value, page: '1' } : { page: '1' })
   }
 
   return (
@@ -46,16 +55,37 @@ export default function MyOrdersPage() {
           <h1 className="font-headline-lg text-4xl text-primary mt-2">Đơn hàng của tôi</h1>
           <p className="text-on-surface-variant mt-3">Theo dõi nhận áo và thanh toán riêng cho từng đơn.</p>
         </div>
-        <button className="border border-primary text-primary px-5 py-3" type="button" onClick={() => setRevision((value) => value + 1)}>
-          Tải lại
-        </button>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="space-y-2">
+            <span className="block text-sm text-on-surface-variant">Trạng thái đơn</span>
+            <select className="border border-outline-variant bg-surface px-4 py-3 min-w-48" value={status} onChange={(event) => changeStatus(event.target.value)}>
+              <option value="">Tất cả</option>
+              {orderFulfillmentStatuses.map((value) => (
+                <option key={value} value={value}>
+                  {orderFulfillmentLabel(value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="border border-primary text-primary px-5 py-3" type="button" onClick={() => setRevision((value) => value + 1)}>
+            Tải lại
+          </button>
+        </div>
       </header>
       {data.data.length === 0 ? (
         <section className="bg-surface-container-low p-8 text-center space-y-4">
-          <h2 className="font-headline-md text-2xl text-primary">{data.total === 0 ? 'Bạn chưa có đơn hàng nào' : 'Chưa có đơn hàng ở trang này'}</h2>
-          <Link to="/bo-suu-tap" className="inline-block bg-primary text-on-primary px-6 py-3">
-            Khám phá bộ sưu tập
-          </Link>
+          <h2 className="font-headline-md text-2xl text-primary">
+            {data.total > 0 ? 'Chưa có đơn hàng ở trang này' : status ? `Không có đơn "${orderFulfillmentLabel(status)}"` : 'Bạn chưa có đơn hàng nào'}
+          </h2>
+          {status ? (
+            <button type="button" className="inline-block border border-primary text-primary px-6 py-3" onClick={() => changeStatus('')}>
+              Xem tất cả đơn
+            </button>
+          ) : (
+            <Link to="/bo-suu-tap" className="inline-block bg-primary text-on-primary px-6 py-3">
+              Khám phá bộ sưu tập
+            </Link>
+          )}
           {data.page > 1 && (
             <button type="button" className="block mx-auto underline text-primary" onClick={() => goToPage(1)}>
               Về trang đầu
@@ -83,9 +113,12 @@ export default function MyOrdersPage() {
                 </div>
               </div>
               <OrderStatusLabels order={order} />
-              <Link to={`/don-hang/${encodeURIComponent(order.id)}`} className="inline-block border border-primary text-primary px-5 py-2">
-                Xem chi tiết đơn
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link to={`/don-hang/${encodeURIComponent(order.id)}`} className="inline-block border border-primary text-primary px-5 py-2">
+                  Xem chi tiết đơn
+                </Link>
+                <OrderReviewButtons order={order} statuses={reviewStatuses} />
+              </div>
             </li>
           ))}
         </ul>

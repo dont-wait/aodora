@@ -27,6 +27,7 @@ Response công khai không có email, số điện thoại, customer ID, order I
 ```text
 GET /api/v1/me/reviews?product_id={product_id}
 GET /api/v1/me/reviews/eligible-orders?product_id={product_id}
+GET /api/v1/me/reviews/status?product_id={a}&product_id={b}
 PUT /api/v1/me/reviews/{product_id}
 ```
 
@@ -39,6 +40,7 @@ PUT /api/v1/me/reviews/{product_id}
 - Server gọi `VerifiedPurchase` với customer ID lấy từ session. Đơn của người khác, đơn guest, đơn chưa giao hoặc đã hủy, hoặc đơn không có sản phẩm đều trả `403 REVIEW_NOT_ELIGIBLE`.
 - `customer_id` và `verified_purchase` do client gửi lên bị từ chối (`DisallowUnknownFields`).
 - Mỗi khách có một review cho một sản phẩm; gửi lại sẽ cập nhật review đó.
+- `status` trả `[{ "product_id", "slug", "reviewed" }]` theo đúng thứ tự gửi lên (bỏ trùng, tối đa 200 ID). `slug` rỗng khi sản phẩm không còn hiển thị công khai. Trang `/tai-khoan/don-hang` dùng API này để hiện nút **Đánh giá** cho từng mẫu trong đơn đã nhận áo và đã thu đủ tiền; mẫu đã review thì nút bị vô hiệu hóa.
 
 ## Quản trị (chỉ admin)
 

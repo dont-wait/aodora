@@ -107,6 +107,72 @@ func (r *ReviewRepository) Upsert(ctx context.Context, customerID, productID str
 	return r.upsert(ctx, filter, productOID, orderOID, displayOrFallback(customer.FullName), input.Rating, input.Content, input.Images)
 }
 
+// Statuses returns one entry per requested product, in request order.
+// Unknown or non-public products get an empty slug; invalid IDs are kept
+// with an empty slug so the caller can still render the order line.
+func (r *ReviewRepository) Statuses(ctx context.Context, customerID string, productIDs []string) ([]app.ProductReviewStatus, error) {
+	result := make([]app.ProductReviewStatus, len(productIDs))
+	oids := make([]bson.ObjectID, 0, len(productIDs))
+	for i, id := range productIDs {
+		result[i].ProductID = id
+		if oid, err := bson.ObjectIDFromHex(id); err == nil {
+			oids = append(oids, oid)
+		}
+	}
+	if len(oids) == 0 {
+		return result, nil
+	}
+	pipeline := bson.A{bson.M{"$match": bson.M{"_id": bson.M{"$in": oids}, "is_active": true}}}
+	pipeline = append(pipeline, categoryVisibilityStages()...)
+	pipeline = append(pipeline, bson.M{"$project": bson.M{"slug": 1}})
+	cur, err := r.products.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("read review product slugs: %w", err)
+	}
+	slugs := map[string]string{}
+	for cur.Next(ctx) {
+		var row struct {
+			ID   bson.ObjectID `bson:"_id"`
+			Slug string        `bson:"slug"`
+		}
+		if err := cur.Decode(&row); err != nil {
+			_ = cur.Close(ctx)
+			return nil, err
+		}
+		slugs[row.ID.Hex()] = row.Slug
+	}
+	if err := cur.Err(); err != nil {
+		_ = cur.Close(ctx)
+		return nil, err
+	}
+	_ = cur.Close(ctx)
+	reviewed := map[string]bool{}
+	if customerOID, err := bson.ObjectIDFromHex(customerID); err == nil {
+		cur, err := r.reviews.Find(ctx, bson.M{"customer_id": customerOID, "product_id": bson.M{"$in": oids}}, options.Find().SetProjection(bson.M{"product_id": 1}))
+		if err != nil {
+			return nil, fmt.Errorf("read reviewed products: %w", err)
+		}
+		defer cur.Close(ctx)
+		for cur.Next(ctx) {
+			var row struct {
+				ProductID bson.ObjectID `bson:"product_id"`
+			}
+			if err := cur.Decode(&row); err != nil {
+				return nil, err
+			}
+			reviewed[row.ProductID.Hex()] = true
+		}
+		if err := cur.Err(); err != nil {
+			return nil, err
+		}
+	}
+	for i := range result {
+		result[i].Slug = slugs[result[i].ProductID]
+		result[i].Reviewed = reviewed[result[i].ProductID]
+	}
+	return result, nil
+}
+
 func (r *ReviewRepository) AdminList(ctx context.Context, filter app.AdminFilter) (app.AdminPage, error) {
 	match := bson.M{}
 	if filter.ProductID != "" {

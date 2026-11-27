@@ -298,6 +298,41 @@ func TestReviewHTTPAcceptanceIntegration(t *testing.T) {
 		assertSummary(4.5, 2)
 	})
 
+	t.Run("review status reports slug and reviewed flag per product", func(t *testing.T) {
+		path := fmt.Sprintf("/api/v1/me/reviews/status?product_id=%s&product_id=%s&product_id=%s&product_id=bad", product.Hex(), other.Hex(), product.Hex())
+		call("GET", path, "", nil, nil, http.StatusUnauthorized)
+		call("GET", "/api/v1/me/reviews/status?x=1", "", cookieA, nil, http.StatusBadRequest)
+		// Hide the other product: it must come back without a slug.
+		if _, err := db.Collection("products").UpdateOne(ctx, bson.M{"_id": other}, bson.M{"$set": bson.M{"is_active": false}}); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := db.Collection("products").UpdateOne(ctx, bson.M{"_id": other}, bson.M{"$set": bson.M{"is_active": true}}); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		w := call("GET", path, "", cookieA, nil, http.StatusOK)
+		var got struct {
+			Data []reviewapp.ProductReviewStatus `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		want := []reviewapp.ProductReviewStatus{
+			{ProductID: product.Hex(), Slug: productSlug, Reviewed: true},
+			{ProductID: other.Hex(), Slug: "", Reviewed: false},
+			{ProductID: "bad"},
+		}
+		if fmt.Sprint(got.Data) != fmt.Sprint(want) {
+			t.Fatalf("statuses = %+v, want %+v", got.Data, want)
+		}
+		// Customer B has not reviewed "other"; reviewed flags are per session.
+		admin := call("GET", fmt.Sprintf("/api/v1/me/reviews/status?product_id=%s", product.Hex()), "", adminCookie, nil, http.StatusOK)
+		if !strings.Contains(admin.Body.String(), `"reviewed":false`) {
+			t.Fatalf("admin (no review) status = %s", admin.Body.String())
+		}
+	})
+
 	t.Run("guests without an account can read but not write reviews", func(t *testing.T) {
 		guestHeader := map[string]string{"X-Order-Access-Token": guestToken}
 		body := fmt.Sprintf(`{"order_id":%q,"rating":5}`, guestOrder.Hex())

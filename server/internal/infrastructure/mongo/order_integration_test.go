@@ -1324,17 +1324,17 @@ func TestOrderQueriesAndRecoveryScenarios(t *testing.T) {
 			t.Fatalf("seed order B: %v", err)
 		}
 
-		p1, total1, _, _, err := svc.List(ctx, custA, 1, 2)
+		p1, total1, _, _, err := svc.List(ctx, custA, "", 1, 2)
 		if err != nil || total1 != 5 || len(p1) != 2 {
 			t.Fatalf("page 1 failed: err=%v, total=%d, len=%d", err, total1, len(p1))
 		}
 
-		p2, total2, _, _, err := svc.List(ctx, custA, 2, 2)
+		p2, total2, _, _, err := svc.List(ctx, custA, "", 2, 2)
 		if err != nil || total2 != 5 || len(p2) != 2 {
 			t.Fatalf("page 2 failed: err=%v, total=%d, len=%d", err, total2, len(p2))
 		}
 
-		p3, total3, _, _, err := svc.List(ctx, custA, 3, 2)
+		p3, total3, _, _, err := svc.List(ctx, custA, "", 3, 2)
 		if err != nil || total3 != 5 || len(p3) != 1 {
 			t.Fatalf("page 3 failed: err=%v, total=%d, len=%d", err, total3, len(p3))
 		}
