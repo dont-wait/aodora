@@ -104,6 +104,9 @@ type ProductPage struct {
 type Repository interface {
 	Categories(context.Context) ([]map[string]any, error)
 	Products(context.Context, int64, int64) (ProductPage, error)
+	// ProductsBySlug and SKUOwners back the bulk import (lookups only, no writes).
+	ProductsBySlug(context.Context, []string) ([]map[string]any, error)
+	SKUOwners(context.Context, []string) (map[string]string, error)
 	CategoryExists(context.Context, string) (bool, error)
 	CreateCategory(context.Context, CategoryInput) (map[string]any, error)
 	UpdateCategory(context.Context, string, CategoryInput) (map[string]any, error)

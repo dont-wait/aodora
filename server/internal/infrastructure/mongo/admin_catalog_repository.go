@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	app "github.com/your-org/aodora/server/internal/application/catalogadmin"
@@ -45,6 +46,57 @@ func (r *AdminCatalogRepository) Products(ctx context.Context, page, pageSize in
 	defer cur.Close(ctx)
 	result.Items, err = adminDecodeList(ctx, cur)
 	return result, err
+}
+
+// ProductsBySlug returns the products with the given slugs (admin shape, including version and variants).
+func (r *AdminCatalogRepository) ProductsBySlug(ctx context.Context, slugs []string) ([]map[string]any, error) {
+	if len(slugs) == 0 {
+		return []map[string]any{}, nil
+	}
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
+	cur, err := r.products.Find(ctx, bson.M{"slug": bson.M{"$in": slugs}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	return adminDecodeList(ctx, cur)
+}
+
+// SKUOwners maps each requested SKU (lower-case) to the slug of the product that owns it.
+func (r *AdminCatalogRepository) SKUOwners(ctx context.Context, skus []string) (map[string]string, error) {
+	owners := map[string]string{}
+	if len(skus) == 0 {
+		return owners, nil
+	}
+	ctx, cancel := catalogContext(ctx)
+	defer cancel()
+	cur, err := r.products.Find(ctx, bson.M{"variants.sku": bson.M{"$in": skus}}, options.Find().SetProjection(bson.M{"slug": 1, "variants.sku": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	wanted := make(map[string]bool, len(skus))
+	for _, sku := range skus {
+		wanted[strings.ToLower(sku)] = true
+	}
+	for cur.Next(ctx) {
+		var doc struct {
+			Slug     string `bson:"slug"`
+			Variants []struct {
+				SKU string `bson:"sku"`
+			} `bson:"variants"`
+		}
+		if err := cur.Decode(&doc); err != nil {
+			return nil, err
+		}
+		for _, v := range doc.Variants {
+			if wanted[strings.ToLower(v.SKU)] {
+				owners[strings.ToLower(v.SKU)] = doc.Slug
+			}
+		}
+	}
+	return owners, cur.Err()
 }
 func adminDecodeList(ctx context.Context, cur *driver.Cursor) ([]map[string]any, error) {
 	result := make([]map[string]any, 0)

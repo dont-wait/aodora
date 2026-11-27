@@ -1,0 +1,14 @@
+[
+  {
+    "dropIndexes": "tailoring_requests",
+    "index": "ix_tailoring_requests_created_at"
+  },
+  {
+    "dropIndexes": "customers",
+    "index": "ix_customers_created_at"
+  },
+  {
+    "dropIndexes": "orders",
+    "index": "ix_orders_created_at"
+  }
+]

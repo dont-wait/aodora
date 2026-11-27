@@ -27,3 +27,49 @@
 [id] {
   scroll-margin-top: 8rem;
 }
+
+/* ---- Admin UI (applies only under .admin-ui, i.e. /admin/*) ---- */
+@layer components {
+  .admin-ui {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #1f1b18;
+    -webkit-font-smoothing: antialiased;
+  }
+  .admin-ui h1 {
+    font-family: 'EB Garamond', serif;
+    font-size: 26px;
+    line-height: 1.25;
+    font-weight: 500;
+  }
+  .admin-ui h2 {
+    font-size: 16px;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .admin-ui h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .admin-ui :is(input:not([type='checkbox'], [type='radio'], [type='color'], [type='file'], [type='range']), select) {
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    font-size: 14px;
+  }
+  .admin-ui textarea {
+    border-radius: 0.5rem;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .admin-ui :is(input, select, textarea):focus-visible {
+    outline: 2px solid rgba(91, 2, 21, 0.35);
+    outline-offset: 0;
+  }
+  .admin-ui table {
+    font-variant-numeric: tabular-nums;
+  }
+  .admin-ui .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

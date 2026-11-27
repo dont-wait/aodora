@@ -5,6 +5,8 @@ import GuidePage from '@/pages/guide/GuidePage'
 import HomePage from '@/pages/home/HomePage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ProductDetailPage from '@/pages/product-detail/ProductDetailPage'
+import DashboardPage from '@/pages/admin/DashboardPage'
+import ImportPage from '@/pages/admin/ImportPage'
 import AdminLayout from '@/pages/admin/AdminLayout'
 import AdminCatalogPage from '@/pages/admin/AdminCatalogPage'
 import AdminAccessGuard from '@/pages/admin/AdminAccessGuard'
@@ -31,7 +33,8 @@ export default function App() {
       <Route path="403" element={<ForbiddenPage />} />
       <Route path="admin" element={<AdminAccessGuard />}>
         <Route element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/catalog" replace />} />
+          <Route index element={<DashboardPage />} />
+          <Route path="import" element={<ImportPage />} />
           <Route path="catalog" element={<AdminCatalogPage view="product" />} />
           <Route path="categories" element={<AdminCatalogPage view="category" />} />
           <Route path="orders" element={<AdminOrdersPage />} />

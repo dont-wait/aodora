@@ -1,7 +1,7 @@
 import type { FormEvent, ReactNode } from 'react'
 import type { Category, ProductInput } from '@/features/admin/catalog'
 import ColorEditor from './ColorEditor'
-import { Button, Card, Field } from '../ui'
+import { AutoTextarea, Button, Card, Field } from '../ui'
 import { inputClass } from '../uiStyles'
 
 interface Props {
@@ -43,7 +43,7 @@ export default function ProductForm({ productId, product, categories, galleryTex
             {categories.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         </Field>
-        <Field label="Mô tả"><textarea className={inputClass} rows={3} value={product.description} onChange={(e) => set({ description: e.target.value })} /></Field>
+        <Field label="Mô tả"><AutoTextarea value={product.description} onChange={(e) => set({ description: e.target.value })} /></Field>
         <Field label="Chất liệu"><input className={inputClass} value={product.material} onChange={(e) => set({ material: e.target.value })} /></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={product.is_active} onChange={(e) => set({ is_active: e.target.checked })} />Đang bán</label>
       </Card>
@@ -65,7 +65,7 @@ export default function ProductForm({ productId, product, categories, galleryTex
             <Field label="Alt hình chính"><input className={inputClass} value={product.image?.alt || ''} onChange={(e) => set({ image: e.target.value || product.image?.src ? { src: product.image?.src || '', alt: e.target.value } : null })} /></Field>
           </div>
         </div>
-        <Field label="Ảnh phụ (mỗi dòng: URL | mô tả ảnh)"><textarea className={inputClass} rows={3} value={galleryText} onChange={(e) => onGalleryText(e.target.value)} /></Field>
+        <Field label="Ảnh phụ (mỗi dòng: URL | mô tả ảnh)"><AutoTextarea minRows={2} value={galleryText} onChange={(e) => onGalleryText(e.target.value)} /></Field>
         {galleryUrls.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Xem trước ảnh phụ">{galleryUrls.map((src, index) => <Thumb key={index + src} src={src} alt={'Ảnh phụ ' + (index + 1)} />)}</div>}
       </Card>
 
@@ -74,7 +74,7 @@ export default function ProductForm({ productId, product, categories, galleryTex
       </Card>
 
       <Card title="Phụ kiện" description="JSON: id, name, description, price, image (tùy chọn), tag, tag_variant.">
-        <Field label="Danh sách phụ kiện (JSON)"><textarea className={`${inputClass} font-mono text-xs`} rows={5} value={accessoriesText} onChange={(e) => onAccessoriesText(e.target.value)} /></Field>
+        <Field label="Danh sách phụ kiện (JSON)"><AutoTextarea minRows={4} className="font-mono text-xs" value={accessoriesText} onChange={(e) => onAccessoriesText(e.target.value)} /></Field>
       </Card>
 
       {children}

@@ -20,6 +20,12 @@ func (f *fakeRepo) Categories(context.Context) ([]map[string]any, error) { retur
 func (f *fakeRepo) Products(context.Context, int64, int64) (ProductPage, error) {
 	return ProductPage{}, nil
 }
+func (f *fakeRepo) ProductsBySlug(context.Context, []string) ([]map[string]any, error) {
+	return nil, nil
+}
+func (f *fakeRepo) SKUOwners(context.Context, []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
 func (f *fakeRepo) CategoryExists(context.Context, string) (bool, error) { return true, nil }
 func (f *fakeRepo) CreateCategory(context.Context, CategoryInput) (map[string]any, error) {
 	f.created = true

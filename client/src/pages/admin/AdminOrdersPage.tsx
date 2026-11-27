@@ -10,7 +10,7 @@ import { useOrderRead } from '@/features/orders/useOrderRead'
 import AdminOrderFrame from './AdminOrderFrame'
 import AdminOrderNotice from './AdminOrderNotice'
 import { Button, ButtonLink, DataTable, EmptyState, StatusBadge } from './ui'
-import { inputClass, tdClass, thClass, toneForStatus } from './uiStyles'
+import { inputClass, tdClass, tdNumClass, thClass, thNumClass, toneForStatus } from './uiStyles'
 
 export default function AdminOrdersPage() {
   const { user, loading, error } = useAuth()
@@ -62,7 +62,7 @@ export default function AdminOrdersPage() {
           <thead>
             <tr>
               <th className={thClass}>Mã đơn</th><th className={thClass}>Khách</th><th className={thClass}>Hình thức</th>
-              <th className={thClass}>Nhận áo</th><th className={thClass}>Thanh toán</th><th className={`${thClass} text-right`}>Tổng</th><th className={thClass}><span className="sr-only">Thao tác</span></th>
+              <th className={thClass}>Nhận áo</th><th className={thClass}>Thanh toán</th><th className={thNumClass}>Tổng</th><th className={thClass}><span className="sr-only">Thao tác</span></th>
             </tr>
           </thead>
           <tbody>
@@ -81,7 +81,7 @@ export default function AdminOrdersPage() {
                   <td className={tdClass}>{order.payment_method === 'cod' ? 'Giao tận nơi (COD)' : order.payment_method === 'cash_at_counter' ? 'Nhận tại quầy' : 'Khác'}</td>
                   <td className={tdClass}><StatusBadge tone={toneForStatus(order.status)}>{labels.fulfillment}</StatusBadge></td>
                   <td className={tdClass}><StatusBadge tone={toneForStatus(order.payment_status)}>{labels.payment}</StatusBadge></td>
-                  <td className={`${tdClass} text-right font-semibold text-primary whitespace-nowrap`}>{formatOrderMoney(order.total)}</td>
+                  <td className={`${tdNumClass} font-semibold text-primary`}>{formatOrderMoney(order.total)}</td>
                   <td className={tdClass}><ButtonLink to={`/admin/orders/${encodeURIComponent(order.id)}`}>Xử lý</ButtonLink></td>
                 </tr>
               )

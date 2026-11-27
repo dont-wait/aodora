@@ -14,6 +14,7 @@ import (
 	"github.com/your-org/aodora/server/internal/application/catalog"
 	admin "github.com/your-org/aodora/server/internal/application/catalogadmin"
 	customerapp "github.com/your-org/aodora/server/internal/application/customer"
+	dashboardapp "github.com/your-org/aodora/server/internal/application/dashboard"
 	"github.com/your-org/aodora/server/internal/application/health"
 	orderapp "github.com/your-org/aodora/server/internal/application/order"
 	reviewapp "github.com/your-org/aodora/server/internal/application/review"
@@ -63,6 +64,7 @@ func main() {
 	service := health.NewService(db, *log)
 	catalogService := catalog.NewService(catalogMongo.NewCatalogRepository(db.DB))
 	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB))
+	dashboardService := dashboardapp.NewService(catalogMongo.NewDashboardRepository(db.DB))
 	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
 	customerService := customerapp.NewService(catalogMongo.NewCustomerRepository(db.DB))
 	cartService := cartapp.NewService(catalogMongo.NewCartRepository(db.DB))
@@ -104,6 +106,8 @@ func main() {
 			httpapi.WithCart(cartService, authGuard),
 			httpapi.WithCatalog(catalogService, *log),
 			httpapi.WithAdminCatalog(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithAdminImport(adminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithAdminDashboard(dashboardService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithOrders(orderService, authGuard, *log),
 			httpapi.WithReviews(reviewService, authGuard, catalogService, orderService, *log),
 			httpapi.WithAdminReviews(reviewService, authGuard, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
