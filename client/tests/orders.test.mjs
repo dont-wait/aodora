@@ -8,6 +8,7 @@ import {
   makeAttempt,
   saveAttempt,
   readAttempt,
+  attemptQuoteExpired,
   clearAttempt,
   saveReceipt,
   saveOrderToken,
@@ -799,4 +800,12 @@ test('link đăng nhập giữ next đúng chi tiết hoặc danh sách và khô
     assert.equal(url.searchParams.get('next'), path)
     assert.deepEqual([...url.searchParams.keys()], ['next'])
   }
+})
+
+test('saved attempts remember when their quote stops being accepted', () => {
+  const pending = makeAttempt(body(), snapshot(), 'a', '2026-11-28T02:00:00Z')
+  assert.equal(pending.quote_expires_at, '2026-11-28T02:00:00Z')
+  assert.equal(attemptQuoteExpired(pending, Date.parse('2026-11-28T01:59:00Z')), false)
+  assert.equal(attemptQuoteExpired(pending, Date.parse('2026-11-28T02:00:01Z')), true)
+  assert.equal(attemptQuoteExpired(makeAttempt(body(), snapshot(), 'a')), false)
 })

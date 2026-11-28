@@ -21,7 +21,8 @@
     "test:address": "node --experimental-strip-types --test tests/address.test.mjs",
     "test:sizes": "node --experimental-strip-types --test tests/sizes.test.mjs",
     "test:dashboard": "node --experimental-strip-types --test tests/dashboard.test.mjs",
-    "test:validation": "node --experimental-strip-types --test tests/validation.test.mjs"
+    "test:validation": "node --experimental-strip-types --test tests/validation.test.mjs",
+    "test:returns": "node --experimental-strip-types --test tests/returns.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

@@ -48,6 +48,7 @@ type Order struct {
 	InventoryRestockedAt *time.Time
 	PaidAt               *time.Time
 	RefundedAt           *time.Time
+	DeliveredAt          *time.Time // set when the shop marks the order delivered; nil on older orders
 	ID                   string
 	OrderNumber          string
 	CustomerID           string // empty for guest orders

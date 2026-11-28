@@ -49,9 +49,12 @@ type Result struct {
 }
 
 type Service struct {
-	store storage.ObjectStore
-	now   func() time.Time
-	newID func() string
+	transcoder VideoTranscoder
+	// OnTranscodeError is told when a video had to be stored unconverted.
+	OnTranscodeError func(error)
+	store            storage.ObjectStore
+	now              func() time.Time
+	newID            func() string
 }
 
 // NewService accepts a nil store: every upload then answers ErrNotConfigured.

@@ -8,6 +8,7 @@ import { useCart } from '@/features/cart/useCart'
 import { cartApi } from '@/features/cart/api'
 import { ordersApi, OrderApiError } from '@/features/orders/api'
 import {
+  attemptQuoteExpired,
   clearAttempt,
   CheckoutIdentityError,
   isDefinitiveOrderError,
@@ -37,6 +38,10 @@ function initialCheckout() {
 function messageFor(error: unknown) {
   if (error instanceof CheckoutIdentityError) return error.message
   if (error instanceof OrderApiError) {
+    if (error.code === 'QUOTE_EXPIRED')
+      return 'Đơn chưa được gửi vì giá chỉ được giữ 15 phút và đã hết hiệu lực. Thông tin nhận áo vẫn được giữ: bấm “Tính tổng tiền” bên dưới rồi xác nhận để đặt lại.'
+    if (error.code === 'QUOTE_CHANGED')
+      return 'Đơn chưa được gửi vì giá hoặc giỏ hàng đã thay đổi. Bấm “Tính tổng tiền” bên dưới để xem giá mới rồi xác nhận lại.'
     if (error.code === 'SHIPPING_UNAVAILABLE')
       return 'COD tạm không khả dụng vì chưa có phí giao hàng. Bạn có thể chọn nhận và thanh toán tại quầy khi không còn đơn nào đang gửi.'
     return error.message
@@ -168,6 +173,8 @@ export default function CheckoutPage() {
   const cartLineOf = (item: { product_id: string; sku: string }) => cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
   const blocked = busy || authLoading || cartLoading || !!initial.error
   const identityMatches = !attempt || matchesIdentity(attempt.credential, customerId)
+  // Only once lookup proved nothing was placed: resending an expired quote would just be refused.
+  const staleQuote = notPlaced && !!attempt && attemptQuoteExpired(attempt)
 
   function selectAddress(saved: Address) {
     setAddress({ recipient: saved.recipient, phone: saved.phone, line1: saved.line1, ward: saved.ward ?? '', city: saved.city })
@@ -250,6 +257,7 @@ export default function CheckoutPage() {
           { ...body, quote_token: quote!.quote_token },
           items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, name: item.name })),
           customerId,
+          quote!.expires_at,
         )
         try {
           saveAttempt(pending)
@@ -316,7 +324,9 @@ export default function CheckoutPage() {
         <section className="bg-surface-container-low p-6 space-y-5">
           <h2 className="font-headline-md text-2xl text-primary">{notPlaced ? 'Đơn trước chưa gửi thành công' : 'Đơn đang gửi, chờ kết quả'}</h2>
           <p>
-            {notPlaced
+            {notPlaced && staleQuote
+              ? 'Lần đặt hàng trước bị gián đoạn nên cửa hàng chưa nhận được đơn này (chưa có đơn nào được tạo, bạn chưa bị tính tiền). Giá trong đơn chỉ được giữ 15 phút và đã hết hiệu lực, nên cần tính lại tổng tiền. Thông tin nhận áo vẫn được giữ; đơn mới gồm các áo đang chọn trong giỏ.'
+              : notPlaced
               ? 'Lần đặt hàng trước bị gián đoạn nên cửa hàng chưa nhận được đơn này (chưa có đơn nào được tạo, bạn chưa bị tính tiền). Bạn có thể gửi lại đúng đơn bên dưới, hoặc bỏ đơn này để đặt lại từ giỏ hàng.'
               : 'Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.'}
           </p>
@@ -337,10 +347,22 @@ export default function CheckoutPage() {
               </Link>
             </p>
           )}
+          {staleQuote ? (
+            <button type="button" className={buttonClass} disabled={busy} onClick={() => {
+                clearAttempt(attempt.request_id)
+                setAttempt(null)
+                setNotPlaced(false)
+                setNotice('')
+                setError('')
+              }}>
+              Tính lại tổng tiền
+            </button>
+          ) : (
           <button type="button" className={buttonClass} disabled={busy || !identityMatches || !!initial.error} onClick={() => void sendOrder()}>
             {busy ? 'Đang tra cứu / gửi đơn...' : notPlaced ? 'Gửi lại đơn này' : 'Tra cứu và gửi lại đơn đã lưu'}
           </button>
-          {notPlaced && (
+          )}
+          {notPlaced && !staleQuote && (
             <button
               type="button"
               className="ml-3 border border-outline-variant px-6 py-3 text-on-surface disabled:opacity-50"

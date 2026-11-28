@@ -17,12 +17,14 @@ import (
 	dashboardapp "github.com/your-org/aodora/server/internal/application/dashboard"
 	"github.com/your-org/aodora/server/internal/application/health"
 	orderapp "github.com/your-org/aodora/server/internal/application/order"
+	returnsapp "github.com/your-org/aodora/server/internal/application/returns"
 	reviewapp "github.com/your-org/aodora/server/internal/application/review"
 	tailoringapp "github.com/your-org/aodora/server/internal/application/tailoring"
 	uploadapp "github.com/your-org/aodora/server/internal/application/upload"
 	"github.com/your-org/aodora/server/internal/config"
 	domainorder "github.com/your-org/aodora/server/internal/domain/order"
 	"github.com/your-org/aodora/server/internal/infrastructure/database"
+	"github.com/your-org/aodora/server/internal/infrastructure/media"
 	catalogMongo "github.com/your-org/aodora/server/internal/infrastructure/mongo"
 	"github.com/your-org/aodora/server/internal/infrastructure/storage"
 	httpapi "github.com/your-org/aodora/server/internal/interfaces/http"
@@ -73,6 +75,14 @@ func main() {
 		imageStore = store
 	}
 	uploadService := uploadapp.NewService(imageStore)
+	if ff := media.NewFFmpeg(); ff != nil {
+		uploadService.WithVideoTranscoder(ff)
+		uploadService.OnTranscodeError = func(err error) {
+			log.Warn().Str("cause", err.Error()).Msg("return video kept unconverted")
+		}
+	} else {
+		log.Warn().Msg("ffmpeg/ffprobe not found; return videos are stored as sent (HEVC from phones may not play in admin browsers)")
+	}
 	adminService := admin.NewService(catalogMongo.NewAdminCatalogRepository(db.DB), admin.WithImagePrefix(storageCfg.PublicURL))
 	dashboardService := dashboardapp.NewService(catalogMongo.NewDashboardRepository(db.DB))
 	authService := authapp.NewService(catalogMongo.NewAuthRepository(db.DB), cfg.Auth.SessionTTL)
@@ -97,6 +107,7 @@ func main() {
 	orderRepo := catalogMongo.NewOrderRepository(db.Client, db.DB)
 	orderAdminService := orderapp.NewAdminService(orderRepo)
 	orderService := orderapp.NewService(orderRepo, orderRepo, quoteSigner, cfg.Order.QuoteTTL, cfg.Order.CODShippingFee, nil, nil)
+	returnService := returnsapp.NewService(catalogMongo.NewReturnRepository(orderRepo), orderRepo, uploadService.EvidencePrefix)
 	reviewService := reviewapp.NewService(catalogMongo.NewReviewRepository(db.DB), orderService)
 
 	tailoringRepo := catalogMongo.NewTailoringRepository(db.DB)
@@ -122,6 +133,8 @@ func main() {
 			httpapi.WithOrders(orderService, authGuard, *log),
 			httpapi.WithReviews(reviewService, authGuard, catalogService, orderService, *log),
 			httpapi.WithAdminReviews(reviewService, authGuard, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
+			httpapi.WithReturns(returnService, uploadService, authGuard, *log),
+			httpapi.WithAdminReturns(returnService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithAdminOrders(orderAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),
 			httpapi.WithTailoring(tailoringService, authGuard, *log),
 			httpapi.WithAdminTailoring(tailoringAdminService, authGuard.RequireAdmin, *log, os.Getenv("ADMIN_ALLOWED_ORIGIN")),

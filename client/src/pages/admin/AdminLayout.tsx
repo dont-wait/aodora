@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin/catalog', label: 'Sản phẩm', icon: 'checkroom' },
   { to: '/admin/categories', label: 'Danh mục', icon: 'category' },
   { to: '/admin/orders', label: 'Đơn hàng', icon: 'receipt_long' },
+  { to: '/admin/returns', label: 'Hoàn hàng', icon: 'assignment_return' },
   { to: '/admin/tailoring', label: 'May đo', icon: 'straighten' },
   { to: '/admin/reviews', label: 'Đánh giá', icon: 'rate_review' },
   { to: '/admin/import', label: 'Nhập dữ liệu', icon: 'upload_file' },

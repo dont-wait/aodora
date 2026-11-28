@@ -515,6 +515,7 @@ func decodeOrder(doc bson.M) (domainorder.Order, error) {
 		InventoryRestockedAt: optionalOrderTime(doc, "inventory_restocked_at"),
 		PaidAt:               optionalOrderTime(doc, "paid_at"),
 		RefundedAt:           optionalOrderTime(doc, "refunded_at"),
+		DeliveredAt:          optionalOrderTime(doc, "delivered_at"),
 		ID:                   idHex,
 		OrderNumber:          orderNum,
 		CustomerID:           custID,
@@ -715,6 +716,10 @@ func (r *OrderRepository) mutateAdminOnce(ctx context.Context, id string, action
 		}
 		filter["status"] = o.Status
 		set["status"] = target
+		if target == domainorder.StatusDelivered {
+			// Starts the 3-day return window.
+			set["delivered_at"] = now
+		}
 	case apporder.AdminSetPayment:
 		if !domainorder.NextPaymentAllowed(o.PaymentStatus, target) {
 			return nil, apporder.ErrPaymentConflict

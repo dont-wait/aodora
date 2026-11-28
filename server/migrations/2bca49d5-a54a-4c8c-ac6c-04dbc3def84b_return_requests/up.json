@@ -1,0 +1,170 @@
+[
+  {
+    "create": "return_requests",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+          "order_id",
+          "order_number",
+          "customer_id",
+          "items",
+          "reason",
+          "evidence",
+          "status",
+          "refund_amount",
+          "history",
+          "delivered_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "order_id": {
+            "bsonType": "objectId"
+          },
+          "customer_id": {
+            "bsonType": "objectId"
+          },
+          "open_order_id": {
+            "bsonType": "objectId"
+          },
+          "order_number": {
+            "bsonType": "string"
+          },
+          "items": {
+            "bsonType": "array",
+            "minItems": 1,
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "product_id",
+                "sku",
+                "quantity",
+                "unit_price"
+              ],
+              "properties": {
+                "quantity": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 1
+                },
+                "unit_price": {
+                  "bsonType": [
+                    "int",
+                    "long"
+                  ],
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "reason": {
+            "enum": [
+              "wrong_size",
+              "defect",
+              "not_as_described",
+              "wrong_item",
+              "changed_mind",
+              "other"
+            ]
+          },
+          "evidence": {
+            "bsonType": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "bsonType": "object",
+              "required": [
+                "url",
+                "kind"
+              ],
+              "properties": {
+                "url": {
+                  "bsonType": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "image",
+                    "video"
+                  ]
+                }
+              }
+            }
+          },
+          "status": {
+            "enum": [
+              "requested",
+              "approved",
+              "rejected",
+              "collecting",
+              "collected",
+              "refunded",
+              "cancelled"
+            ]
+          },
+          "refund_amount": {
+            "bsonType": [
+              "int",
+              "long"
+            ],
+            "minimum": 0
+          },
+          "history": {
+            "bsonType": "array"
+          },
+          "delivered_at": {
+            "bsonType": "date"
+          },
+          "created_at": {
+            "bsonType": "date"
+          },
+          "updated_at": {
+            "bsonType": "date"
+          }
+        }
+      }
+    },
+    "validationLevel": "strict",
+    "validationAction": "error"
+  },
+  {
+    "createIndexes": "return_requests",
+    "indexes": [
+      {
+        "key": {
+          "open_order_id": 1
+        },
+        "name": "ux_return_requests_open_order",
+        "unique": true,
+        "partialFilterExpression": {
+          "open_order_id": {
+            "$exists": true
+          }
+        }
+      },
+      {
+        "key": {
+          "order_id": 1,
+          "created_at": -1
+        },
+        "name": "ix_return_requests_order"
+      },
+      {
+        "key": {
+          "customer_id": 1,
+          "created_at": -1
+        },
+        "name": "ix_return_requests_customer"
+      },
+      {
+        "key": {
+          "status": 1,
+          "created_at": -1
+        },
+        "name": "ix_return_requests_status"
+      }
+    ]
+  }
+]
