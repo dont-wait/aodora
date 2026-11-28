@@ -6,6 +6,7 @@ import { EvidenceStrip } from '@/features/returns/ReturnRequestSection'
 import { adminActionLabels, adminReturnsApi, reasonLabels, returnStatusLabels, returnStatusTone, timeLeft, type AdminReturn, type ReturnStatus } from '@/features/returns/returns'
 import { useToast } from '@/hooks/useToast'
 import { Alert, AutoTextarea, Button, ButtonLink, Card, CardSkeleton, PageHeader, StatusBadge } from './ui'
+import { useAdminCrumb } from './breadcrumb'
 
 const hints: Partial<Record<ReturnStatus, string>> = {
   approved: 'Khách sẽ thấy yêu cầu đã được duyệt và chờ cửa hàng thu hồi áo.',
@@ -24,6 +25,7 @@ export default function AdminReturnDetailPage() {
   const [restock, setRestock] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  useAdminCrumb(state.kind === 'ready' ? `Đơn ${state.data.order_number}` : null)
   const load = useCallback(() => {
     adminReturnsApi.get(id).then(
       (data) => setState({ kind: 'ready', data }),

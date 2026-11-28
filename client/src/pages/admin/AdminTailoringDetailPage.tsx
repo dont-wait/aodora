@@ -80,7 +80,7 @@ export default function AdminTailoringDetailPage() {
   const modalOpen = !!dialog && (dialog.action === 'confirm_measurements' || !!statusSpec)
 
   return (
-    <AdminOrderFrame title={`Yêu cầu của ${t.full_name}`}>
+    <AdminOrderFrame title={`Yêu cầu của ${t.full_name}`} crumb={t.full_name}>
       <div className="flex flex-wrap justify-between gap-4">
         <p className="text-on-surface-variant">
           {tailoringStatusLabel(t.status)} · {t.is_guest ? 'Khách vãng lai' : 'Khách tài khoản'}

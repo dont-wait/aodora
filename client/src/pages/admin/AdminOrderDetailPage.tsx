@@ -64,7 +64,7 @@ export default function AdminOrderDetailPage() {
     }
   }
   return (
-    <AdminOrderFrame title={`Đơn ${order.order_number}`}>
+    <AdminOrderFrame title={`Đơn ${order.order_number}`} crumb={order.order_number}>
       <div className="flex flex-wrap justify-between gap-4">
         <p className="text-on-surface-variant">{order.is_guest ? 'Khách vãng lai' : 'Khách tài khoản'} · Thao tác giao nhận và thu tiền độc lập.</p>
         <button type="button" disabled={busy} className={buttonClass} onClick={retry}>

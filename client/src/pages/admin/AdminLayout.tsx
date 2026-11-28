@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '@/components/ui/Icon'
 import { useAuth } from '@/features/auth/useAuth'
 import { ToastProvider, useToast } from '@/hooks/useToast'
 import { Button } from './ui'
 import { UNSAVED_MESSAGE, UnsavedContext } from './unsaved'
+import { AdminCrumbContext, adminBreadcrumb } from './breadcrumb'
 
 const NAV = [
   { to: '/admin', label: 'Tổng quan', icon: 'dashboard', end: true },
@@ -37,6 +38,29 @@ function NavList({ onNavigate, guard }: { onNavigate?: () => void; guard: (event
   )
 }
 
+function AdminBreadcrumb({ pathname, detail, guard }: { pathname: string; detail?: string; guard: (event: MouseEvent) => void }) {
+  const items = adminBreadcrumb(pathname, detail)
+  if (!items.length) return null
+  return (
+    <nav aria-label="Breadcrumb" className="text-[13px] text-on-surface-variant">
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {items.map((item, index) => (
+          <li key={`${index}-${item.label}`} className="flex items-center gap-1.5 min-w-0">
+            {index > 0 && <Icon name="chevron_right" size={16} className="text-outline shrink-0" />}
+            {item.to ? (
+              <Link to={item.to} onClick={guard} className="hover:text-primary hover:underline">
+                {item.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="font-semibold text-primary truncate max-w-[60vw]">{item.label}</span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+
 function Shell() {
   const { user, logout } = useAuth()
   const { showToast } = useToast()
@@ -53,6 +77,13 @@ function Shell() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
+  // The label belongs to the page that set it; a stale one is ignored after navigation.
+  const [crumb, setCrumb] = useState<{ path: string; label: string } | null>(null)
+  const setDetail = useCallback((label: string | null) => {
+    const path = window.location.pathname
+    setCrumb(label ? { path, label } : null)
+  }, [])
+  const crumbContext = useMemo(() => ({ setDetail }), [setDetail])
   const [seenPath, setSeenPath] = useState(pathname)
   if (seenPath !== pathname) {
     // Close the mobile menu on navigation (adjusted during render, not in an effect).
@@ -95,8 +126,11 @@ function Shell() {
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <div className="max-w-[1440px] mx-auto space-y-6">
+            <AdminBreadcrumb pathname={pathname} detail={crumb?.path === pathname ? crumb.label : undefined} guard={guard} />
             <UnsavedContext.Provider value={{ setDirty }}>
-              <Outlet />
+              <AdminCrumbContext.Provider value={crumbContext}>
+                <Outlet />
+              </AdminCrumbContext.Provider>
             </UnsavedContext.Provider>
           </div>
         </main>
