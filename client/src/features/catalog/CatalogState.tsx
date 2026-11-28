@@ -1,17 +1,8 @@
 import type { ReactNode } from 'react'
+import { CardGridSkeleton } from '@/components/ui/Skeleton'
 
 export function ProductGridSkeleton({ count = 6 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="animate-pulse space-y-3">
-          <div className="aspect-[3/4] bg-surface-container" />
-          <div className="h-4 w-3/4 bg-surface-container" />
-          <div className="h-4 w-1/3 bg-surface-container" />
-        </div>
-      ))}
-    </div>
-  )
+  return <CardGridSkeleton count={count} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8" label="Đang tải sản phẩm" />
 }
 
 export function ProductDetailSkeleton() {

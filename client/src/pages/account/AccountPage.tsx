@@ -8,6 +8,7 @@ import { formatAddress, matchSavedAddress } from '@/features/address/divisions'
 import { useDivisions } from '@/features/address/useDivisions'
 import { useAuth } from '@/features/auth/useAuth'
 import { ROUTES } from '@/data/site'
+import { PageSkeleton } from '@/components/ui/Skeleton'
 
 type Section = 'profile' | 'addresses' | 'measurements'
 const inputClass = 'w-full bg-surface-container px-4 py-3 border border-outline-variant/60 focus:border-primary focus:outline-none'
@@ -112,7 +113,7 @@ export default function AccountPage() {
 
   const status = <>{success && <p role="status" className="text-green-700">{success}</p>}{error && <p role="alert" className="text-red-700">{error}</p>}</>
 
-  if (loading) return <main className="max-w-[1440px] mx-auto px-margin-desktop py-20"><p role="status">Đang tải tài khoản...</p></main>
+  if (loading) return <PageSkeleton label="Đang tải tài khoản" blocks={3} />
   if (!profile && error) return <main className="max-w-lg mx-auto px-5 py-20 text-center space-y-4"><p role="alert" className="text-red-700">{error}</p><button type="button" className="bg-primary text-on-primary px-5 py-3" onClick={() => { setError(''); setLoading(true); setReload((value) => value + 1) }}>Thử tải lại</button></main>
   return <main className="bg-surface min-h-screen">
     <div className="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-4"><Breadcrumb items={[{ label: 'Trang chủ', to: ROUTES.home }, { label: 'Tài khoản' }]} /></div>

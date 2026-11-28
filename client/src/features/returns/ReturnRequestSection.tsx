@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatMoney } from '@/features/catalog/prices'
 import { formatOrderDate } from '@/features/orders/presentation'
 import type { Order } from '@/features/orders/types'
+import { SkeletonBlock, SkeletonStatus } from '@/components/ui/Skeleton'
 import {
   EVIDENCE_ACCEPT, MAX_EVIDENCE, RETURN_REASONS, RETURN_STEPS, draftBody, evidenceKindOf, evidenceProblem, reasonLabels, returnStatusLabels, returnsApi, timeLeft, validateReturnDraft,
   ReturnApiError, type Eligibility, type Evidence, type ReturnDraft, type ReturnReason, type ReturnRequest,
@@ -23,7 +24,7 @@ export default function ReturnRequestSection({ order }: { order: Order }) {
   useEffect(load, [load])
 
   if (order.status !== 'delivered') return null
-  if (state.kind === 'loading') return <section className={box} aria-busy="true"><p className="text-on-surface-variant">Đang tải thông tin hoàn hàng…</p></section>
+  if (state.kind === 'loading') return <section className={box}><SkeletonStatus label="Đang tải thông tin hoàn hàng" className="space-y-3"><SkeletonBlock className="h-6 w-1/3" /><SkeletonBlock className="h-4 w-full" /><SkeletonBlock className="h-10 w-48" /></SkeletonStatus></section>
   if (state.kind === 'error')
     return (
       <section className={box}>
