@@ -8,6 +8,7 @@ import { useCart } from '@/features/cart/useCart'
 import { cartApi } from '@/features/cart/api'
 import { ordersApi, OrderApiError } from '@/features/orders/api'
 import {
+  attemptQuoteExpired,
   clearAttempt,
   CheckoutIdentityError,
   isDefinitiveOrderError,
@@ -37,6 +38,10 @@ function initialCheckout() {
 function messageFor(error: unknown) {
   if (error instanceof CheckoutIdentityError) return error.message
   if (error instanceof OrderApiError) {
+    if (error.code === 'QUOTE_EXPIRED')
+      return 'Đơn chưa được gửi vì giá chỉ được giữ 15 phút và đã hết hiệu lực. Thông tin nhận áo vẫn được giữ: bấm “Tính tổng tiền” bên dưới rồi xác nhận để đặt lại.'
+    if (error.code === 'QUOTE_CHANGED')
+      return 'Đơn chưa được gửi vì giá hoặc giỏ hàng đã thay đổi. Bấm “Tính tổng tiền” bên dưới để xem giá mới rồi xác nhận lại.'
     if (error.code === 'SHIPPING_UNAVAILABLE')
       return 'COD tạm không khả dụng vì chưa có phí giao hàng. Bạn có thể chọn nhận và thanh toán tại quầy khi không còn đơn nào đang gửi.'
     return error.message
@@ -66,6 +71,8 @@ export default function CheckoutPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(initial.error)
   const [notice, setNotice] = useState('')
+  // Lookup ran and the server has no order for the saved request: nothing was placed.
+  const [notPlaced, setNotPlaced] = useState(false)
   const { user, loading: authLoading } = useAuth()
   const { cart, loading: cartLoading, error: cartError, refresh, consumePurchased, selectedItems: items, selectedSubtotal } = useCart()
   const customerId = user?.id ?? null
@@ -103,7 +110,10 @@ export default function CheckoutPage() {
     lookupAttempt(attempt, customerId)
       .then(async (order) => {
         if (order) await finish(order, attempt)
-        else setNotice('Chưa tìm thấy kết quả. Bạn có thể gửi lại đúng đơn đã lưu bên dưới; hệ thống giữ nguyên mã yêu cầu và nội dung.')
+        else {
+          setNotice('')
+          setNotPlaced(true)
+        }
       })
       .catch((error: unknown) => setError(messageFor(error)))
       .finally(() => {
@@ -163,6 +173,8 @@ export default function CheckoutPage() {
   const cartLineOf = (item: { product_id: string; sku: string }) => cart.items.find((line) => line.product_id === item.product_id && line.sku === item.sku)
   const blocked = busy || authLoading || cartLoading || !!initial.error
   const identityMatches = !attempt || matchesIdentity(attempt.credential, customerId)
+  // Only once lookup proved nothing was placed: resending an expired quote would just be refused.
+  const staleQuote = notPlaced && !!attempt && attemptQuoteExpired(attempt)
 
   function selectAddress(saved: Address) {
     setAddress({ recipient: saved.recipient, phone: saved.phone, line1: saved.line1, ward: saved.ward ?? '', city: saved.city })
@@ -245,6 +257,7 @@ export default function CheckoutPage() {
           { ...body, quote_token: quote!.quote_token },
           items.map((item) => ({ product_id: item.product_id, sku: item.sku, quantity: item.quantity, name: item.name })),
           customerId,
+          quote!.expires_at,
         )
         try {
           saveAttempt(pending)
@@ -291,7 +304,9 @@ export default function CheckoutPage() {
       <header>
         <p className="text-secondary text-sm tracking-widest uppercase">Aodora · Đặt mua áo</p>
         <h1 className="font-headline-lg text-4xl text-primary mt-2">Thông tin nhận áo</h1>
-        <p className="mt-3 text-on-surface-variant">Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.</p>
+        <p className="mt-3 text-on-surface-variant">
+          {user ? <>Đặt hàng với tài khoản <strong>{user.full_name || user.email}</strong>; địa chỉ đã lưu được điền sẵn.</> : 'Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.'}
+        </p>
       </header>
       {error && (
         <p role="alert" className="border border-error/30 bg-error-container p-4 text-on-error-container">
@@ -307,8 +322,14 @@ export default function CheckoutPage() {
         <p role="status">Đang kiểm tra đăng nhập...</p>
       ) : attempt ? (
         <section className="bg-surface-container-low p-6 space-y-5">
-          <h2 className="font-headline-md text-2xl text-primary">Đơn đang gửi, chờ kết quả</h2>
-          <p>Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.</p>
+          <h2 className="font-headline-md text-2xl text-primary">{notPlaced ? 'Đơn trước chưa gửi thành công' : 'Đơn đang gửi, chờ kết quả'}</h2>
+          <p>
+            {notPlaced && staleQuote
+              ? 'Lần đặt hàng trước bị gián đoạn nên cửa hàng chưa nhận được đơn này (chưa có đơn nào được tạo, bạn chưa bị tính tiền). Giá trong đơn chỉ được giữ 15 phút và đã hết hiệu lực, nên cần tính lại tổng tiền. Thông tin nhận áo vẫn được giữ; đơn mới gồm các áo đang chọn trong giỏ.'
+              : notPlaced
+              ? 'Lần đặt hàng trước bị gián đoạn nên cửa hàng chưa nhận được đơn này (chưa có đơn nào được tạo, bạn chưa bị tính tiền). Bạn có thể gửi lại đúng đơn bên dưới, hoặc bỏ đơn này để đặt lại từ giỏ hàng.'
+              : 'Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.'}
+          </p>
           <ul className="space-y-2">
             {attempt.snapshot.map((line) => (
               <li key={`${line.product_id}:${line.sku}`}>
@@ -326,9 +347,37 @@ export default function CheckoutPage() {
               </Link>
             </p>
           )}
+          {staleQuote ? (
+            <button type="button" className={buttonClass} disabled={busy} onClick={() => {
+                clearAttempt(attempt.request_id)
+                setAttempt(null)
+                setNotPlaced(false)
+                setNotice('')
+                setError('')
+              }}>
+              Tính lại tổng tiền
+            </button>
+          ) : (
           <button type="button" className={buttonClass} disabled={busy || !identityMatches || !!initial.error} onClick={() => void sendOrder()}>
-            {busy ? 'Đang tra cứu / gửi đơn...' : 'Tra cứu và gửi lại đơn đã lưu'}
+            {busy ? 'Đang tra cứu / gửi đơn...' : notPlaced ? 'Gửi lại đơn này' : 'Tra cứu và gửi lại đơn đã lưu'}
           </button>
+          )}
+          {notPlaced && !staleQuote && (
+            <button
+              type="button"
+              className="ml-3 border border-outline-variant px-6 py-3 text-on-surface disabled:opacity-50"
+              disabled={busy}
+              onClick={() => {
+                clearAttempt(attempt.request_id)
+                setAttempt(null)
+                setNotPlaced(false)
+                setNotice('')
+                setError('')
+              }}
+            >
+              Bỏ đơn này, đặt đơn mới
+            </button>
+          )}
           <Link to="/gio-hang" className="block underline text-primary">
             Xem giỏ hàng
           </Link>

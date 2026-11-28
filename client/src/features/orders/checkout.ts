@@ -18,9 +18,21 @@ export function createGuestToken(random: Pick<Crypto, 'getRandomValues'> = crypt
 export function matchesIdentity(credential: OrderCredential, customerId: string | null): boolean {
   return credential.kind === 'guest' ? customerId === null : credential.customerId === customerId
 }
-export function makeAttempt(body: CheckoutBody, snapshot: PurchaseLine[], customerId: string | null): CheckoutAttempt {
+export function makeAttempt(body: CheckoutBody, snapshot: PurchaseLine[], customerId: string | null, quoteExpiresAt?: string): CheckoutAttempt {
   const credential: OrderCredential = customerId ? { kind: 'account', customerId } : { kind: 'guest', token: createGuestToken() }
-  return { version: 1, request_id: crypto.randomUUID(), credential, body: JSON.stringify(body), snapshot: snapshot.map((line) => ({ ...line })) }
+  return {
+    version: 1,
+    request_id: crypto.randomUUID(),
+    credential,
+    body: JSON.stringify(body),
+    snapshot: snapshot.map((line) => ({ ...line })),
+    ...(quoteExpiresAt ? { quote_expires_at: quoteExpiresAt } : {}),
+  }
+}
+/** The saved request carries a quote that is only honoured until quote_expires_at (older attempts do not record it). */
+export function attemptQuoteExpired(attempt: Pick<CheckoutAttempt, 'quote_expires_at'>, now = Date.now()): boolean {
+  const at = attempt.quote_expires_at ? Date.parse(attempt.quote_expires_at) : NaN
+  return Number.isFinite(at) && at <= now
 }
 export function saveAttempt(attempt: CheckoutAttempt, storage: StorageAccess = localStorage): void {
   if (storage.getItem(attemptKey)) throw new Error('Lần đặt trước chưa có kết quả. Vui lòng tra cứu lại trước khi đặt mới.')

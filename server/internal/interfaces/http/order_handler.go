@@ -172,6 +172,7 @@ type orderDTO struct {
 	Items           []orderItemResponseDTO `json:"items"`
 	Note            string                 `json:"note,omitempty"`
 	CreatedAt       string                 `json:"created_at"`
+	DeliveredAt     *time.Time             `json:"delivered_at,omitempty"`
 }
 
 func toOrderDTO(o domainorder.Order) orderDTO {
@@ -204,9 +205,10 @@ func toOrderDTO(o domainorder.Order) orderDTO {
 			District:  o.ShippingAddress.District,
 			City:      o.ShippingAddress.City,
 		},
-		Items:     items,
-		Note:      o.Note,
-		CreatedAt: o.CreatedAt.UTC().Format(time.RFC3339),
+		Items:       items,
+		DeliveredAt: o.DeliveredAt,
+		Note:        o.Note,
+		CreatedAt:   o.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
 

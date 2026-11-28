@@ -27,6 +27,8 @@ export type CheckoutAttempt = {
   credential: OrderCredential
   body: string
   snapshot: PurchaseLine[]
+  /** When the quote inside body stops being accepted; absent on attempts saved before this field existed. */
+  quote_expires_at?: string
 }
 export type OrderReceipt = {
   order_id: string

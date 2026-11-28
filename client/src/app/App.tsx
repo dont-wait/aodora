@@ -15,6 +15,8 @@ import AdminOrderDetailPage from '@/pages/admin/AdminOrderDetailPage'
 import AdminTailoringPage from '@/pages/admin/AdminTailoringPage'
 import AdminTailoringDetailPage from '@/pages/admin/AdminTailoringDetailPage'
 import AdminReviewsPage from '@/pages/admin/AdminReviewsPage'
+import AdminReturnsPage from '@/pages/admin/AdminReturnsPage'
+import AdminReturnDetailPage from '@/pages/admin/AdminReturnDetailPage'
 import ForbiddenPage from '@/pages/admin/ForbiddenPage'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
@@ -39,6 +41,8 @@ export default function App() {
           <Route path="categories" element={<AdminCatalogPage view="category" />} />
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="orders/:id" element={<AdminOrderDetailPage />} />
+          <Route path="returns" element={<AdminReturnsPage />} />
+          <Route path="returns/:id" element={<AdminReturnDetailPage />} />
           <Route path="tailoring" element={<AdminTailoringPage />} />
           <Route path="tailoring/:id" element={<AdminTailoringDetailPage />} />
           <Route path="reviews" element={<AdminReviewsPage />} />
