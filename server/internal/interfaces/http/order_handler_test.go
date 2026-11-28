@@ -23,11 +23,12 @@ import (
 )
 
 type stubOrderService struct {
-	quoteFunc   func(ctx context.Context, input domainorder.CheckoutInput) (*apporder.QuoteResult, error)
-	createFunc  func(ctx context.Context, principal apporder.Principal, requestID string, input domainorder.CheckoutInput) (domainorder.Order, bool, error)
-	getFunc     func(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
-	listFunc    func(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
-	attemptFunc func(ctx context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error)
+	quoteFunc    func(ctx context.Context, input domainorder.CheckoutInput) (*apporder.QuoteResult, error)
+	createFunc   func(ctx context.Context, principal apporder.Principal, requestID string, input domainorder.CheckoutInput) (domainorder.Order, bool, error)
+	getFunc      func(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
+	listFunc     func(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
+	attemptFunc  func(ctx context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error)
+	receivedFunc func(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
 
 	lastPrincipal apporder.Principal
 	lastViewer    apporder.Viewer
@@ -54,6 +55,15 @@ func (s *stubOrderService) Create(ctx context.Context, principal apporder.Princi
 		return s.createFunc(ctx, principal, requestID, input)
 	}
 	return domainorder.Order{}, false, nil
+}
+
+func (s *stubOrderService) ConfirmReceived(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error) {
+	s.called = true
+	s.lastViewer = viewer
+	if s.receivedFunc != nil {
+		return s.receivedFunc(ctx, viewer, id)
+	}
+	return nil, apporder.ErrNotFound
 }
 
 func (s *stubOrderService) Get(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error) {

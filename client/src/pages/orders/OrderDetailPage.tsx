@@ -4,6 +4,7 @@ import OrderReadNotice from '@/features/orders/OrderReadNotice'
 import { useOrderDetail } from '@/features/orders/useOrderRead'
 import OrderSummary from '@/pages/checkout/OrderSummary'
 import ReturnRequestSection from '@/features/returns/ReturnRequestSection'
+import ConfirmReceivedCard from '@/features/orders/ConfirmReceivedCard'
 
 export default function OrderDetailPage() {
   const { id = '' } = useParams()
@@ -27,6 +28,7 @@ export default function OrderDetailPage() {
         <h1 className="font-headline-lg text-4xl text-primary">Đơn {order.order_number}</h1>
         <p className="text-on-surface-variant">Thông tin được tải từ cửa hàng. Trạng thái nhận áo và thanh toán được cập nhật độc lập.</p>
       </header>
+      <ConfirmReceivedCard order={order} onDone={retry} />
       <OrderSummary order={order} />
       {isAccount && <ReturnRequestSection order={order} />}
       {result.guest && (

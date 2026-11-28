@@ -115,7 +115,13 @@ func TestAdminServiceTransitionTables(t *testing.T) {
 	states := []string{domain.StatusPending, domain.StatusConfirmed, domain.StatusShipping, domain.StatusDelivered, domain.StatusCancelled, "unknown"}
 	for _, method := range []string{"cod", "cash_at_counter", "bank_transfer"} {
 		for _, from := range states {
-			for _, target := range []string{"confirmed", "shipping", "delivered"} {
+			if f := (&adminFake{result: &domain.Order{ID: id, Status: from, PaymentMethod: method}}); true {
+				// Only the buyer confirms delivery.
+				if _, err := NewAdminService(f).SetStatus(ctx, id, domain.StatusDelivered); !errors.Is(err, ErrStateConflict) || f.calls != 0 {
+					t.Fatalf("%s %s -> delivered by admin: %v calls=%d", method, from, err, f.calls)
+				}
+			}
+			for _, target := range []string{"confirmed", "shipping"} {
 				f := &adminFake{result: &domain.Order{ID: id, Status: from, PaymentMethod: method, PaymentStatus: domain.PaymentPaid}}
 				s := NewAdminService(f)
 				got, err := s.SetStatus(ctx, id, target)

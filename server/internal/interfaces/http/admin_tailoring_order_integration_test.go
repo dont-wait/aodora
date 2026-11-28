@@ -238,7 +238,9 @@ func TestAdminTailoringCustomOrderIntegration(t *testing.T) {
 
 	// Order business flow reuses #20: counter order confirm -> deliver -> paid.
 	do("PATCH", "/api/v1/admin/orders/"+o.ID+"/status", `{"status":"confirmed"}`, admin, 200)
-	do("PATCH", "/api/v1/admin/orders/"+o.ID+"/status", `{"status":"delivered"}`, admin, 200)
+	do("PATCH", "/api/v1/admin/orders/"+o.ID+"/status", `{"status":"delivered"}`, admin, 409)
+	do("POST", "/api/v1/orders/"+o.ID+"/received", "", other, 404)
+	do("POST", "/api/v1/orders/"+o.ID+"/received", "", customer, 200)
 	do("PATCH", "/api/v1/admin/orders/"+o.ID+"/payment", `{"payment_status":"paid"}`, admin, 200)
 
 	// Guest request: COD needs address, adds the configured fee, no customer_id.

@@ -71,12 +71,12 @@ test('product rules: each limit reports the right field path', () => {
   for (const [patch, want] of cases) assert.deepEqual(fieldsOf({ ...base(), ...patch }), want, JSON.stringify(patch).slice(0, 60))
 })
 
-test('gallery rules: max 12, no duplicates, alt required', () => {
+test('gallery rules: max 12, duplicates allowed, alt required', () => {
   const g = (n) => Array.from({ length: n }, (_, i) => img('https://cdn.test/g' + i + '.jpg', 'alt ' + i))
   assert.deepEqual(fieldsOf({ ...base(), gallery: g(12) }), [])
   assert.deepEqual(fieldsOf({ ...base(), gallery: g(13) }), ['gallery'])
-  assert.deepEqual(fieldsOf({ ...base(), gallery: [img('https://cdn.test/g.jpg', 'a'), img('https://cdn.test/g.jpg', 'b')] }), ['gallery[1].src'])
-  assert.deepEqual(fieldsOf({ ...base(), gallery: [img(base().image.src, 'again')] }), ['gallery[0].src'])
+  assert.deepEqual(fieldsOf({ ...base(), gallery: [img('https://cdn.test/g.jpg', 'a'), img('https://cdn.test/g.jpg', 'b')] }), [])
+  assert.deepEqual(fieldsOf({ ...base(), gallery: [img(base().image.src, 'again')] }), [])
   assert.deepEqual(fieldsOf({ ...base(), gallery: [img('https://cdn.test/g.jpg', '')] }), ['gallery[0].alt'])
 })
 

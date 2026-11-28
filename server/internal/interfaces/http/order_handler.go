@@ -22,6 +22,7 @@ type OrderService interface {
 	Quote(ctx context.Context, input domainorder.CheckoutInput) (*apporder.QuoteResult, error)
 	Create(ctx context.Context, principal apporder.Principal, requestID string, input domainorder.CheckoutInput) (domainorder.Order, bool, error)
 	Get(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
+	ConfirmReceived(ctx context.Context, viewer apporder.Viewer, id string) (*domainorder.Order, error)
 	List(ctx context.Context, customerID, status string, page, pageSize int64) ([]domainorder.Order, int64, int64, int64, error)
 	Attempt(ctx context.Context, viewer apporder.Viewer, requestID string) (*domainorder.Order, error)
 }
@@ -43,6 +44,7 @@ func WithOrders(service OrderService, guard *AuthGuard, log zerolog.Logger) Rout
 		mux.HandleFunc("GET /api/v1/orders", h.wrap(h.list))
 		mux.HandleFunc("GET /api/v1/orders/attempts/{request_id}", h.wrap(h.attempt))
 		mux.HandleFunc("GET /api/v1/orders/{id}", h.wrap(h.get))
+		mux.HandleFunc("POST /api/v1/orders/{id}/received", h.wrap(h.received))
 	}
 }
 
@@ -410,6 +412,28 @@ func (h orderHandler) get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": toOrderDTO(*order)})
 }
 
+// received is the buyer confirming receipt (and payment) of their order.
+func (h orderHandler) received(w http.ResponseWriter, r *http.Request) {
+	auth, ok := h.resolveAuth(w, r)
+	if !ok {
+		return
+	}
+	if !auth.IsAuth && auth.GuestHash == "" {
+		respondError(w, http.StatusNotFound, "NOT_FOUND", "", "Không tìm thấy đơn hàng")
+		return
+	}
+	viewer := apporder.Viewer{GuestHash: auth.GuestHash}
+	if auth.IsAuth {
+		viewer.CustomerID = auth.User.ID
+	}
+	order, err := h.service.ConfirmReceived(r.Context(), viewer, r.PathValue("id"))
+	if err != nil {
+		h.respondError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": toOrderDTO(*order)})
+}
+
 func (h orderHandler) attempt(w http.ResponseWriter, r *http.Request) {
 	auth, ok := h.resolveAuth(w, r)
 	if !ok {
@@ -494,6 +518,8 @@ func (h orderHandler) respondError(w http.ResponseWriter, err error) {
 		respondError(w, http.StatusBadRequest, "INVALID_FIELD", ifErr.Field, ifErr.Message)
 	case errors.Is(err, apporder.ErrNotFound):
 		respondError(w, http.StatusNotFound, "NOT_FOUND", "", "Không tìm thấy đơn hàng")
+	case errors.Is(err, apporder.ErrStateConflict):
+		respondError(w, http.StatusConflict, "ORDER_STATE_CONFLICT", "", "Đơn chưa ở bước nhận hàng hoặc trạng thái đã thay đổi. Hãy tải lại trang.")
 	case errors.Is(err, apporder.ErrIdempotencyConflict):
 		respondError(w, http.StatusConflict, "IDEMPOTENCY_CONFLICT", "", "Nội dung yêu cầu khác với lần gửi trước")
 	case errors.Is(err, apporder.ErrOutOfStock):

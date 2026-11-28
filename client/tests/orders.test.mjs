@@ -809,3 +809,11 @@ test('saved attempts remember when their quote stops being accepted', () => {
   assert.equal(attemptQuoteExpired(pending, Date.parse('2026-11-28T02:00:01Z')), true)
   assert.equal(attemptQuoteExpired(makeAttempt(body(), snapshot(), 'a')), false)
 })
+
+test('khách xác nhận đã nhận hàng: POST /received với đúng quyền', async () => {
+  const { orderReceivable } = await import('../src/features/orders/presentation.ts')
+  assert.equal(orderReceivable({ status: 'shipping', payment_method: 'cod' }), true)
+  assert.equal(orderReceivable({ status: 'confirmed', payment_method: 'cash_at_counter' }), true)
+  assert.equal(orderReceivable({ status: 'pending', payment_method: 'cash_at_counter' }), false)
+  assert.equal(orderReceivable({ status: 'delivered', payment_method: 'cod' }), false)
+})

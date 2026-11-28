@@ -140,18 +140,11 @@ func validateProduct(p *ProductInput) error {
 	if err := validateImage(p.Image, "image"); err != nil {
 		return err
 	}
-	seen := map[string]bool{}
-	if p.Image != nil {
-		seen[p.Image.Src] = true
-	}
+	// The same image may appear as main image and in the gallery (common in imports); the storefront shows it once.
 	for i := range p.Gallery {
 		if err := validateImage(&p.Gallery[i], fmt.Sprintf("gallery[%d]", i)); err != nil {
 			return err
 		}
-		if seen[p.Gallery[i].Src] {
-			return Invalid{fmt.Sprintf("gallery[%d].src", i), "Ảnh bị trùng"}
-		}
-		seen[p.Gallery[i].Src] = true
 	}
 	for i, s := range p.Images {
 		img := Image{Src: s, Alt: p.Name}

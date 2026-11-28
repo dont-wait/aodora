@@ -37,3 +37,20 @@ export async function loadOrderDetail(id: string, customerId: string | null): Pr
 
 // Retain the checkout caller contract while sharing all detail reads.
 export const loadCheckoutResult = loadOrderDetail
+
+/** Buyer's "Đã nhận được hàng": marks the order delivered and paid. Throws a user-facing Error. */
+export async function confirmOrderReceived(id: string, customerId: string | null): Promise<void> {
+  let credential: OrderCredential
+  if (customerId) credential = { kind: 'account', customerId }
+  else {
+    const token = readOrderToken(id)
+    if (!token) throw new Error('Trình duyệt này không còn quyền với đơn. Vui lòng liên hệ cửa hàng.')
+    credential = { kind: 'guest', token }
+  }
+  try {
+    await ordersApi.confirmReceived(id, credential)
+  } catch (error) {
+    if (error instanceof OrderApiError && error.status === 409) throw new Error('Đơn chưa ở bước nhận hàng hoặc vừa được cập nhật. Hãy tải lại trang.')
+    throw new Error(error instanceof Error ? error.message : 'Không xác nhận được. Vui lòng thử lại.')
+  }
+}

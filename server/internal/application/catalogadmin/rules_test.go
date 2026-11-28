@@ -68,8 +68,8 @@ func TestProductRulesTable(t *testing.T) {
 		}, ""},
 		{"gallery duplicate", func(p *ProductInput) {
 			p.Gallery = []Image{{Src: "https://cdn.test/g.jpg", Alt: "x"}, {Src: "https://cdn.test/g.jpg", Alt: "y"}}
-		}, "gallery[1].src"},
-		{"gallery repeats main image", func(p *ProductInput) { p.Gallery = []Image{{Src: p.Image.Src, Alt: "x"}} }, "gallery[0].src"},
+		}, ""},
+		{"gallery repeats main image", func(p *ProductInput) { p.Gallery = []Image{{Src: p.Image.Src, Alt: "x"}} }, ""},
 		{"gallery alt empty", func(p *ProductInput) { p.Gallery = []Image{{Src: "https://cdn.test/g.jpg", Alt: ""}} }, "gallery[0].alt"},
 		{"colors 21", func(p *ProductInput) {
 			for i := 0; i < 21; i++ {
@@ -450,5 +450,14 @@ func TestCategoryParentCycleAndDuplicateSlug(t *testing.T) {
 	}
 	if _, err := svc.CreateCategory(context.Background(), CategoryInput{Name: "Mới", Slug: "a"}); fieldOf(err) != "slug" {
 		t.Fatalf("create duplicate slug: %v", err)
+	}
+}
+
+func TestGalleryMayRepeatMainImage(t *testing.T) {
+	p := goodCreate().ProductInput
+	p.Image = &Image{Src: "https://x/a.jpg", Alt: "a"}
+	p.Gallery = []Image{{Src: "https://x/a.jpg", Alt: "a"}, {Src: "https://x/a.jpg", Alt: "a"}}
+	if err := validateProduct(&p); err != nil {
+		t.Fatalf("duplicates must be allowed: %v", err)
 	}
 }

@@ -17,6 +17,9 @@ export function readOrderStatusFilter(params: URLSearchParams): string {
   return values.length === 1 && orderFulfillmentStatuses.includes(values[0]) ? values[0] : ''
 }
 /** Delivered and fully paid: the customer is invited to review each product. */
+/** The buyer closes delivery: COD once it is on the way, counter pickup once the shop confirmed it. */
+export const orderReceivable = (order: Pick<Order, 'status' | 'payment_method'>) =>
+  order.payment_method === 'cash_at_counter' ? order.status === 'confirmed' : order.status === 'shipping'
 export const orderReviewable = (order: Pick<Order, 'status' | 'payment_status'>) => order.status === 'delivered' && order.payment_status === 'paid'
 const paymentLabels: Record<string, string> = { unpaid: 'Chưa thu tiền', paid: 'Đã thu đủ tiền', refunded: 'Đã hoàn tiền' }
 

@@ -887,3 +887,38 @@ func decodeMeasurementProfile(value any) *domainorder.MeasurementProfile {
 	}
 	return p
 }
+
+// ConfirmReceived implements apporder.ReceiptStore.
+func (r *OrderRepository) ConfirmReceived(ctx context.Context, id, from string) (*domainorder.Order, error) {
+	o, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if o == nil {
+		return nil, apporder.ErrNotFound
+	}
+	if o.Status == domainorder.StatusDelivered {
+		return o, nil
+	}
+	if o.Status != from {
+		return nil, apporder.ErrStateConflict
+	}
+	itemID, _ := oid(id)
+	now := time.Now().UTC()
+	filter := bson.M{"_id": itemID, "status": from, "payment_status": o.PaymentStatus}
+	set := bson.M{"status": domainorder.StatusDelivered, "delivered_at": now, "updated_at": now}
+	if o.PaymentStatus == domainorder.PaymentUnpaid {
+		set["payment_status"] = domainorder.PaymentPaid
+		set["paid_at"] = now
+	}
+	var doc bson.M
+	err = r.orders.FindOneAndUpdate(ctx, filter, bson.M{"$set": set}, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&doc)
+	if errors.Is(err, driver.ErrNoDocuments) {
+		return nil, apporder.ErrStateConflict
+	}
+	if err != nil {
+		return nil, err
+	}
+	updated, err := decodeOrder(doc)
+	return &updated, err
+}

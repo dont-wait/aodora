@@ -266,9 +266,9 @@ func TestAdminOrderDTOAndAllowedActions(t *testing.T) {
 	}{
 		{"pending", "cod", "unpaid", "", []string{"confirm", "cancel", "mark_paid"}},
 		{"confirmed", "cod", "unpaid", "", []string{"ship", "cancel", "mark_paid"}},
-		{"confirmed", "cash_at_counter", "unpaid", "", []string{"deliver", "cancel", "mark_paid"}},
+		{"confirmed", "cash_at_counter", "unpaid", "", []string{"cancel", "mark_paid"}},
 		{"confirmed", "bank_transfer", "paid", "", []string{"ship", "cancel", "mark_refunded"}},
-		{"shipping", "cod", "paid", "", []string{"deliver", "cancel", "mark_refunded"}},
+		{"shipping", "cod", "paid", "", []string{"cancel", "mark_refunded"}},
 		{"delivered", "cod", "unpaid", "", []string{"mark_paid"}},
 		{"cancelled", "cod", "paid", "awaiting_return", []string{"restock", "mark_refunded"}},
 		{"cancelled", "cod", "refunded", "restocked", []string{}},

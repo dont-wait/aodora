@@ -86,7 +86,7 @@ func toAdminOrderDTO(o domain.Order) adminOrderDTO {
 		items[i] = adminOrderItemDTO{orderItemResponseDTO: base.Items[i], FulfillmentMode: it.FulfillmentMode, Measurements: toMeasurementsDTO(it.Measurements)}
 	}
 	actions := make([]string, 0, 5)
-	for _, next := range []struct{ target, action string }{{domain.StatusConfirmed, "confirm"}, {domain.StatusShipping, "ship"}, {domain.StatusDelivered, "deliver"}} {
+	for _, next := range []struct{ target, action string }{{domain.StatusConfirmed, "confirm"}, {domain.StatusShipping, "ship"}} {
 		if o.Status != next.target && domain.NextStatusAllowed(o.PaymentMethod, o.Status, next.target) {
 			actions = append(actions, next.action)
 		}

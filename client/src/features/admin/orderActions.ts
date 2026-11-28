@@ -1,11 +1,10 @@
 import { adminOrders, AdminOrderApiError, type AdminOrder, type AdminOrderFilter, type AdminOrderPage } from './orders.ts'
 import { formatOrderMoney } from '../orders/money.ts'
 
-export type AdminOrderAction = 'confirm' | 'ship' | 'deliver' | 'cancel' | 'restock' | 'mark_paid' | 'mark_refunded'
+export type AdminOrderAction = 'confirm' | 'ship' | 'cancel' | 'restock' | 'mark_paid' | 'mark_refunded'
 const actions: { id: AdminOrderAction; group: 'delivery' | 'payment'; label: string }[] = [
   { id: 'confirm', group: 'delivery', label: 'Xác nhận đơn' },
   { id: 'ship', group: 'delivery', label: 'Bắt đầu giao áo' },
-  { id: 'deliver', group: 'delivery', label: 'Xác nhận khách đã nhận áo' },
   { id: 'cancel', group: 'delivery', label: 'Hủy đơn' },
   { id: 'restock', group: 'delivery', label: 'Xác nhận hàng đã về kho' },
   { id: 'mark_paid', group: 'payment', label: 'Ghi nhận đã thu đủ tiền' },
@@ -18,14 +17,16 @@ export function adminOrderActionGroups(order: Pick<AdminOrder, 'allowed_actions'
     payment: actions.filter((action) => action.group === 'payment' && allowed.has(action.id)),
   }
 }
+/** Delivery is closed by the buyer ("Đã nhận được hàng"), which also records payment. */
+export function awaitingCustomerReceipt(order: Pick<AdminOrder, 'status' | 'payment_method'>): boolean {
+  return order.payment_method === 'cash_at_counter' ? order.status === 'confirmed' : order.status === 'shipping'
+}
 export function adminOrderConfirmation(order: AdminOrder, action: AdminOrderAction): string {
   switch (action) {
     case 'confirm':
       return 'Xác nhận đơn để chuẩn bị giao hoặc nhận tại quầy. Thao tác không ghi nhận thu tiền.'
     case 'ship':
       return 'Xác nhận bắt đầu giao áo. Trạng thái thanh toán giữ nguyên.'
-    case 'deliver':
-      return 'Xác nhận khách đã thực tế nhận áo. Thao tác không tự ghi nhận đã thu tiền.'
     case 'cancel':
       return `${order.status === 'shipping' ? 'Hủy đơn đang giao: chưa cộng tồn vì hàng chưa về kho. Chỉ nhập lại khi xác nhận hàng thực tế đã về.' : 'Hủy đơn: hàng đủ điều kiện sẽ được hoàn tồn; hàng may đo hoặc đơn cũ không áp dụng hoàn tồn sẽ không được cộng tồn.'} Hủy không đổi trạng thái thanh toán và không tự hoàn tiền.`
     case 'restock':
@@ -79,9 +80,6 @@ export async function performAdminOrderAction(order: AdminOrder, action: AdminOr
         break
       case 'ship':
         updated = await adminOrders.setStatus(order.id, 'shipping')
-        break
-      case 'deliver':
-        updated = await adminOrders.setStatus(order.id, 'delivered')
         break
       case 'cancel':
         updated = await adminOrders.cancel(order.id)
