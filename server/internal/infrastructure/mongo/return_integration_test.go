@@ -41,15 +41,23 @@ func TestReturnRequestLifecycle(t *testing.T) {
 	if _, err := admin.SetStatus(ctx, order.ID, "confirmed"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := admin.SetPayment(ctx, order.ID, domainorder.PaymentPaid); err != nil {
-		t.Fatal(err)
+	if _, err := admin.SetStatus(ctx, order.ID, domainorder.StatusDelivered); !errors.Is(err, apporder.ErrStateConflict) {
+		t.Fatalf("the shop must not confirm receipt for the buyer: %v", err)
 	}
-	delivered, err := admin.SetStatus(ctx, order.ID, domainorder.StatusDelivered)
+	if _, err := svc.ConfirmReceived(ctx, apporder.Viewer{CustomerID: bson.NewObjectID().Hex()}, order.ID); !errors.Is(err, apporder.ErrNotFound) {
+		t.Fatalf("another customer confirmed: %v", err)
+	}
+	// The buyer confirms receipt at the counter: delivered and paid in one step.
+	delivered, err := svc.ConfirmReceived(ctx, apporder.Viewer{CustomerID: custID}, order.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if delivered.DeliveredAt == nil || time.Since(*delivered.DeliveredAt) > time.Minute {
-		t.Fatalf("delivered_at not recorded: %v", delivered.DeliveredAt)
+	if delivered.Status != domainorder.StatusDelivered || delivered.PaymentStatus != domainorder.PaymentPaid || delivered.PaidAt == nil ||
+		delivered.DeliveredAt == nil || time.Since(*delivered.DeliveredAt) > time.Minute {
+		t.Fatalf("receipt not recorded: %+v", delivered)
+	}
+	if again, err := svc.ConfirmReceived(ctx, apporder.Viewer{CustomerID: custID}, order.ID); err != nil || !again.DeliveredAt.Equal(*delivered.DeliveredAt) {
+		t.Fatalf("second confirm must be a no-op: %v", err)
 	}
 
 	prefix := "http://cdn/uploads/returns/"

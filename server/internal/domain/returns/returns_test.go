@@ -35,3 +35,12 @@ func TestDeadlineIsThreeDays(t *testing.T) {
 		t.Fatalf("deadline %s", got)
 	}
 }
+
+func TestAdminNextIsNeverNil(t *testing.T) {
+	// JSON must say [] (not null) for finished requests; the admin page reads .length.
+	for _, s := range []string{StatusRefunded, StatusRejected, StatusCancelled} {
+		if next := AdminNext(s); next == nil || len(next) != 0 {
+			t.Fatalf("%s: %#v", s, next)
+		}
+	}
+}

@@ -7,8 +7,7 @@ import {
   inventoryRestockLabel,
   loadAdminOrder,
   loadAdminOrders,
-  performAdminOrderAction,
-} from '../src/features/admin/orderActions.ts'
+  performAdminOrderAction, awaitingCustomerReceipt } from '../src/features/admin/orderActions.ts'
 import { formatOrderMoney } from '../src/features/orders/money.ts'
 import { orderLoginPath } from '../src/features/orders/presentation.ts'
 
@@ -26,7 +25,7 @@ const order = () => ({
   created_at: '2026-11-17T00:00:00Z',
   updated_at: '2026-11-17T01:00:00Z',
   is_guest: true,
-  allowed_actions: ['confirm', 'ship', 'deliver', 'cancel', 'restock', 'mark_paid', 'mark_refunded'],
+  allowed_actions: ['confirm', 'ship', 'cancel', 'restock', 'mark_paid', 'mark_refunded'],
 })
 const filter = () => ({ status: '', payment_status: '', page: 1, page_size: 20 })
 const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status })
@@ -43,7 +42,6 @@ async function withFetch(fn, run) {
 const actionCases = [
   ['confirm', 'PATCH', '/status', { status: 'confirmed' }],
   ['ship', 'PATCH', '/status', { status: 'shipping' }],
-  ['deliver', 'PATCH', '/status', { status: 'delivered' }],
   ['cancel', 'POST', '/cancel', undefined],
   ['restock', 'POST', '/restock', undefined],
   ['mark_paid', 'PATCH', '/payment', { payment_status: 'paid' }],
@@ -142,10 +140,10 @@ test('tiền admin giữ nguyên JSON decimal lớn qua parseExactJSON, cả uni
 })
 
 test('nút chỉ sinh từ allowed_actions; confirmed tại quầy không tự sinh ship/mark_paid', () => {
-  const groups = adminOrderActionGroups({ ...order(), allowed_actions: ['deliver', 'cancel'] })
+  const groups = adminOrderActionGroups({ ...order(), allowed_actions: ['ship', 'cancel'] })
   assert.deepEqual(
     groups.delivery.map((action) => action.id),
-    ['deliver', 'cancel'],
+    ['ship', 'cancel'],
   )
   assert.deepEqual(groups.payment, [])
   const empty = adminOrderActionGroups({ ...order(), status: 'pending', payment_status: 'unpaid', allowed_actions: [] })
@@ -161,13 +159,21 @@ test('nhóm giao nhận và nhóm tiền tách riêng, action lạ không sinh n
   const groups = adminOrderActionGroups({ ...order(), allowed_actions: [...order().allowed_actions, 'unknown-action'] })
   assert.deepEqual(
     groups.delivery.map((action) => action.id),
-    ['confirm', 'ship', 'deliver', 'cancel', 'restock'],
+    ['confirm', 'ship', 'cancel', 'restock'],
   )
   assert.deepEqual(
     groups.payment.map((action) => action.id),
     ['mark_paid', 'mark_refunded'],
   )
   assert.ok(groups.payment[1].label.includes('hoàn tiền thủ công'))
+})
+
+test('admin không còn xác nhận giao: chờ khách bấm đã nhận hàng', () => {
+  assert.equal(adminOrderActionGroups({ ...order(), allowed_actions: ['deliver', 'cancel'] }).delivery.map((a) => a.id).join(), 'cancel')
+  assert.equal(awaitingCustomerReceipt({ status: 'shipping', payment_method: 'cod' }), true)
+  assert.equal(awaitingCustomerReceipt({ status: 'confirmed', payment_method: 'cod' }), false)
+  assert.equal(awaitingCustomerReceipt({ status: 'confirmed', payment_method: 'cash_at_counter' }), true)
+  assert.equal(awaitingCustomerReceipt({ status: 'delivered', payment_method: 'cash_at_counter' }), false)
 })
 
 test('xác nhận nêu hệ quả hủy shipping/tiền độc lập và hoàn tiền chỉ ghi nhận thủ công', () => {

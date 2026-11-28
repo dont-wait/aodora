@@ -183,10 +183,13 @@ func TestAdminOrderHTTPEndToEndIntegration(t *testing.T) {
 		t.Fatal("confirm changed payment")
 	}
 	assertAdminHTTP(t, request("PATCH", "/api/v1/admin/orders/"+counterID+"/status", `{"status":"shipping"}`, adminCookie, nil, 409), 409, "ORDER_STATE_CONFLICT", "")
-	delivered := mutation(counterID, "status", `{"status":"delivered"}`)
-	if delivered.PaymentStatus != "unpaid" {
-		t.Fatal("delivery changed payment")
+	// The shop cannot confirm receipt; the buyer (here a guest) does, which also records payment.
+	assertAdminHTTP(t, request("PATCH", "/api/v1/admin/orders/"+counterID+"/status", `{"status":"delivered"}`, adminCookie, nil, 409), 409, "ORDER_STATE_CONFLICT", "")
+	received := request("POST", "/api/v1/orders/"+counterID+"/received", "", nil, guestHeader, 200)
+	if !strings.Contains(received.Body.String(), `"status":"delivered"`) || !strings.Contains(received.Body.String(), `"payment_status":"paid"`) {
+		t.Fatalf("guest receipt: %s", received.Body.String())
 	}
+	request("POST", "/api/v1/orders/"+counterID+"/received", "", nil, nil, 404)
 	paid := mutation(counterID, "payment", `{"payment_status":"paid"}`)
 	if paid.Status != "delivered" || paid.PaidAt == nil {
 		t.Fatal("payment changed delivery")

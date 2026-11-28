@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import {
   adminOrderActionGroups,
   adminOrderConfirmation,
+  awaitingCustomerReceipt,
   inventoryRestockLabel,
   loadAdminOrder,
   performAdminOrderAction,
@@ -100,7 +101,10 @@ export default function AdminOrderDetailPage() {
                   {action.label}
                 </button>
               ))}
-              {!groups.delivery.length && <p className="text-on-surface-variant">Hiện không có thao tác giao nhận được phép.</p>}
+              {awaitingCustomerReceipt(order) && (
+                <p className="text-sm text-on-surface-variant">Chờ khách bấm “Đã nhận được hàng” trên trang đơn; khi đó đơn chuyển sang Đã giao và ghi nhận đã thu tiền.</p>
+              )}
+              {!groups.delivery.length && !awaitingCustomerReceipt(order) && <p className="text-on-surface-variant">Hiện không có thao tác giao nhận được phép.</p>}
             </div>
           </section>
           <section className="bg-surface p-5 sm:p-6 space-y-4">

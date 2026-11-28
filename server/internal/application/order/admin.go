@@ -153,7 +153,8 @@ func (s *AdminService) mutate(ctx context.Context, id string, action AdminAction
 }
 
 func (s *AdminService) SetStatus(ctx context.Context, id, target string) (*domain.Order, error) {
-	if target == domain.StatusPending || target == domain.StatusCancelled {
+	// Delivery is confirmed by the buyer (Service.ConfirmReceived), never by the shop.
+	if target == domain.StatusPending || target == domain.StatusCancelled || target == domain.StatusDelivered {
 		return nil, ErrStateConflict
 	}
 	if target != domain.StatusConfirmed && target != domain.StatusShipping && target != domain.StatusDelivered {

@@ -146,13 +146,21 @@ func TestAdminOrderLifecycle(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			delivered := f.status(t, "delivered")
-			repeat := f.status(t, "delivered")
-			if !delivered.UpdatedAt.Equal(repeat.UpdatedAt) {
-				t.Fatal("retry wrote status")
+			// Only the buyer confirms receipt; that also records the payment.
+			if _, err := f.admin.SetStatus(ctx, f.order.ID, "delivered"); !errors.Is(err, app.ErrStateConflict) {
+				t.Fatalf("admin delivered: %v", err)
 			}
-			if f.read(t).PaymentStatus != "unpaid" {
-				t.Fatal("delivery changed payment")
+			buyer := app.Viewer{CustomerID: f.order.CustomerID}
+			delivered, err := f.customer.ConfirmReceived(ctx, buyer, f.order.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			repeat, err := f.customer.ConfirmReceived(ctx, buyer, f.order.ID)
+			if err != nil || !delivered.UpdatedAt.Equal(repeat.UpdatedAt) {
+				t.Fatalf("retry wrote status: %v", err)
+			}
+			if got := f.read(t); got.Status != "delivered" || got.PaymentStatus != "paid" || got.PaidAt == nil || got.DeliveredAt == nil {
+				t.Fatalf("receipt not recorded: %+v", got)
 			}
 			if _, err := f.admin.Cancel(ctx, f.order.ID); !errors.Is(err, app.ErrStateConflict) {
 				t.Fatal(err)

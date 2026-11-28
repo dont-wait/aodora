@@ -82,6 +82,8 @@ function orderData(raw: unknown): Order {
 export const ordersApi = {
   quote: async (body: CheckoutBody) => quoteData((await request('/quote', 'POST', JSON.stringify(body))).data),
   create: async (attempt: CheckoutAttempt) => orderData((await request('', 'POST', attempt.body, attempt.credential, attempt.request_id)).data),
+  confirmReceived: async (id: string, credential: OrderCredential) =>
+    orderData((await request(`/${encodeURIComponent(id)}/received`, 'POST', undefined, credential)).data),
   get: async (id: string, credential: OrderCredential) => orderData((await request(`/${encodeURIComponent(id)}`, 'GET', undefined, credential)).data),
   attempt: async (attempt: CheckoutAttempt) =>
     orderData((await request(`/attempts/${encodeURIComponent(attempt.request_id)}`, 'GET', undefined, attempt.credential)).data),

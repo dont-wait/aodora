@@ -33,3 +33,12 @@ func NextPaymentAllowed(from, to string) bool {
 	}
 	return from == to || (from == PaymentUnpaid && to == PaymentPaid) || (from == PaymentPaid && to == PaymentRefunded)
 }
+
+// CustomerCanConfirmReceived: the buyer confirms receipt (and payment) once the
+// order is with them: COD while shipping, counter pickup once confirmed.
+func CustomerCanConfirmReceived(paymentMethod, status string) bool {
+	if paymentMethod == PaymentMethodCashAtCounter {
+		return status == StatusConfirmed
+	}
+	return status == StatusShipping
+}

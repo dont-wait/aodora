@@ -75,12 +75,8 @@ export function validateProduct(p: ProductFormValues, ctx: { skuCount: number; i
 
   checkImage(e, 'image', p.image)
   if (p.gallery.length > LIMITS.galleryMax) e.gallery = 'Tối đa ' + LIMITS.galleryMax + ' ảnh phụ'
-  const seen = new Set<string>(p.image?.src ? [p.image.src] : [])
-  p.gallery.forEach((g, i) => {
-    checkImage(e, 'gallery[' + i + ']', g)
-    if (g.src && seen.has(g.src)) e['gallery[' + i + '].src'] = 'Ảnh bị trùng'
-    seen.add(g.src)
-  })
+  // Duplicates of the main image are allowed; the storefront gallery shows each image once.
+  p.gallery.forEach((g, i) => checkImage(e, 'gallery[' + i + ']', g))
 
   if (p.colors.length > LIMITS.colorsMax) e.colors = 'Tối đa ' + LIMITS.colorsMax + ' màu'
   const names = new Set<string>()

@@ -31,7 +31,7 @@ var adminNext = map[string][]string{
 }
 
 // AdminNext lists the statuses an admin may move a request to.
-func AdminNext(from string) []string { return append([]string(nil), adminNext[from]...) }
+func AdminNext(from string) []string { return append([]string{}, adminNext[from]...) }
 
 // AdminCan reports whether an admin may move a request from one status to another.
 func AdminCan(from, to string) bool { return slices.Contains(adminNext[from], to) }

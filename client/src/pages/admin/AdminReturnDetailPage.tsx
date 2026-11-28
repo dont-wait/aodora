@@ -37,6 +37,10 @@ export default function AdminReturnDetailPage() {
   if (state.kind === 'loading') return <CardSkeleton label="Đang tải yêu cầu hoàn hàng" />
   if (state.kind === 'error') return <Alert action={<Button variant="secondary" onClick={load}>Thử lại</Button>}>{state.message}</Alert>
   const r = state.data
+  const allowedNext = r.allowed_next ?? []
+  const evidence = r.evidence ?? []
+  const history = r.history ?? []
+  const items = r.items ?? []
   const deadline = new Date(Date.parse(r.delivered_at) + 72 * 3600_000).toISOString()
   const onTime = Date.parse(r.created_at) <= Date.parse(deadline)
 
@@ -67,7 +71,7 @@ export default function AdminReturnDetailPage() {
       <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-5 min-w-0">
           <Card title="Minh chứng của khách" description="Video phát ngay tại đây; bấm ảnh để mở cỡ lớn.">
-            <EvidenceStrip evidence={r.evidence} large />
+            <EvidenceStrip evidence={evidence} large />
           </Card>
           <Card title="Nội dung yêu cầu">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -78,7 +82,7 @@ export default function AdminReturnDetailPage() {
               <dd>{formatOrderDate(r.created_at)} {onTime ? <StatusBadge tone="success">Trong hạn 3 ngày</StatusBadge> : <StatusBadge tone="danger">Quá hạn</StatusBadge>}</dd>
             </dl>
             <ul className="divide-y divide-outline-variant/40 text-sm mt-3">
-              {r.items.map((it) => (
+              {items.map((it) => (
                 <li key={it.sku} className="flex justify-between gap-3 py-2">
                   <span>{it.product_name} <span className="text-on-surface-variant">{[it.size, it.color, it.sku].filter(Boolean).join(' · ')}</span> × {it.quantity}</span>
                   <span className="tabular-nums">{formatMoney(it.unit_price * it.quantity)} ₫</span>
@@ -93,10 +97,10 @@ export default function AdminReturnDetailPage() {
             <StatusBadge tone={returnStatusTone[r.status]}>{returnStatusLabels[r.status]}</StatusBadge>
             {r.status === 'requested' && timeLeft(deadline) && <p className="text-xs text-on-surface-variant mt-2">Hạn khách gửi: {timeLeft(deadline)}</p>}
             {r.restocked && <p className="text-sm mt-2">Đã nhập lại kho.</p>}
-            {r.allowed_next.length > 0 ? (
+            {allowedNext.length > 0 ? (
               <div className="space-y-3 mt-4">
                 <div className="flex flex-wrap gap-2">
-                  {r.allowed_next.map((to) => (
+                  {allowedNext.map((to) => (
                     <Button key={to} variant={to === 'rejected' ? 'danger' : action === to ? 'primary' : 'secondary'} onClick={() => { setAction(to); setError('') }}>
                       {adminActionLabels[to]}
                     </Button>
@@ -109,7 +113,7 @@ export default function AdminReturnDetailPage() {
                     {action === 'collected' && (
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} />
-                        Nhập lại kho {r.items.reduce((s, it) => s + it.quantity, 0)} áo (bỏ chọn nếu áo hỏng, không bán lại được)
+                        Nhập lại kho {items.reduce((s, it) => s + it.quantity, 0)} áo (bỏ chọn nếu áo hỏng, không bán lại được)
                       </label>
                     )}
                     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -126,7 +130,7 @@ export default function AdminReturnDetailPage() {
           </Card>
           <Card title="Lịch sử">
             <ol className="space-y-3 text-sm">
-              {r.history.map((h, i) => (
+              {history.map((h, i) => (
                 <li key={i} className="border-l-2 border-primary/40 pl-3">
                   <p className="font-semibold">{returnStatusLabels[h.status]}</p>
                   <p className="text-xs text-on-surface-variant">{formatOrderDate(h.at)} · {h.by === 'admin' ? 'Cửa hàng' : 'Khách'}</p>
