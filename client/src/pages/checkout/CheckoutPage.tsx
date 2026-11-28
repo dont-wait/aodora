@@ -23,6 +23,7 @@ import {
 import { completeCheckout } from '@/features/orders/completion'
 import { formatOrderMoney } from '@/features/orders/money'
 import type { CheckoutAttempt, CheckoutBody, Order, PaymentMethod, Quote, ShippingAddress } from '@/features/orders/types'
+import { SkeletonBlock, SkeletonStatus } from '@/components/ui/Skeleton'
 
 const inputClass = 'w-full border border-outline-variant bg-surface-container-lowest px-4 py-3 focus:outline-primary'
 const buttonClass = 'bg-primary px-6 py-3 text-on-primary disabled:opacity-50 disabled:cursor-not-allowed'
@@ -319,7 +320,21 @@ export default function CheckoutPage() {
         </p>
       )}
       {authLoading ? (
-        <p role="status">Đang kiểm tra đăng nhập...</p>
+        <SkeletonStatus label="Đang kiểm tra đăng nhập" className="grid lg:grid-cols-[1.1fr_1fr] gap-8 items-start">
+          <div className="space-y-4">
+            <SkeletonBlock className="h-16 w-full" />
+            <SkeletonBlock className="h-16 w-full" />
+            <SkeletonBlock className="h-12 w-full" />
+            <SkeletonBlock className="h-12 w-full" />
+            <SkeletonBlock className="h-24 w-full" />
+          </div>
+          <div className="bg-surface-container-low p-6 sm:p-8 space-y-4">
+            <SkeletonBlock className="h-7 w-1/2" />
+            <SkeletonBlock className="h-4 w-full" />
+            <SkeletonBlock className="h-4 w-3/4" />
+            <SkeletonBlock className="h-12 w-full" />
+          </div>
+        </SkeletonStatus>
       ) : attempt ? (
         <section className="bg-surface-container-low p-6 space-y-5">
           <h2 className="font-headline-md text-2xl text-primary">{notPlaced ? 'Đơn trước chưa gửi thành công' : 'Đơn đang gửi, chờ kết quả'}</h2>
@@ -493,7 +508,7 @@ export default function CheckoutPage() {
                   }}
                 />
               </label>
-              {cartLoading && <p role="status">Đang kiểm tra giỏ hàng...</p>}
+              {cartLoading && <SkeletonStatus label="Đang kiểm tra giỏ hàng" className="space-y-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-4 w-1/2" /></SkeletonStatus>}
               {cartError && (
                 <div role="alert" className="space-y-2 text-error">
                   <p>{cartError}</p>

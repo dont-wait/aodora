@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { orderLoginPath } from './presentation'
+import { PageSkeleton } from '@/components/ui/Skeleton'
 
 export default function OrderReadNotice({
   kind,
@@ -14,12 +15,7 @@ export default function OrderReadNotice({
   backTo?: string
   backLabel?: string
 }) {
-  if (kind === 'loading')
-    return (
-      <main className="max-w-3xl mx-auto px-5 py-12" role="status">
-        Đang tải và kiểm tra quyền xem đơn...
-      </main>
-    )
+  if (kind === 'loading') return <PageSkeleton label="Đang tải đơn hàng" blocks={2} narrow />
   return (
     <main className="max-w-3xl mx-auto px-5 py-12 space-y-5">
       <h1 className="font-headline-lg text-primary text-3xl">

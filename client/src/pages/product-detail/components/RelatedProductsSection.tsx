@@ -4,6 +4,7 @@ import { getCategories, listProducts } from '@/features/catalog/api'
 import { useCatalogRequest } from '@/features/catalog/useCatalogRequest'
 import type { CatalogProduct } from '@/features/catalog/types'
 import ProductCard from '@/pages/collection/components/ProductCard'
+import { CardGridSkeleton, SkeletonBlock } from '@/components/ui/Skeleton'
 
 const SHOWN = 4
 
@@ -18,7 +19,16 @@ export default function RelatedProductsSection({ product }: { product: CatalogPr
   const category = categories.data?.find((item) => item.id === product.category_id)
   const items = (related.data?.data || []).filter((item) => item.id !== product.id).slice(0, SHOWN)
   // A failed or empty suggestion list never blocks the product page.
-  if (related.loading || related.error || !items.length) return null
+  if (related.loading)
+    return (
+      <section className="w-full bg-surface py-16">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-margin-desktop space-y-8">
+          <SkeletonBlock className="h-10 w-72" />
+          <CardGridSkeleton count={SHOWN} label="Đang tải mẫu áo cùng loại" />
+        </div>
+      </section>
+    )
+  if (related.error || !items.length) return null
   return (
     <section className="w-full bg-surface py-16" aria-labelledby="goi-y-cung-loai">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-margin-desktop">

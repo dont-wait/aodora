@@ -8,6 +8,7 @@ import { formatReviewImages, parseReviewImages, reviewApi, reviewErrorMessage, t
 import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { ROUTES } from '@/data/site'
+import { ReviewCardsSkeleton } from '@/components/ui/Skeleton'
 
 const input = 'w-full bg-surface-container px-4 py-3 border border-outline-variant/60 focus:border-primary focus:outline-none'
 type ReviewDraft = { order_id: string; rating: number; content: string }
@@ -94,7 +95,7 @@ export default function ReviewsSection({ product }: { product: CatalogProduct })
         <div className="flex items-center gap-3 bg-surface-container-low px-5 py-3"><StarRating value={Math.round(average)} /><span className="text-sm text-on-surface-variant">{average.toFixed(1)}/5 · {count} đánh giá</span></div>
       </div>
       {error && <div className="border border-red-200 bg-red-50 p-4 flex items-center justify-between gap-4"><p role="alert" className="text-red-700">{error}</p><button type="button" className="underline text-primary" onClick={() => void loadReviews(page.page)}>Thử lại</button></div>}
-      {!error && loading && <p role="status" className="py-10 text-on-surface-variant">Đang tải đánh giá...</p>}
+      {!error && loading && <ReviewCardsSkeleton />}
       {!error && !loading && <>
         {page.items.length ? <div className="grid grid-cols-1 md:grid-cols-3 gap-5">{page.items.map((review) => <article key={review.id} className="bg-surface p-5 border border-outline-variant/50"><div className="flex items-center justify-between gap-3"><StarRating value={review.rating} /><time className="text-xs text-on-surface-variant" dateTime={review.created_at}>{formatDate(review.created_at)}</time></div><p className="font-semibold text-primary mt-4">{review.display_name}</p>{review.verified_purchase && <span className="inline-flex items-center gap-1 text-xs text-secondary mt-1"><span aria-hidden="true">✓</span> Đã mua hàng</span>}{review.content && <p className="text-sm leading-6 text-on-surface-variant mt-3 whitespace-pre-line">{review.content}</p>}{review.images.length > 0 && <div className="grid grid-cols-3 gap-2 mt-4">{review.images.map((image, index) => <CatalogImage key={`${image.src}-${index}`} src={image.src} alt={image.alt} className="aspect-square" />)}</div>}</article>)}</div> : <p className="py-8 text-on-surface-variant">Chưa có nhận xét cho mẫu áo này.</p>}
         {page.total > page.page_size && <div className="flex items-center justify-center gap-4 mt-8"><button type="button" disabled={page.page <= 1} onClick={() => void loadReviews(page.page - 1)} className="border border-outline-variant px-4 py-2 disabled:opacity-40">Trước</button><span className="text-sm text-on-surface-variant">Trang {page.page}</span><button type="button" disabled={page.page * page.page_size >= page.total} onClick={() => void loadReviews(page.page + 1)} className="border border-outline-variant px-4 py-2 disabled:opacity-40">Sau</button></div>}
