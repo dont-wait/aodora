@@ -66,6 +66,8 @@ export default function CheckoutPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(initial.error)
   const [notice, setNotice] = useState('')
+  // Lookup ran and the server has no order for the saved request: nothing was placed.
+  const [notPlaced, setNotPlaced] = useState(false)
   const { user, loading: authLoading } = useAuth()
   const { cart, loading: cartLoading, error: cartError, refresh, consumePurchased, selectedItems: items, selectedSubtotal } = useCart()
   const customerId = user?.id ?? null
@@ -103,7 +105,10 @@ export default function CheckoutPage() {
     lookupAttempt(attempt, customerId)
       .then(async (order) => {
         if (order) await finish(order, attempt)
-        else setNotice('Chưa tìm thấy kết quả. Bạn có thể gửi lại đúng đơn đã lưu bên dưới; hệ thống giữ nguyên mã yêu cầu và nội dung.')
+        else {
+          setNotice('')
+          setNotPlaced(true)
+        }
       })
       .catch((error: unknown) => setError(messageFor(error)))
       .finally(() => {
@@ -291,7 +296,9 @@ export default function CheckoutPage() {
       <header>
         <p className="text-secondary text-sm tracking-widest uppercase">Aodora · Đặt mua áo</p>
         <h1 className="font-headline-lg text-4xl text-primary mt-2">Thông tin nhận áo</h1>
-        <p className="mt-3 text-on-surface-variant">Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.</p>
+        <p className="mt-3 text-on-surface-variant">
+          {user ? <>Đặt hàng với tài khoản <strong>{user.full_name || user.email}</strong>; địa chỉ đã lưu được điền sẵn.</> : 'Đặt hàng bằng thông tin liên hệ của bạn, không cần tạo tài khoản.'}
+        </p>
       </header>
       {error && (
         <p role="alert" className="border border-error/30 bg-error-container p-4 text-on-error-container">
@@ -307,8 +314,12 @@ export default function CheckoutPage() {
         <p role="status">Đang kiểm tra đăng nhập...</p>
       ) : attempt ? (
         <section className="bg-surface-container-low p-6 space-y-5">
-          <h2 className="font-headline-md text-2xl text-primary">Đơn đang gửi, chờ kết quả</h2>
-          <p>Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.</p>
+          <h2 className="font-headline-md text-2xl text-primary">{notPlaced ? 'Đơn trước chưa gửi thành công' : 'Đơn đang gửi, chờ kết quả'}</h2>
+          <p>
+            {notPlaced
+              ? 'Lần đặt hàng trước bị gián đoạn nên cửa hàng chưa nhận được đơn này (chưa có đơn nào được tạo, bạn chưa bị tính tiền). Bạn có thể gửi lại đúng đơn bên dưới, hoặc bỏ đơn này để đặt lại từ giỏ hàng.'
+              : 'Nội dung đã gửi được giữ nguyên để tránh tạo hai đơn. Bạn có thể xem hoặc thêm áo trong giỏ; đơn đang gửi này vẫn chỉ gồm các dòng bên dưới.'}
+          </p>
           <ul className="space-y-2">
             {attempt.snapshot.map((line) => (
               <li key={`${line.product_id}:${line.sku}`}>
@@ -327,8 +338,24 @@ export default function CheckoutPage() {
             </p>
           )}
           <button type="button" className={buttonClass} disabled={busy || !identityMatches || !!initial.error} onClick={() => void sendOrder()}>
-            {busy ? 'Đang tra cứu / gửi đơn...' : 'Tra cứu và gửi lại đơn đã lưu'}
+            {busy ? 'Đang tra cứu / gửi đơn...' : notPlaced ? 'Gửi lại đơn này' : 'Tra cứu và gửi lại đơn đã lưu'}
           </button>
+          {notPlaced && (
+            <button
+              type="button"
+              className="ml-3 border border-outline-variant px-6 py-3 text-on-surface disabled:opacity-50"
+              disabled={busy}
+              onClick={() => {
+                clearAttempt(attempt.request_id)
+                setAttempt(null)
+                setNotPlaced(false)
+                setNotice('')
+                setError('')
+              }}
+            >
+              Bỏ đơn này, đặt đơn mới
+            </button>
+          )}
           <Link to="/gio-hang" className="block underline text-primary">
             Xem giỏ hàng
           </Link>
